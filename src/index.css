@@ -1,0 +1,28 @@
+@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800;900&family=Montserrat:wght@400;500;600;700;800&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Poppins", "Montserrat", sans-serif;
+  
+  --color-primary: #008361;
+  --color-primary-hover: #006b4f;
+  --color-navy: #1f1346;
+
+  --color-green: #008361;
+  --color-green-light: #def4f0;
+  --color-yellow: #C9CA48;
+  --color-yellow-light: #fafad8;
+  --color-bg: #F8FAFC;
+  --color-surface: #FFFFFF;
+  --color-border: #E2E8F0;
+  --color-border-strong: #CBD5E1;
+  --color-text: #1d1e20;
+  --color-text-muted: #64748B;
+  --color-text-dim: #94A3B8;
+}
+
+body {
+  font-family: var(--font-sans);
+  background-color: var(--color-bg);
+  color: var(--color-text);
+}

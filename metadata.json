@@ -1,0 +1,6 @@
+{
+  "name": "LetzRyd Walk-In Registry",
+  "description": "Digital walk-in check-in and on-ground onboarding manager for LetzRyd operations.",
+  "requestFramePermissions": ["camera"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
