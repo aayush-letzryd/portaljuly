@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { 
   Calendar, MapPin, User, Phone, FileText, CheckCircle, 
   Clock, ArrowLeft, Download, Search, Trash2, Edit, Camera, 
-  Upload, X, RefreshCw, AlertTriangle, ShieldCheck, Filter, Plus, ChevronLeft, ChevronRight, Eye, EyeOff
+  Upload, X, RefreshCw, AlertTriangle, ShieldCheck, Filter, Plus, ChevronLeft, ChevronRight, Eye, EyeOff, Database
 } from "lucide-react";
 import { WalkInRecord, User as UserSession, CITIES, OnboardingOutcome } from "../types";
 import CameraCapture from "./CameraCapture";
@@ -35,17 +35,28 @@ const maskSensitiveID = (idString: string | null | undefined) => {
   return "*".repeat(cleanStr.length - 4) + cleanStr.slice(-4);
 };
 
+const normalizeCity = (cityVal: string): string => {
+  if (!cityVal) return "Hyderabad";
+  const c = cityVal.toLowerCase().trim();
+  if (c === "blr" || c === "bangalore" || c === "bengaluru") return "Bangalore";
+  if (c === "hyd" || c === "hyderabad") return "Hyderabad";
+  if (c === "mum" || c === "mumbai") return "Mumbai";
+  return "Hyderabad"; // Fallback
+};
+
 export default function WalkInForm({ 
   user, 
   onBackToSelector, 
   onLogout
 }: WalkInFormProps) {
   
-  // RBAC Security Lock: Check if the user is a Support Executive (Read-Only)
+  // RBAC Security Lock & City Scoping
   const isReadOnly = user.role_code === "SP";
+  const isGlobalRole = ["SA", "BH", "FL", "FE", "AU"].includes(user.role_code);
+  const userAssignedCity = normalizeCity(user.city || "Hyderabad");
   
   // Default to registry if user is read-only
-  const [activeTab, setActiveTab] = useState<"form" | "registry">(isReadOnly ? "registry" : "form");
+  const [activeTab, setActiveTab] = useState<"form" | "registry" | "drafts">(isReadOnly ? "registry" : "form");
   
   // Header clock state
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString("en-IN", {
@@ -62,15 +73,6 @@ export default function WalkInForm({
     }, 1000);
     return () => clearInterval(timer);
   }, []);
-
-  const normalizeCity = (cityVal: string): string => {
-    if (!cityVal) return "Hyderabad";
-    const c = cityVal.toLowerCase().trim();
-    if (c === "blr" || c === "bangalore" || c === "bengaluru") return "Bangalore";
-    if (c === "hyd" || c === "hyderabad") return "Hyderabad";
-    if (c === "mum" || c === "mumbai") return "Mumbai";
-    return "Hyderabad"; // Fallback
-  };
 
   // Form Fields State
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -165,10 +167,10 @@ export default function WalkInForm({
 
   // Registry Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterCity, setFilterCity] = useState("all");
+  const [filterCity, setFilterCity] = useState(isGlobalRole ? "all" : userAssignedCity);
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
-  const [filterTimePeriod, setFilterTimePeriod] = useState("beginning_of_month");
+  const [filterTimePeriod, setFilterTimePeriod] = useState("all");
   
   const [page, setPage] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -283,6 +285,27 @@ export default function WalkInForm({
     }
   };
 
+  const [draftRecords, setDraftRecords] = useState<any[]>([]);
+  const [draftCount, setDraftCount] = useState(0);
+
+  const fetchDrafts = async () => {
+    try {
+      const token = localStorage.getItem("lr_token");
+      const res = await fetch(`/api/walkins?status=Draft&time_period=all&limit=100`, { headers: { "Authorization": `Bearer ${token}` }});
+      if (res.ok) {
+        const data = await res.json();
+        setDraftRecords(data.items || []);
+        setDraftCount(data.total || 0);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  useEffect(() => {
+    if (!isReadOnly) fetchDrafts();
+  }, [activeTab, isReadOnly]);
+
   useEffect(() => {
     fetchData(page);
   }, [searchQuery, filterCity, filterType, filterStatus, filterTimePeriod, page]);
@@ -309,13 +332,14 @@ export default function WalkInForm({
       });
       if (!res.ok) throw new Error("Failed to delete record");
       await fetchData(page);
+      if (activeTab === "drafts") await fetchDrafts();
     } catch (e: any) {
       alert(e.message || "Error deleting record");
     }
   };
 
-  const handleFormSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleFormSubmit = async (e: React.FormEvent | null, isDraft = false) => {
+    if (e) e.preventDefault();
     if (isReadOnly) return;
 
     // Block submission if duplicate detected
@@ -324,28 +348,31 @@ export default function WalkInForm({
       return;
     }
 
-    // Lead channel is required
-    if (!leadChannel) {
-      alert("Please select a Lead Channel.");
-      return;
+    let cleanPhone = personNumber ? personNumber.trim() : "";
+    
+    if (!isDraft) {
+      // Lead channel is required
+      if (!leadChannel) {
+        alert("Please select a Lead Channel.");
+        return;
+      }
+
+      if (visitingReason === "Onboarding" || cleanPhone) {
+          if (!/^[6-9][0-9]{9}$/.test(cleanPhone)) {
+              alert("Please enter a valid 10-digit Indian phone number.");
+              return;
+          }
+      }
     }
 
-    let cleanPhone = "";
-    if (visitingReason === "Onboarding" || personNumber) {
-        cleanPhone = personNumber.trim();
-        if (!/^[6-9][0-9]{9}$/.test(cleanPhone)) {
-            alert("Please enter a valid 10-digit Indian phone number.");
-            return;
-        }
-    }
-
-    let cleanAadhaar = "";
-    if (visitingReason === "Onboarding" && aadhaarNumber) {
-        cleanAadhaar = aadhaarNumber.replace(/\s/g, "");
-        if (cleanAadhaar && !/^[0-9]{12}$/.test(cleanAadhaar)) {
-            alert("Aadhaar Card must be exactly 12 digits.");
-            return;
-        }
+    let cleanAadhaar = aadhaarNumber ? aadhaarNumber.replace(/\s/g, "") : "";
+    if (!isDraft) {
+      if (visitingReason === "Onboarding" && cleanAadhaar) {
+          if (!/^[0-9]{12}$/.test(cleanAadhaar)) {
+              alert("Aadhaar Card must be exactly 12 digits.");
+              return;
+          }
+      }
     }
 
     const payload = {
@@ -370,7 +397,7 @@ export default function WalkInForm({
         : (leadChannelDetails.trim() || undefined),
       referred_by_name: leadChannel === "Driver Referral" ? (referredByName.trim() || undefined) : undefined,
       referred_by_phone: leadChannel === "Driver Referral" ? (referredByPhone.trim() || undefined) : undefined,
-      joined_status: joinedStatus,
+      joined_status: isDraft ? "Draft" : joinedStatus,
       remarks: remarks.trim() || undefined
     };
 
@@ -390,10 +417,14 @@ export default function WalkInForm({
       if (!res.ok) throw new Error("Failed to save record");
 
       resetForm();
-      alert(editingId ? "Walk-In record updated successfully!" : "New Walk-In recorded successfully!");
+      if (isDraft) {
+        alert("Walk-in entry saved as draft!");
+      } else {
+        alert(editingId ? "Walk-In record updated successfully!" : "New Walk-In recorded successfully!");
+      }
       
       await fetchData(1);
-      setActiveTab("registry");
+      setActiveTab(isDraft ? "drafts" : "registry");
     } catch (err: any) {
       alert(err.message || "Error saving record");
     }
@@ -442,12 +473,28 @@ export default function WalkInForm({
     }
   };
 
+  const formatTimeForInput = (timeStr: string) => {
+    if (!timeStr) return "";
+    const cleaned = timeStr.trim();
+    if (/^\d{2}:\d{2}$/.test(cleaned)) return cleaned;
+    const match = cleaned.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)?$/i);
+    if (match) {
+      let hours = parseInt(match[1], 10);
+      const minutes = match[2];
+      const ampm = match[3] ? match[3].toUpperCase() : null;
+      if (ampm === "PM" && hours < 12) hours += 12;
+      if (ampm === "AM" && hours === 12) hours = 0;
+      return `${hours.toString().padStart(2, "0")}:${minutes}`;
+    }
+    return timeStr;
+  };
+
   const loadRecordIntoForm = (record: any, id: number) => {
     setEditingId(id);
     setInterestedPosition(record.visitor_type || "Driver");
     setEnquiryDate(record.event_date || "");
-    setEnquiryTime(record.enquiry_time || "");
-    setCity(normalizeCity(record.city));
+    setEnquiryTime(formatTimeForInput(record.enquiry_time || "10:30 AM"));
+    setCity(normalizeCity(record.city || record.city_name));
     setOperatingPlace(record.operating_place || "");
     setFirstName(record.first_name || record.person_name?.split(" ")[0] || "");
     setLastName(record.last_name || record.person_name?.split(" ").slice(1).join(" ") || "");
@@ -545,23 +592,40 @@ export default function WalkInForm({
               onClick={onBackToSelector}
             />
             <span className="hidden h-5 border-l border-border sm:inline-block" />
-            <span className="hidden font-sans text-xs font-semibold text-text-muted sm:inline-block">Fleet Portal</span>
+            <span className="hidden font-sans text-xs font-medium text-text-muted sm:inline-block">
+              Walk-In Lead Generation
+            </span>
           </div>
 
           <nav className="flex gap-2">
-            {/* RBAC: Hide Walk-In Form tab if user is read-only */}
             {!isReadOnly && (
               <button
                 onClick={() => setActiveTab("form")}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all cursor-pointer ${ activeTab === "form" ? "bg-primary text-white shadow-sm" : "text-text-muted hover:bg-slate-100 hover:text-primary" }`}
+                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold tracking-wide transition-all cursor-pointer ${ activeTab === "form" ? "bg-primary text-white shadow-sm shadow-primary/20" : "text-text-muted hover:bg-slate-100 hover:text-primary" }`}
               >
-                <FileText className="h-4 w-4" /> Walk-In Form
+                <FileText className="h-4 w-4" />
+                Walk-In Form
+              </button>
+            )}
+            {!isReadOnly && (
+              <button
+                onClick={() => setActiveTab("drafts")}
+                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold tracking-wide transition-all cursor-pointer ${ activeTab === "drafts" ? "bg-amber-600 text-white shadow-sm shadow-amber-600/20" : "text-text-muted hover:bg-slate-100 hover:text-amber-600" }`}
+              >
+                <Clock className="h-4 w-4" />
+                Saved Drafts
+                {draftCount > 0 && (
+                  <span className="ml-1 px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded-full text-[10px] font-extrabold">
+                    {draftCount}
+                  </span>
+                )}
               </button>
             )}
             <button
               onClick={() => setActiveTab("registry")}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold transition-all cursor-pointer ${ activeTab === "registry" ? "bg-primary text-white shadow-sm" : "text-text-muted hover:bg-slate-100 hover:text-primary" }`}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold tracking-wide transition-all cursor-pointer ${ activeTab === "registry" ? "bg-primary text-white shadow-sm shadow-primary/20" : "text-text-muted hover:bg-slate-100 hover:text-primary" }`}
             >
+              <Database className="h-4 w-4" />
               Walk-In Registry
             </button>
           </nav>
@@ -580,7 +644,7 @@ export default function WalkInForm({
               </div>
             </div>
             <span className="h-5 border-l border-border" />
-            <button onClick={onLogout} className="flex h-8 items-center px-2.5 text-xs text-text-muted hover:text-red-600 transition-colors cursor-pointer">Sign Out</button>
+            <button onClick={onLogout} className="flex h-8 items-center px-3 text-xs border border-slate-200 rounded-lg bg-white text-text-muted hover:text-red-600 hover:border-red-200 transition-colors cursor-pointer">Sign Out</button>
           </div>
         </div>
       </header>
@@ -723,6 +787,7 @@ export default function WalkInForm({
                         <option value="Onboarding">Onboarding</option>
                         <option value="Enquiry">Enquiry</option>
                         <option value="Complaints">Complaints</option>
+                        <option value="(Complaint) DM Meet">(Complaint) DM Meet</option>
                         <option value="Driver Manager (DM) Meet">Driver Manager (DM) Meet</option>
                         <option value="Maintenance Related Issue">Maintenance Related Issue</option>
                         <option value="Others">Others</option>
@@ -740,93 +805,87 @@ export default function WalkInForm({
                     </div>
                   </div>
 
-                  {/* Right Column: Upload Documents (Full Width Inputs & Stacked Actions) */}
-                  {visitingReason === "Onboarding" ? (
-                    <div className="flex flex-col gap-4 p-5 bg-white border border-border rounded-xl">
-                      <h4 className="text-xs font-bold text-primary flex items-center gap-2 border-b border-border/60 pb-2">
-                        <Upload className="w-4 h-4" /> Upload Documents (Optional)
-                      </h4>
+                  {/* Right Column: Upload Documents (Full Width Inputs & Stacked Actions - Optional for All Visits) */}
+                  <div className="flex flex-col gap-4 p-5 bg-white border border-border rounded-xl">
+                    <h4 className="text-xs font-bold text-primary flex items-center gap-2 border-b border-border/60 pb-2">
+                      <Upload className="w-4 h-4" /> Identity & Document Upload (Optional)
+                    </h4>
 
-                      {/* Aadhaar group (TOP) */}
-                      <div className="flex flex-col gap-2.5">
-                        <label className="font-sans text-xs font-bold text-slate-800">1. Aadhaar Card</label>
-                        
-                        <div className="relative w-full">
-                          <input
-                            type={showAadhaar ? "text" : "password"}
-                            placeholder="Enter 12-digit Aadhaar Number"
-                            value={aadhaarNumber}
-                            onChange={(e) => setAadhaarNumber(e.target.value)}
-                            className="h-10 w-full rounded-lg border border-border pl-3 pr-9 text-xs outline-none focus:border-primary font-mono bg-slate-50/50"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowAadhaar(!showAadhaar)}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
-                          >
-                            {showAadhaar ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                          </button>
-                        </div>
-
-                        {aadhaarImage ? (
-                          <div className="relative">
-                            <img src={aadhaarImage} alt="Aadhaar" className="w-full h-16 object-cover rounded-lg border border-border" />
-                            <button type="button" onClick={() => setAadhaarImage(null)} className="absolute top-1 right-1 bg-white rounded-full p-0.5 shadow cursor-pointer text-red-500 hover:bg-red-50"><X className="w-3 h-3"/></button>
-                          </div>
-                        ) : (
-                          <div className="flex gap-2">
-                            <button type="button" onClick={() => setCameraActiveField("aadhaar")} className="flex-1 bg-slate-50 hover:bg-slate-100 text-xs py-2 rounded-lg text-center border border-border font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5"><Camera className="w-3.5 h-3.5 text-primary"/> Camera</button>
-                            <label className="flex-1 bg-slate-50 hover:bg-slate-100 text-xs py-2 rounded-lg text-center border border-border font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5">
-                              <Upload className="w-3.5 h-3.5 text-primary"/> File <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "aadhaar")} />
-                            </label>
-                          </div>
-                        )}
+                    {/* Aadhaar group (TOP) */}
+                    <div className="flex flex-col gap-2.5">
+                      <label className="font-sans text-xs font-bold text-slate-800">1. Aadhaar Card</label>
+                      
+                      <div className="relative w-full">
+                        <input
+                          type={showAadhaar ? "text" : "password"}
+                          placeholder="Enter 12-digit Aadhaar Number"
+                          value={aadhaarNumber}
+                          onChange={(e) => setAadhaarNumber(e.target.value)}
+                          className="h-10 w-full rounded-lg border border-border pl-3 pr-9 text-xs outline-none focus:border-primary font-mono bg-slate-50/50"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowAadhaar(!showAadhaar)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                        >
+                          {showAadhaar ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
                       </div>
 
-                      <hr className="border-border/60" />
-
-                      {/* DL group (BOTTOM) */}
-                      <div className="flex flex-col gap-2.5">
-                        <label className="font-sans text-xs font-bold text-slate-800">2. Driving License</label>
-                        
-                        <div className="relative w-full">
-                          <input
-                            type={showDl ? "text" : "password"}
-                            placeholder="Enter Driving License Number"
-                            value={dlNumber}
-                            onChange={(e) => setDlNumber(e.target.value)}
-                            className="h-10 w-full rounded-lg border border-border pl-3 pr-9 text-xs outline-none focus:border-primary font-mono bg-slate-50/50"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowDl(!showDl)}
-                            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
-                          >
-                            {showDl ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
-                          </button>
+                      {aadhaarImage ? (
+                        <div className="relative">
+                          <img src={aadhaarImage} alt="Aadhaar" className="w-full h-16 object-cover rounded-lg border border-border" />
+                          <button type="button" onClick={() => setAadhaarImage(null)} className="absolute top-1 right-1 bg-white rounded-full p-0.5 shadow cursor-pointer text-red-500 hover:bg-red-50"><X className="w-3 h-3"/></button>
                         </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => setCameraActiveField("aadhaar")} className="flex-1 bg-slate-50 hover:bg-slate-100 text-xs py-2 rounded-lg text-center border border-border font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5"><Camera className="w-3.5 h-3.5 text-primary"/> Camera</button>
+                          <label className="flex-1 bg-slate-50 hover:bg-slate-100 text-xs py-2 rounded-lg text-center border border-border font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5">
+                            <Upload className="w-3.5 h-3.5 text-primary"/> File <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "aadhaar")} />
+                          </label>
+                        </div>
+                      )}
+                    </div>
 
-                        {dlImage ? (
-                          <div className="relative">
-                            <img src={dlImage} alt="DL" className="w-full h-16 object-cover rounded-lg border border-border" />
-                            <button type="button" onClick={() => setDlImage(null)} className="absolute top-1 right-1 bg-white rounded-full p-0.5 shadow cursor-pointer text-red-500 hover:bg-red-50"><X className="w-3 h-3"/></button>
-                          </div>
-                        ) : (
-                          <div className="flex gap-2">
-                            <button type="button" onClick={() => setCameraActiveField("dl")} className="flex-1 bg-slate-50 hover:bg-slate-100 text-xs py-2 rounded-lg text-center border border-border font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5"><Camera className="w-3.5 h-3.5 text-primary"/> Camera</button>
-                            <label className="flex-1 bg-slate-50 hover:bg-slate-100 text-xs py-2 rounded-lg text-center border border-border font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5">
-                              <Upload className="w-3.5 h-3.5 text-primary"/> File <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "dl")} />
-                            </label>
-                          </div>
-                        )}
+                    <hr className="border-border/60" />
+
+                    {/* DL group (BOTTOM) */}
+                    <div className="flex flex-col gap-2.5">
+                      <label className="font-sans text-xs font-bold text-slate-800">2. Driving License</label>
+                      
+                      <div className="relative w-full">
+                        <input
+                          type={showDl ? "text" : "password"}
+                          placeholder="Enter Driving License Number"
+                          value={dlNumber}
+                          onChange={(e) => setDlNumber(e.target.value)}
+                          className="h-10 w-full rounded-lg border border-border pl-3 pr-9 text-xs outline-none focus:border-primary font-mono bg-slate-50/50"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowDl(!showDl)}
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                        >
+                          {showDl ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                        </button>
                       </div>
 
+                      {dlImage ? (
+                        <div className="relative">
+                          <img src={dlImage} alt="DL" className="w-full h-16 object-cover rounded-lg border border-border" />
+                          <button type="button" onClick={() => setDlImage(null)} className="absolute top-1 right-1 bg-white rounded-full p-0.5 shadow cursor-pointer text-red-500 hover:bg-red-50"><X className="w-3 h-3"/></button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2">
+                          <button type="button" onClick={() => setCameraActiveField("dl")} className="flex-1 bg-slate-50 hover:bg-slate-100 text-xs py-2 rounded-lg text-center border border-border font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5"><Camera className="w-3.5 h-3.5 text-primary"/> Camera</button>
+                          <label className="flex-1 bg-slate-50 hover:bg-slate-100 text-xs py-2 rounded-lg text-center border border-border font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5">
+                            <Upload className="w-3.5 h-3.5 text-primary"/> File <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "dl")} />
+                          </label>
+                        </div>
+                      )}
                     </div>
-                  ) : (
-                    <div className="flex items-center justify-center p-6 bg-slate-50 border border-dashed border-border rounded-xl text-center">
-                      <p className="text-xs text-slate-400 italic">Document upload available for Onboarding visits</p>
-                    </div>
-                  )}
+
+                  </div>
 
                 </div>
               </div>
@@ -936,6 +995,14 @@ export default function WalkInForm({
 
                 <div className="flex gap-3">
                   {editingId && <button type="button" onClick={() => { resetForm(); setActiveTab("registry"); }} className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer">Cancel Edit</button>}
+                  <button
+                    type="button"
+                    disabled={isDuplicate}
+                    onClick={(e) => handleFormSubmit(e as any, true)}
+                    className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Save as Draft
+                  </button>
                   <button 
                     type="submit" 
                     disabled={isDuplicate}
@@ -947,6 +1014,55 @@ export default function WalkInForm({
               </div>
 
             </form>
+          </div>
+        )}
+
+        {/* TAB 3: DRAFTS */}
+        {activeTab === "drafts" && !isReadOnly && (
+          <div className="flex flex-col gap-8">
+            <div className="rounded-2xl border border-border bg-white shadow-xs overflow-hidden">
+              <div className="border-b border-border p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="font-sans text-lg font-bold text-slate-900 tracking-tight">Drafts</h3>
+                  <p className="font-sans text-xs text-text-muted mt-1">Incomplete walk-in entries saved as drafts</p>
+                </div>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-border/60">
+                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Draft ID</th>
+                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Name</th>
+                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Contact</th>
+                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Date</th>
+                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
+                    {draftRecords.length === 0 ? (
+                      <tr><td colSpan={5} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">No drafts found.</td></tr>
+                    ) : (
+                      draftRecords.map((r) => (
+                        <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
+                          <td className="px-6 py-4 font-mono text-xs font-bold text-slate-900">#{r.id}</td>
+                          <td className="px-6 py-4">
+                            <div className="font-sans text-sm font-bold text-gray-900">{r.first_name ? `${r.first_name} ${r.last_name}`.trim() : (r.person_name || 'N/A')}</div>
+                          </td>
+                          <td className="px-6 py-4 font-sans text-xs font-semibold text-text">{r.person_number || 'N/A'}</td>
+                          <td className="px-6 py-4 font-sans text-[10px] text-text-dim">{r.event_date}</td>
+                          <td className="px-6 py-4 text-center">
+                            <div className="inline-flex gap-2 justify-center">
+                              <button type="button" onClick={() => fetchRecordDetailsForEdit(r.id)} className="rounded-lg px-2 py-1.5 border border-border bg-white text-text-muted hover:text-primary hover:bg-slate-50 transition-all cursor-pointer flex items-center gap-1 text-xs font-bold"><Edit className="h-3.5 w-3.5" /> Edit</button>
+                              <button type="button" onClick={() => { if (window.confirm('Delete this draft?')) handleDeleteRecord(r.id); }} className="rounded-lg p-1.5 border border-border bg-white text-text-muted hover:text-rose-500 hover:bg-rose-50 border-rose-200 transition-all cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 
@@ -979,9 +1095,20 @@ export default function WalkInForm({
               </div>
 
               <div className="relative">
-                <select value={filterCity} onChange={(e) => {setFilterCity(e.target.value); setPage(1);}} className="h-10 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer">
-                  <option value="all">All Cities</option>
-                  {CITIES.map(c => <option key={c.value} value={c.value}>{c.text}</option>)}
+                <select 
+                  value={filterCity} 
+                  onChange={(e) => {setFilterCity(e.target.value); setPage(1);}} 
+                  disabled={!isGlobalRole}
+                  className="h-10 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer disabled:bg-slate-100 disabled:cursor-not-allowed"
+                >
+                  {isGlobalRole ? (
+                    <>
+                      <option value="all">All Cities</option>
+                      {CITIES.map(c => <option key={c.value} value={c.value}>{c.text}</option>)}
+                    </>
+                  ) : (
+                    <option value={userAssignedCity}>{userAssignedCity}</option>
+                  )}
                 </select>
               </div>
 

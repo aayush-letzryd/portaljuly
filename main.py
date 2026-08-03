@@ -12,6 +12,7 @@ import secrets
 import traceback
 import json
 import uuid
+import uvicorn
 from datetime import datetime
 from starlette.concurrency import run_in_threadpool
 
@@ -905,7 +906,8 @@ def get_current_user(authorization: Optional[str] = Header(None)):
         cur.execute("""
             SELECT pu.portal_user_id, e.employee_id, 
                    CONCAT(e.first_name, ' ', COALESCE(e.last_name, '')), 
-                   r.role_name, pu.username, pu.role_id
+                   r.role_name, pu.username, pu.role_id,
+                   r.role_code, COALESCE(e.city, 'Hyderabad')
             FROM copy_app_sessions s
             JOIN july_portal_users pu ON pu.portal_user_id = s.user_id
             JOIN july_employees e ON e.employee_id = pu.employee_id
@@ -915,7 +917,7 @@ def get_current_user(authorization: Optional[str] = Header(None)):
         row = cur.fetchone()
         
         if row:
-            user_id, exec_id, name, role, username, role_id = row
+            user_id, exec_id, name, role, username, role_id, role_code, city = row
             # Fetch july_role_permissions
             cur.execute("""
                 SELECT p.permission_code, rp.can_view, rp.can_create, rp.can_edit, rp.can_approve, rp.can_delete
@@ -930,11 +932,14 @@ def get_current_user(authorization: Optional[str] = Header(None)):
             }
             return {
                 "user_id": user_id, 
+                "portal_user_id": user_id,
                 "executive_id": f"EMP-{exec_id}", 
                 "name": name.strip(), 
                 "role": role, 
                 "username": username,
                 "role_id": role_id,
+                "role_code": role_code,
+                "city": city,
                 "permission_matrix": perm_matrix,
                 "permissions": [k for k, v in perm_matrix.items() if v["view"]]
             }
@@ -1117,6 +1122,22 @@ class AllocationData(BaseModel):
     dropoff_odometer: Optional[str] = None
     dropoff_remarks: Optional[str] = None
     dropoff_photo: Optional[Any] = None
+    sub_type: Optional[str] = None
+    ola_negative_balance: Optional[str] = None
+    ola_negative_balance_proof: Optional[Any] = None
+    photo_lh_side: Optional[Any] = None
+    photo_rh_side: Optional[Any] = None
+    photo_front_side: Optional[Any] = None
+    photo_back_side: Optional[Any] = None
+    gps_active: Optional[str] = None
+    duplicate_key_status: Optional[str] = None
+    fastag_balance_amount: Optional[str] = None
+    fastag_balance_proof: Optional[Any] = None
+    dropoff_location: Optional[str] = None
+    approval_status: Optional[str] = None
+    current_approver_id: Optional[int] = None
+    approval_remarks: Optional[str] = None
+    created_by: Optional[int] = None
 
 
 class ExpenseData(BaseModel):
@@ -1192,6 +1213,10 @@ class VehicleOnboardingData(BaseModel):
     insurance_document: Optional[Any] = None
     authorization_certificate_doc: Optional[Any] = None
     rto_tax_receipt: Optional[Any] = None
+    approval_status: Optional[str] = None
+    current_approver_id: Optional[int] = None
+    approval_remarks: Optional[str] = None
+    created_by: Optional[int] = None
 
 
 class WorkshopData(BaseModel):
@@ -1297,6 +1322,7 @@ class InspectionData(BaseModel):
     photo_tyre_lh_re: Optional[Any] = None
     photo_tyre_spare: Optional[Any] = None
     remarks: Optional[str] = None
+    music_system: Optional[str] = None
 
 def extract_image(val: Any) -> Optional[str]:
     if val is None:
@@ -1324,7 +1350,8 @@ def login(req: LoginRequest):
         cur.execute("""
             SELECT pu.portal_user_id, pu.password_hash, pu.employee_id, 
                    CONCAT(e.first_name, ' ', COALESCE(e.last_name, '')), 
-                   r.role_name, pu.username, pu.role_id
+                   r.role_name, pu.username, pu.role_id,
+                   r.role_code, COALESCE(e.city, 'Hyderabad')
             FROM july_portal_users pu
             JOIN july_employees e ON e.employee_id = pu.employee_id
             JOIN july_roles r ON r.role_id = pu.role_id
@@ -1333,7 +1360,7 @@ def login(req: LoginRequest):
         row = cur.fetchone()
         
         if row:
-            user_id, pw_hash, exec_id, name, role, username, role_id = row
+            user_id, pw_hash, exec_id, name, role, username, role_id, role_code, city = row
             if not pwd_context.verify(req.password, pw_hash):
                 raise HTTPException(status_code=401, detail="Invalid username or password")
             
@@ -1361,11 +1388,14 @@ def login(req: LoginRequest):
                 "token": token,
                 "user": {
                     "id": user_id,
+                    "portal_user_id": user_id,
                     "username": username,
                     "executive_id": exec_id,
                     "name": name.strip(),
                     "role": role,
                     "role_id": role_id,
+                    "role_code": role_code,
+                    "city": city,
                     "permission_matrix": perm_matrix,
                     "permissions": [k for k, v in perm_matrix.items() if v["view"]]
                 }
@@ -1429,11 +1459,15 @@ def get_me(authorization: Optional[str] = Header(None)):
         
     return {
         "user_id": user.get("user_id") or user.get("portal_user_id"),
+        "portal_user_id": user.get("user_id") or user.get("portal_user_id"),
         "username": user["username"],
         "executive_id": exec_id,
         "name": user["name"],
         "role": user["role"],
         "role_id": user.get("role_id"),
+        "role_code": user.get("role_code"),
+        "city": user.get("city", "Hyderabad"),
+        "data_scope": user.get("data_scope", "City-Scoped"),
         "permissions": user.get("permissions", []),
         "permission_matrix": user.get("permission_matrix")
     }
@@ -1969,20 +2003,41 @@ def delete_city(id: int, authorization: Optional[str] = Header(None)):
 # ─────────────────────────────────────────────────────────
 # Stats
 # ─────────────────────────────────────────────────────────
+# Stats
+# ─────────────────────────────────────────────────────────
 @app.get("/api/stats")
 def get_stats(
+    authorization: Optional[str] = Header(None),
     search: Optional[str] = None,
     city: Optional[str] = "all",
     visitor_type: Optional[str] = "all",
     status: Optional[str] = "all",
     time_period: Optional[str] = "all"
 ):
+    user_city = None
+    is_global = True
+    if authorization:
+        try:
+            curr_user = get_current_user(authorization)
+            r_code = curr_user.get("role_code", "")
+            is_global = r_code in ["SA", "BH", "FL", "FE", "AU"] or curr_user.get("role") in ["Super Admin", "Admin", "Business Head"]
+            user_city = curr_user.get("city", "Hyderabad")
+        except Exception:
+            pass
+
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
         
         where_clause = "WHERE 1=1"
         params = []
+
+        if not is_global and user_city:
+            where_clause += " AND w.city ILIKE %s"
+            params.append(f"%{user_city}%")
+        elif city and city != "all":
+            where_clause += " AND w.city ILIKE %s"
+            params.append(f"%{city}%")
         
         if search:
             where_clause += """
@@ -1999,10 +2054,6 @@ def get_stats(
             search_pattern = f"%{search}%"
             params.extend([search_pattern] * 7)
             
-        if city and city != "all":
-            where_clause += " AND COALESCE(c.name, w.city) = %s"
-            params.append(city)
-            
         if visitor_type and visitor_type != "all":
             where_clause += " AND w.visitor_type = %s"
             params.append(visitor_type)
@@ -2017,30 +2068,30 @@ def get_stats(
             today = datetime.now()
             if time_period == "beginning_of_month":
                 start_dt = today.replace(day=1).strftime("%Y-%m-%d")
-                where_clause += " AND w.checkin_date >= %s"
+                where_clause += " AND w.event_date >= %s"
                 params.append(start_dt)
             elif time_period == "last_1_month":
                 start_dt = (today - relativedelta(months=1)).strftime("%Y-%m-%d")
-                where_clause += " AND w.checkin_date >= %s"
+                where_clause += " AND w.event_date >= %s"
                 params.append(start_dt)
             elif time_period == "this_year":
                 start_dt = today.replace(month=1, day=1).strftime("%Y-%m-%d")
-                where_clause += " AND w.checkin_date >= %s"
+                where_clause += " AND w.event_date >= %s"
                 params.append(start_dt)
             elif time_period == "last_1_year":
                 start_dt = (today - relativedelta(years=1)).strftime("%Y-%m-%d")
-                where_clause += " AND w.checkin_date >= %s"
+                where_clause += " AND w.event_date >= %s"
                 params.append(start_dt)
 
         query = f"""
             SELECT 
                 COUNT(*) as total,
-                SUM(CASE WHEN w.visit_outcome IN ('Successfully Onboarded', 'Joined', 'Onboarded', 'Completed') THEN 1 ELSE 0 END) as joined,
-                SUM(CASE WHEN w.visit_outcome IN ('Follow Up Required', 'Pending', 'Initiated') THEN 1 ELSE 0 END) as pending,
-                SUM(CASE WHEN w.visit_outcome IN ('No Follow Up Required / Closed', 'Not Interested') THEN 1 ELSE 0 END) as not_interested,
-                SUM(CASE WHEN w.visitor_type ILIKE '%%Individual%%' THEN 1 ELSE 0 END) as individuals,
+                SUM(CASE WHEN w.joined_status IN ('Successfully Onboarded', 'Joined', 'Onboarded', 'Completed') THEN 1 ELSE 0 END) as joined,
+                SUM(CASE WHEN w.joined_status IN ('Follow Up Required', 'Pending', 'Initiated', 'Onboarding Process Initiated') THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN w.joined_status IN ('No Follow Up Required / Closed', 'Not Interested') THEN 1 ELSE 0 END) as not_interested,
+                SUM(CASE WHEN w.visitor_type ILIKE '%%Driver%%' THEN 1 ELSE 0 END) as individuals,
                 SUM(CASE WHEN w.visitor_type ILIKE '%%Operator%%' THEN 1 ELSE 0 END) as operators
-            FROM july_walkins w
+            FROM copy_walkins w
             {where_clause}
         """
         
@@ -2074,6 +2125,7 @@ def get_stats(
 # ─────────────────────────────────────────────────────────
 @app.get("/api/walkins")
 def get_all_walkins(
+    authorization: Optional[str] = Header(None),
     search: Optional[str] = None,
     city: Optional[str] = "all",
     visitor_type: Optional[str] = "all",
@@ -2084,56 +2136,73 @@ def get_all_walkins(
     page: Optional[int] = 1,
     limit: Optional[int] = 10
 ):
+    user_city = None
+    is_global = True
+    if authorization:
+        try:
+            curr_user = get_current_user(authorization)
+            r_code = curr_user.get("role_code", "")
+            is_global = r_code in ["SA", "BH", "FL", "FE", "AU"] or curr_user.get("role") in ["Super Admin", "Admin", "Business Head"]
+            user_city = curr_user.get("city", "Hyderabad")
+        except Exception:
+            pass
+
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
         
         base_query = """
             SELECT
-                w.walkin_id AS id,
+                w.id AS id,
                 w.visitor_type,
-                TO_CHAR(w.checkin_date, 'YYYY-MM-DD') AS event_date,
-                '' AS enquiry_time,
-                '' AS mode_of_enquiry,
+                w.event_date,
+                COALESCE(w.enquiry_time, '10:30 AM') AS enquiry_time,
+                COALESCE(w.mode_of_enquiry, 'Walk-in / In-Person') AS mode_of_enquiry,
                 w.first_name,
                 w.last_name,
-                '' AS referred_by_name,
-                '' AS referred_by_phone,
+                COALESCE(w.referred_by_name, '') AS referred_by_name,
+                COALESCE(w.referred_by_phone, '') AS referred_by_phone,
                 w.city AS city_name,
-                w.created_by AS executive_id,
-                COALESCE(e.first_name || ' ' || COALESCE(e.last_name, ''), 'Admin') AS executive_name,
-                w.full_name AS person_name,
-                w.phone_number AS person_number,
-                '' AS aadhaar_number,
-                '' AS dl_number,
+                w.operating_place,
+                w.executive_id,
+                COALESCE(e.first_name || ' ' || COALESCE(e.last_name, ''), 'Onboarding Executive 1') AS executive_name,
+                w.person_name,
+                w.person_number,
+                COALESCE(w.aadhaar_number, '') AS aadhaar_number,
+                COALESCE(w.dl_number, '') AS dl_number,
                 w.visiting_reason,
-                COALESCE(w.visit_outcome, 'Initiated') AS joined_status,
-                '' AS remarks,
+                COALESCE(w.joined_status, 'Initiated') AS joined_status,
+                COALESCE(w.remarks, '') AS remarks,
+                COALESCE(w.lead_channel, '') AS lead_channel,
+                COALESCE(w.lead_channel_details, '') AS lead_channel_details,
                 w.created_at
-            FROM july_walkins w
-            LEFT JOIN july_portal_users pu ON pu.portal_user_id = w.created_by
+            FROM copy_walkins w
+            LEFT JOIN july_portal_users pu ON pu.portal_user_id = w.executive_id
             LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
             WHERE 1=1
         """
         
         params = []
+
+        if not is_global and user_city:
+            base_query += " AND w.city ILIKE %s"
+            params.append(f"%{user_city}%")
+        elif city and city != "all":
+            base_query += " AND w.city ILIKE %s"
+            params.append(f"%{city}%")
         
         if search:
             base_query += """
                 AND (
-                    w.full_name ILIKE %s
+                    w.person_name ILIKE %s
                     OR w.first_name ILIKE %s
                     OR w.last_name ILIKE %s
-                    OR w.phone_number ILIKE %s
-                    OR w.walkin_id::text ILIKE %s
+                    OR w.person_number ILIKE %s
+                    OR w.id::text ILIKE %s
                 )
             """
             search_pattern = f"%{search}%"
             params.extend([search_pattern] * 5)
-            
-        if city and city != "all":
-            base_query += " AND w.city = %s"
-            params.append(city)
             
         if visitor_type and visitor_type != "all":
             base_query += " AND w.visitor_type = %s"
@@ -2144,56 +2213,71 @@ def get_all_walkins(
             params.append(status)
             
         if time_period and time_period != "all":
-            from datetime import datetime, timedelta
+            from datetime import datetime
             from dateutil.relativedelta import relativedelta
             
             today = datetime.now()
             
             if time_period == "beginning_of_month":
                 start_dt = today.replace(day=1).strftime("%Y-%m-%d")
-                base_query += " AND w.checkin_date >= %s"
+                base_query += " AND w.event_date >= %s"
                 params.append(start_dt)
             elif time_period == "last_1_month":
                 start_dt = (today - relativedelta(months=1)).strftime("%Y-%m-%d")
-                base_query += " AND w.checkin_date >= %s"
+                base_query += " AND w.event_date >= %s"
                 params.append(start_dt)
             elif time_period == "this_year":
                 start_dt = today.replace(month=1, day=1).strftime("%Y-%m-%d")
-                base_query += " AND w.checkin_date >= %s"
+                base_query += " AND w.event_date >= %s"
                 params.append(start_dt)
             elif time_period == "last_1_year":
                 start_dt = (today - relativedelta(years=1)).strftime("%Y-%m-%d")
-                base_query += " AND w.checkin_date >= %s"
+                base_query += " AND w.event_date >= %s"
                 params.append(start_dt)
-            elif time_period == "this_quarter":
-                quarter_month = ((today.month - 1) // 3) * 3 + 1
-                start_dt = today.replace(month=quarter_month, day=1).strftime("%Y-%m-%d")
-                base_query += " AND w.checkin_date >= %s"
-                params.append(start_dt)
-            elif time_period == "custom" and start_date and end_date:
-                base_query += " AND w.checkin_date >= %s AND w.checkin_date <= %s"
-                params.extend([start_date, end_date])
                 
-        count_query = f"SELECT COUNT(*) FROM ({base_query}) AS total_count"
+        count_query = f"SELECT COUNT(*) FROM ({base_query}) AS total_subquery"
         cur.execute(count_query, params)
-        total_items = cur.fetchone()[0]
+        total_count = cur.fetchone()[0]
         
+        base_query += " ORDER BY w.id DESC LIMIT %s OFFSET %s"
         offset = (page - 1) * limit
-        base_query += " ORDER BY w.walkin_id DESC LIMIT %s OFFSET %s;"
         params.extend([limit, offset])
         
         cur.execute(base_query, params)
-        cols = [d[0] for d in cur.description]
+        rows = cur.fetchall()
+        
         items = []
-        for row in cur.fetchall():
-            d = dict(zip(cols, row))
-            if d.get("created_at"):
-                d["created_at"] = str(d["created_at"])
-            items.append(d)
+        for r in rows:
+            items.append({
+                "id": r[0],
+                "visitor_type": r[1],
+                "event_date": r[2],
+                "enquiry_time": r[3],
+                "mode_of_enquiry": r[4],
+                "first_name": r[5],
+                "last_name": r[6],
+                "referred_by_name": r[7],
+                "referred_by_phone": r[8],
+                "city_name": r[9],
+                "city": r[9],
+                "operating_place": r[10],
+                "executive_id": r[11],
+                "executive_name": r[12],
+                "person_name": r[13],
+                "person_number": r[14],
+                "aadhaar_number": r[15],
+                "dl_number": r[16],
+                "visiting_reason": r[17],
+                "joined_status": r[18],
+                "remarks": r[19],
+                "lead_channel": r[20],
+                "lead_channel_details": r[21],
+                "created_at": r[22].isoformat() if r[22] else None
+            })
             
         return {
             "items": items,
-            "total": total_items,
+            "total": total_count,
             "page": page,
             "limit": limit
         }
@@ -2274,7 +2358,7 @@ def get_walkin(walkin_id: int):
 @app.post("/api/walkins")
 def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None)):
     user = get_current_user(authorization)
-    final_exec_id = user.get("executive_id") or (int(data.executive_id) if data.executive_id else None)
+    user_p_id = user.get("portal_user_id") or user.get("user_id") or 1
 
     conn = postgreSQL_pool.getconn()
     try:
@@ -2282,37 +2366,42 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
         f_name = (data.first_name or "").strip()
         l_name = (data.last_name or "").strip()
         full_n = (data.person_name or f"{f_name} {l_name}").strip()
-        user_p_id = user.get("portal_user_id") or user.get("user_id") or 1
 
         cur.execute("""
-            INSERT INTO july_walkins
-              (visitor_type, checkin_date, city, full_name, first_name, last_name,
-               phone_number, visiting_reason, lead_channel, visit_outcome, created_by)
-            VALUES (%s, COALESCE(TO_DATE(%s, 'YYYY-MM-DD'), CURRENT_DATE), %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING walkin_id;
+            INSERT INTO copy_walkins
+              (visitor_type, event_date, enquiry_time, city, operating_place, executive_id,
+               first_name, last_name, person_name, person_number, aadhaar_number, dl_number,
+               visiting_reason, mode_of_enquiry, lead_channel, lead_channel_details,
+               referred_by_name, referred_by_phone, joined_status, remarks,
+               aadhaar_image, dl_image, created_by)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            RETURNING id;
         """, (
-            data.visitor_type or 'Individual Driver',
-            data.event_date,
+            data.visitor_type or 'Driver',
+            data.event_date or datetime.now().strftime("%Y-%m-%d"),
+            data.enquiry_time or '10:30 AM',
             str(data.city) if data.city is not None else 'Hyderabad',
-            full_n,
+            data.operating_place or 'Hitec City Hub',
+            user_p_id,
             f_name,
             l_name,
+            full_n,
             str(data.person_number) if data.person_number else '',
+            data.aadhaar_number or '',
+            data.dl_number or '',
             data.visiting_reason or 'Onboarding',
+            data.mode_of_enquiry or 'Walk-in / In-Person',
             data.lead_channel or 'Direct Walk-in',
+            data.lead_channel_details or '',
+            data.referred_by_name or '',
+            data.referred_by_phone or '',
             data.joined_status or 'Initiated',
+            data.remarks or '',
+            data.aadhaar_image or None,
+            data.dl_image or None,
             user_p_id
         ))
         walkin_id = cur.fetchone()[0]
-
-        # Audit Log
-        cur.execute("""
-            INSERT INTO july_walkin_logs (walkin_id, action, performed_by, new_data)
-            VALUES (%s, 'CREATED', %s, %s);
-        """, (walkin_id, user_p_id, json.dumps({
-            "full_name": full_n, "first_name": f_name, "last_name": l_name,
-            "phone_number": data.person_number, "city": data.city, "visiting_reason": data.visiting_reason
-        })))
 
         conn.commit()
         return {"success": True, "walkin_id": walkin_id}
@@ -2336,32 +2425,38 @@ def update_walkin(walkin_id: int, data: WalkinData, authorization: Optional[str]
         full_n = (data.person_name or f"{f_name} {l_name}").strip()
 
         cur.execute("""
-            UPDATE july_walkins SET
-                visitor_type=%s, checkin_date=COALESCE(TO_DATE(%s, 'YYYY-MM-DD'), checkin_date),
-                city=%s, full_name=%s, first_name=%s, last_name=%s,
-                phone_number=%s, visiting_reason=%s, lead_channel=%s, visit_outcome=%s
-            WHERE walkin_id=%s;
+            UPDATE copy_walkins SET
+                visitor_type=%s, event_date=%s, enquiry_time=%s, city=%s, operating_place=%s,
+                first_name=%s, last_name=%s, person_name=%s, person_number=%s,
+                aadhaar_number=%s, dl_number=%s, visiting_reason=%s, mode_of_enquiry=%s,
+                lead_channel=%s, lead_channel_details=%s, referred_by_name=%s, referred_by_phone=%s,
+                joined_status=%s, remarks=%s,
+                aadhaar_image=COALESCE(%s, aadhaar_image), dl_image=COALESCE(%s, dl_image)
+            WHERE id=%s;
         """, (
             data.visitor_type,
             data.event_date,
+            data.enquiry_time,
             str(data.city) if data.city is not None else 'Hyderabad',
-            full_n,
+            data.operating_place,
             f_name,
             l_name,
+            full_n,
             str(data.person_number) if data.person_number else '',
+            data.aadhaar_number,
+            data.dl_number,
             data.visiting_reason,
+            data.mode_of_enquiry,
             data.lead_channel,
+            data.lead_channel_details,
+            data.referred_by_name,
+            data.referred_by_phone,
             data.joined_status,
+            data.remarks,
+            data.aadhaar_image,
+            data.dl_image,
             walkin_id
         ))
-
-        # Audit Log
-        cur.execute("""
-            INSERT INTO july_walkin_logs (walkin_id, action, performed_by, new_data)
-            VALUES (%s, 'UPDATED', %s, %s);
-        """, (walkin_id, user_p_id, json.dumps({
-            "full_name": full_n, "phone_number": data.person_number, "visiting_reason": data.visiting_reason
-        })))
 
         conn.commit()
         return {"success": True}
@@ -2374,7 +2469,17 @@ def update_walkin(walkin_id: int, data: WalkinData, authorization: Optional[str]
 @app.delete("/api/walkins/{walkin_id}")
 def delete_walkin(walkin_id: int, authorization: Optional[str] = Header(None)):
     user = get_current_user(authorization)
-    user_p_id = user.get("portal_user_id") or user.get("user_id") or 1
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM copy_walkins WHERE id = %s RETURNING id;", (walkin_id,))
+        deleted = cur.fetchone()
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Walkin record not found")
+        conn.commit()
+        return {"success": True}
+    finally:
+        postgreSQL_pool.putconn(conn)
 
     conn = postgreSQL_pool.getconn()
     try:
@@ -2581,6 +2686,70 @@ def create_onboarding(data: OnboardingData):
     finally:
         postgreSQL_pool.putconn(conn)
 
+
+@app.post("/api/onboarding/send-for-approval/{id}")
+def send_onboarding_for_approval(id: int, authorization: Optional[str] = Header(None)):
+    """Send a Draft or Changes Requested onboarding record for City Manager approval."""
+    user = get_current_user(authorization)
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        
+        # 1. Update copy_form_onboarding
+        cur.execute("""
+            UPDATE copy_form_onboarding
+            SET approval_status = 'Pending Approval',
+                approval_requested_to = 20,
+                approval_note = 'Submitted by Executive for City Manager Review',
+                approval_submitted_at = NOW()
+            WHERE id = %s
+            RETURNING driver_name, candidate_role, vendor_type, city, phone_number, father_name, present_address, emergency_name, emergency_phone, dl_number, pan_number, aadhaar_number;
+        """, (id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Onboarding record not found")
+        
+        driver_name, candidate_role, vendor_type, city, phone_number, father_name, present_address, emergency_name, emergency_phone, dl_number, pan_number, aadhaar_number = row
+        role_label = vendor_type or candidate_role or "Driver"
+
+        # 2. Upsert into july_onboarding for approval workflow engine
+        cur.execute("SELECT onboarding_id FROM july_onboarding WHERE onboarding_id = %s;", (id,))
+        if cur.fetchone():
+            cur.execute("""
+                UPDATE july_onboarding
+                SET approval_status = 'Pending Approval',
+                    current_approver_id = 20,
+                    created_at = NOW()
+                WHERE onboarding_id = %s;
+            """, (id,))
+        else:
+            cur.execute("""
+                INSERT INTO july_onboarding (
+                    onboarding_id, driver_id, driver_name, phone_number, city, driver_plan, father_name,
+                    present_address, emergency_name, emergency_phone, driving_license, pan_number, aadhaar_number,
+                    approval_status, created_by, current_approver_id, created_at
+                ) VALUES (
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Pending Approval', %s, 20, NOW()
+                );
+            """, (id, f"DRV-{id}", driver_name, phone_number, city, role_label, father_name, present_address, emergency_name, emergency_phone, dl_number, pan_number, aadhaar_number, user.get("user_id", 24)))
+
+        # 3. Log in july_approval_chain_logs
+        cur.execute("""
+            INSERT INTO july_approval_chain_logs (module_name, record_id, action, from_user_id, to_user_id, remarks)
+            VALUES ('individual_onboarding', %s, 'SUBMITTED', %s, 20, 'Submitted for City Manager approval');
+        """, (id, user.get("portal_user_id", 24)))
+
+        conn.commit()
+        return {"success": True, "message": "Onboarding application sent to City Manager 1 for approval!"}
+    except Exception as e:
+        conn.rollback()
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+
 @app.get("/api/onboarding/{id}")
 def get_onboarding(id: int):
     conn = postgreSQL_pool.getconn()
@@ -2657,6 +2826,19 @@ def get_onboarding(id: int):
             else:
                 res["operator_drivers"] = []
             return res
+        
+        # Fallback to july_onboarding for July portal entries
+        cur.execute("SELECT * FROM july_onboarding WHERE onboarding_id = %s;", (id,))
+        jrow = cur.fetchone()
+        if jrow:
+            jcols = [desc[0] for desc in cur.description]
+            jdata = dict(zip(jcols, jrow))
+            jdata["id"] = jdata["onboarding_id"]
+            jdata["vendor_type"] = jdata.get("driver_plan") or "Driver"
+            jdata["candidate_role"] = jdata.get("driver_plan") or "Driver"
+            jdata["operator_drivers"] = []
+            return jdata
+
         raise HTTPException(status_code=404, detail="Onboarding record not found")
     finally:
         postgreSQL_pool.putconn(conn)
@@ -3053,13 +3235,24 @@ def get_allocation_stats():
         cur.execute("SELECT COUNT(*) FROM copy_vehicle_allocation;")
         total = cur.fetchone()[0]
         
-        cur.execute("SELECT COUNT(*) FROM copy_vehicle_allocation WHERE allocation_type = 'New Allocation';")
+        cur.execute("""
+            SELECT COUNT(*) FROM copy_vehicle_allocation 
+            WHERE allocation_type IN ('New Allocation', 'New allocation') 
+               OR (allocation_type = 'Allocation' AND sub_type IN ('New Allocation', 'Rejoining'));
+        """)
         new_alloc = cur.fetchone()[0]
         
-        cur.execute("SELECT COUNT(*) FROM copy_vehicle_allocation WHERE allocation_type = 'Car Swap';")
+        cur.execute("""
+            SELECT COUNT(*) FROM copy_vehicle_allocation 
+            WHERE allocation_type IN ('Car Swap', 'Swap') 
+               OR (allocation_type = 'Allocation' AND sub_type = 'Swap');
+        """)
         swap_alloc = cur.fetchone()[0]
         
-        cur.execute("SELECT COUNT(*) FROM copy_vehicle_allocation WHERE allocation_type = 'Reallocation';")
+        cur.execute("""
+            SELECT COUNT(*) FROM copy_vehicle_allocation 
+            WHERE allocation_type = 'Reallocation';
+        """)
         realloc = cur.fetchone()[0]
         
         return {
@@ -3086,7 +3279,14 @@ def get_allocation_record(id: int):
         postgreSQL_pool.putconn(conn)
 
 @app.post("/api/allocation")
-def create_allocation_record(data: AllocationData):
+def create_allocation_record(data: AllocationData, authorization: Optional[str] = Header(None)):
+    user = None
+    if authorization:
+        try:
+            user = get_july_user(authorization)
+        except Exception:
+            pass
+    uid = user["portal_user_id"] if user else None
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
@@ -3094,14 +3294,24 @@ def create_allocation_record(data: AllocationData):
             INSERT INTO copy_vehicle_allocation (
                 allocation_date, allocation_type, city_name, driver_id, driver_name, 
                 driver_phone, driver_plan, type_of_plan, car_model, vehicle_number, 
-                old_vehicle_number, dropoff_odometer, dropoff_remarks, dropoff_photo
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                old_vehicle_number, dropoff_odometer, dropoff_remarks, dropoff_photo,
+                sub_type, ola_negative_balance, ola_negative_balance_proof,
+                photo_lh_side, photo_rh_side, photo_front_side, photo_back_side,
+                gps_active, duplicate_key_status, fastag_balance_amount, fastag_balance_proof,
+                dropoff_location, approval_status, current_approver_id, approval_remarks,
+                created_by, created_at
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW())
             RETURNING id;
         """, (
             data.allocation_date, data.allocation_type, data.city_name, data.driver_id, data.driver_name,
             data.driver_phone, data.driver_plan, data.type_of_plan, data.car_model, data.vehicle_number,
             data.old_vehicle_number, data.dropoff_odometer, data.dropoff_remarks,
-            extract_image(data.dropoff_photo)
+            extract_image(data.dropoff_photo),
+            data.sub_type, data.ola_negative_balance, extract_image(data.ola_negative_balance_proof),
+            extract_image(data.photo_lh_side), extract_image(data.photo_rh_side), extract_image(data.photo_front_side), extract_image(data.photo_back_side),
+            data.gps_active, data.duplicate_key_status, data.fastag_balance_amount, extract_image(data.fastag_balance_proof),
+            data.dropoff_location, data.approval_status or "Draft", data.current_approver_id, data.approval_remarks,
+            data.created_by or uid
         ))
         new_id = cur.fetchone()[0]
         conn.commit()
@@ -3118,13 +3328,23 @@ def update_allocation_record(id: int, data: AllocationData):
             UPDATE copy_vehicle_allocation SET
                 allocation_date=%s, allocation_type=%s, city_name=%s, driver_id=%s, driver_name=%s, 
                 driver_phone=%s, driver_plan=%s, type_of_plan=%s, car_model=%s, vehicle_number=%s, 
-                old_vehicle_number=%s, dropoff_odometer=%s, dropoff_remarks=%s, dropoff_photo=%s
+                old_vehicle_number=%s, dropoff_odometer=%s, dropoff_remarks=%s, dropoff_photo=%s,
+                sub_type=%s, ola_negative_balance=%s, ola_negative_balance_proof=%s,
+                photo_lh_side=%s, photo_rh_side=%s, photo_front_side=%s, photo_back_side=%s,
+                gps_active=%s, duplicate_key_status=%s, fastag_balance_amount=%s, fastag_balance_proof=%s,
+                dropoff_location=%s, approval_status=%s, current_approver_id=%s, approval_remarks=%s,
+                created_by=%s
             WHERE id=%s RETURNING id;
         """, (
             data.allocation_date, data.allocation_type, data.city_name, data.driver_id, data.driver_name,
             data.driver_phone, data.driver_plan, data.type_of_plan, data.car_model, data.vehicle_number,
             data.old_vehicle_number, data.dropoff_odometer, data.dropoff_remarks,
             extract_image(data.dropoff_photo),
+            data.sub_type, data.ola_negative_balance, extract_image(data.ola_negative_balance_proof),
+            extract_image(data.photo_lh_side), extract_image(data.photo_rh_side), extract_image(data.photo_front_side), extract_image(data.photo_back_side),
+            data.gps_active, data.duplicate_key_status, data.fastag_balance_amount, extract_image(data.fastag_balance_proof),
+            data.dropoff_location, data.approval_status, data.current_approver_id, data.approval_remarks,
+            data.created_by,
             id
         ))
         row = cur.fetchone()
@@ -3352,7 +3572,13 @@ def get_single_vehicle(id: int, authorization: Optional[str] = Header(None)):
 
 @app.post("/api/vehicle")
 def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[str] = Header(None)):
-    get_current_user(authorization)
+    user = None
+    if authorization:
+        try:
+            user = get_current_user(authorization)
+        except Exception:
+            pass
+    uid = user["portal_user_id"] if user else None
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
@@ -3367,7 +3593,8 @@ def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[s
                 rc_document, insurance_document, authorization_certificate_doc, rto_tax_receipt,
                 fuel_type,
                 insurance_idv, cover_engine_protect, cover_consumables, cover_zero_dep, cover_rsa,
-                chassis_number, engine_number, cng_tank_number, fast_tag_number, fast_tag_vendor
+                chassis_number, engine_number, cng_tank_number, fast_tag_number, fast_tag_vendor,
+                approval_status, current_approver_id, approval_remarks, created_by
             ) VALUES (
                 %s,%s,%s,%s,%s,%s,
                 %s,%s,%s,%s,%s,%s,
@@ -3378,7 +3605,8 @@ def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[s
                 %s,%s,%s,%s,
                 %s,
                 %s,%s,%s,%s,%s,
-                %s,%s,%s,%s,%s
+                %s,%s,%s,%s,%s,
+                %s,%s,%s,%s
             ) RETURNING id;
         """, (
             data.vehicle_number, data.letzryd_unique_no, data.city_name, data.model, data.received_allocated, data.delivery_month,
@@ -3393,9 +3621,39 @@ def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[s
             extract_image(data.rc_document), extract_image(data.insurance_document), extract_image(data.authorization_certificate_doc), extract_image(data.rto_tax_receipt),
             data.fuel_type,
             data.insurance_idv, data.cover_engine_protect, data.cover_consumables, data.cover_zero_dep, data.cover_rsa,
-            data.chassis_number, data.engine_number, data.cng_tank_number, data.fast_tag_number, data.fast_tag_vendor
+            data.chassis_number, data.engine_number, data.cng_tank_number, data.fast_tag_number, data.fast_tag_vendor,
+            data.approval_status or "Draft", data.current_approver_id, data.approval_remarks, data.created_by or uid
         ))
         new_id = cur.fetchone()[0]
+
+        # Sync with july_vehicles table
+        cur.execute("SELECT vehicle_id FROM july_vehicles WHERE vehicle_number = %s;", (data.vehicle_number,))
+        exists_row = cur.fetchone()
+        if exists_row:
+            cur.execute("""
+                UPDATE july_vehicles SET
+                    manufacturer='Tata Motors', model=%s, fuel_type=%s, city=%s,
+                    chassis_number=%s, approval_status=%s, current_approver_id=%s,
+                    approval_remarks=%s, created_by=%s
+                WHERE vehicle_number=%s;
+            """, (
+                data.model, data.fuel_type or 'EV', data.city_name,
+                data.chassis_number, data.approval_status or 'Draft', data.current_approver_id,
+                data.approval_remarks, data.created_by or uid, data.vehicle_number
+            ))
+        else:
+            cur.execute("""
+                INSERT INTO july_vehicles (
+                    vehicle_number, manufacturer, model, fuel_type, city,
+                    chassis_number, approval_status, current_approver_id,
+                    approval_remarks, created_by, created_at
+                ) VALUES (%s, 'Tata Motors', %s, %s, %s, %s, %s, %s, %s, %s, NOW());
+            """, (
+                data.vehicle_number, data.model, data.fuel_type or 'EV', data.city_name,
+                data.chassis_number, data.approval_status or 'Draft', data.current_approver_id,
+                data.approval_remarks, data.created_by or uid
+            ))
+
         conn.commit()
         return {"success": True, "id": new_id}
     finally:
@@ -3403,7 +3661,13 @@ def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[s
 
 @app.put("/api/vehicle/{id}")
 def update_vehicle_record(id: int, data: VehicleOnboardingData, authorization: Optional[str] = Header(None)):
-    get_current_user(authorization)
+    user = None
+    if authorization:
+        try:
+            user = get_current_user(authorization)
+        except Exception:
+            pass
+    uid = user["portal_user_id"] if user else None
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
@@ -3418,7 +3682,8 @@ def update_vehicle_record(id: int, data: VehicleOnboardingData, authorization: O
                 rc_document=%s, insurance_document=%s, authorization_certificate_doc=%s, rto_tax_receipt=%s,
                 fuel_type=%s,
                 insurance_idv=%s, cover_engine_protect=%s, cover_consumables=%s, cover_zero_dep=%s, cover_rsa=%s,
-                chassis_number=%s, engine_number=%s, cng_tank_number=%s, fast_tag_number=%s, fast_tag_vendor=%s
+                chassis_number=%s, engine_number=%s, cng_tank_number=%s, fast_tag_number=%s, fast_tag_vendor=%s,
+                approval_status=%s, current_approver_id=%s, approval_remarks=%s, created_by=%s
             WHERE id=%s RETURNING id;
         """, (
             data.vehicle_number, data.letzryd_unique_no, data.city_name, data.model, data.received_allocated, data.delivery_month,
@@ -3434,11 +3699,41 @@ def update_vehicle_record(id: int, data: VehicleOnboardingData, authorization: O
             data.fuel_type,
             data.insurance_idv, data.cover_engine_protect, data.cover_consumables, data.cover_zero_dep, data.cover_rsa,
             data.chassis_number, data.engine_number, data.cng_tank_number, data.fast_tag_number, data.fast_tag_vendor,
+            data.approval_status, data.current_approver_id, data.approval_remarks, data.created_by or uid,
             id
         ))
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Vehicle record not found")
+
+        # Sync with july_vehicles table
+        cur.execute("SELECT vehicle_id FROM july_vehicles WHERE vehicle_number = %s;", (data.vehicle_number,))
+        exists_row = cur.fetchone()
+        if exists_row:
+            cur.execute("""
+                UPDATE july_vehicles SET
+                    manufacturer='Tata Motors', model=%s, fuel_type=%s, city=%s,
+                    chassis_number=%s, approval_status=%s, current_approver_id=%s,
+                    approval_remarks=%s, created_by=%s
+                WHERE vehicle_number=%s;
+            """, (
+                data.model, data.fuel_type or 'EV', data.city_name,
+                data.chassis_number, data.approval_status, data.current_approver_id,
+                data.approval_remarks, data.created_by or uid, data.vehicle_number
+            ))
+        else:
+            cur.execute("""
+                INSERT INTO july_vehicles (
+                    vehicle_number, manufacturer, model, fuel_type, city,
+                    chassis_number, approval_status, current_approver_id,
+                    approval_remarks, created_by, created_at
+                ) VALUES (%s, 'Tata Motors', %s, %s, %s, %s, %s, %s, %s, %s, NOW());
+            """, (
+                data.vehicle_number, data.model, data.fuel_type or 'EV', data.city_name,
+                data.chassis_number, data.approval_status, data.current_approver_id,
+                data.approval_remarks, data.created_by or uid
+            ))
+
         conn.commit()
         return {"success": True, "id": id}
     finally:
@@ -4173,8 +4468,8 @@ def create_inspection(data: InspectionData, authorization: Optional[str] = Heade
                 photo_front, photo_back, photo_lh, photo_rh, photo_engine_chassis, photo_battery, 
                 photo_engine_compartment, photo_fast_tag, photo_music_system, 
                 photo_tyre_rh_fr, photo_tyre_lh_fr, photo_tyre_rh_re, photo_tyre_lh_re, photo_tyre_spare, 
-                remarks
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id;
+                remarks, music_system
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id;
         """, (
             data.vehicle_number, data.inspection_date, data.odometer_reading, data.jack, data.jack_rod, data.spanner,
             data.parking_triangle, data.fire_extinguishers, data.seat_cover, data.floor_carpet, data.key_quantity,
@@ -4183,7 +4478,7 @@ def create_inspection(data: InspectionData, authorization: Optional[str] = Heade
             extract_image(data.photo_fast_tag), extract_image(data.photo_music_system), 
             extract_image(data.photo_tyre_rh_fr), extract_image(data.photo_tyre_lh_fr), extract_image(data.photo_tyre_rh_re),
             extract_image(data.photo_tyre_lh_re), extract_image(data.photo_tyre_spare),
-            data.remarks
+            data.remarks, data.music_system
         ))
         new_id = cur.fetchone()[0]
         conn.commit()
@@ -4207,7 +4502,7 @@ def update_inspection(id: int, data: InspectionData, authorization: Optional[str
                 photo_front=%s, photo_back=%s, photo_lh=%s, photo_rh=%s, photo_engine_chassis=%s, photo_battery=%s, 
                 photo_engine_compartment=%s, photo_fast_tag=%s, photo_music_system=%s, 
                 photo_tyre_rh_fr=%s, photo_tyre_lh_fr=%s, photo_tyre_rh_re=%s, photo_tyre_lh_re=%s, photo_tyre_spare=%s, 
-                remarks=%s
+                remarks=%s, music_system=%s
             WHERE id=%s RETURNING id;
         """, (
             data.vehicle_number, data.inspection_date, data.odometer_reading, data.jack, data.jack_rod, data.spanner,
@@ -4217,7 +4512,7 @@ def update_inspection(id: int, data: InspectionData, authorization: Optional[str
             extract_image(data.photo_fast_tag), extract_image(data.photo_music_system), 
             extract_image(data.photo_tyre_rh_fr), extract_image(data.photo_tyre_lh_fr), extract_image(data.photo_tyre_rh_re),
             extract_image(data.photo_tyre_lh_re), extract_image(data.photo_tyre_spare),
-            data.remarks, id
+            data.remarks, data.music_system, id
         ))
         row = cur.fetchone()
         if not row:
@@ -4787,26 +5082,25 @@ def get_july_user(authorization: Optional[str] = Header(None)):
 
 @app.get("/api/july/approvers")
 def get_approvers(authorization: Optional[str] = Header(None)):
-    """Return list of valid approvers for current user based on city scope."""
+    """Return list of valid approvers for current user (excluding Super Admin)."""
     user = get_july_user(authorization)
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        # Managers in same city + all Senior Management/Admin/Dev
         cur.execute("""
             SELECT pu.portal_user_id, pu.username, 
                    e.first_name || ' ' || COALESCE(e.last_name, '') AS full_name,
-                   r.role_name, e.city
+                   r.role_name, COALESCE(e.city, 'Hyderabad')
             FROM july_portal_users pu
             JOIN july_employees e ON e.employee_id = pu.employee_id
             JOIN july_roles r ON r.role_id = pu.role_id
             WHERE pu.account_status = 'Active'
               AND pu.portal_user_id != %s
-              AND (
-                r.role_name IN ('Senior Management', 'Super Admin', 'Developer')
-                OR (r.role_name = 'Manager' AND e.city = %s)
-              )
-            ORDER BY r.role_id, e.first_name;
+              AND r.role_code != 'SA'
+              AND NOT (r.role_name ILIKE '%%Super Admin%%')
+            ORDER BY 
+              CASE WHEN e.city = %s THEN 0 ELSE 1 END,
+              r.role_id, e.first_name;
         """, (user["portal_user_id"], user["city"]))
         rows = cur.fetchall()
         return [
@@ -4827,73 +5121,103 @@ def get_pending_approvals(authorization: Optional[str] = Header(None)):
         uid = user["portal_user_id"]
         pending = []
 
-        # Strict personal filter: Every user (including Super Admin, Dev & Senior Management) only sees records assigned to them!
+        # Strict personal filter + City check for non-global roles
+        is_global = user.get("role_code") in ["SA", "BH", "FL", "FE", "AU"] or user.get("role") in ["Super Admin", "Admin", "Business Head"]
+        user_city = user.get("city")
+
         where_cond = f"WHERE o.current_approver_id = {uid} AND o.approval_status LIKE 'Pending%%'"
         where_v_cond = f"WHERE v.current_approver_id = {uid} AND v.approval_status LIKE 'Pending%%'"
         where_t_cond = f"WHERE t.current_approver_id = {uid} AND t.approval_status LIKE 'Pending%%'"
 
+        if not is_global and user_city:
+            where_cond += f" AND o.city ILIKE '%%{user_city}%%'"
+            where_v_cond += f" AND v.city ILIKE '%%{user_city}%%'"
+            where_t_cond += f" AND t.city ILIKE '%%{user_city}%%'"
+
         # Onboarding pending
         cur.execute(f"""
-            SELECT o.onboarding_id, 'individual_onboarding' AS module, 
+            SELECT o.onboarding_id, 
+                   CASE WHEN o.driver_plan ILIKE '%%Operator%%' OR o.driver_plan ILIKE '%%Partner%%' THEN 'operator_onboarding' ELSE 'individual_onboarding' END AS module, 
                    o.driver_name AS title, o.city, o.driver_plan AS subtitle,
                    o.approval_status, o.created_at,
-                   sub.username AS submitted_by, COALESCE(sub_e.first_name || ' ' || COALESCE(sub_e.last_name,''), sub.username) AS submitted_by_name,
-                   app_u.username AS current_approver, COALESCE(app_e.first_name || ' ' || COALESCE(app_e.last_name,''), app_u.username) AS current_approver_name
+                   sub.username AS submitted_by,
+                   COALESCE(sub_e.first_name || ' ' || COALESCE(sub_e.last_name,'') || ' (' || COALESCE(sub_r.role_name, 'Onboarding Executive') || ' — ' || COALESCE(sub_e.city, 'Hyderabad') || ')', sub.username, 'Onboarding Executive 1 (Onboarding Executive — Hyderabad)') AS submitted_by_name,
+                   app_u.username AS current_approver,
+                   COALESCE(app_e.first_name || ' ' || COALESCE(app_e.last_name,'') || ' (' || COALESCE(app_r.role_name, 'City Manager') || ' — ' || COALESCE(app_e.city, 'Hyderabad') || ')', app_u.username, 'City Manager 1 (City Manager — Hyderabad)') AS current_approver_name,
+                   o.daily_rent, o.security_deposit
             FROM july_onboarding o
             LEFT JOIN july_portal_users sub ON sub.portal_user_id = o.created_by
             LEFT JOIN july_employees sub_e ON sub_e.employee_id = sub.employee_id
+            LEFT JOIN july_roles sub_r ON sub_r.role_id = sub.role_id
             LEFT JOIN july_portal_users app_u ON app_u.portal_user_id = o.current_approver_id
             LEFT JOIN july_employees app_e ON app_e.employee_id = app_u.employee_id
+            LEFT JOIN july_roles app_r ON app_r.role_id = app_u.role_id
             {where_cond};
         """)
         for r in cur.fetchall():
-            pending.append({"id": r[0], "module": r[1], "module_label": "Individual Onboarding",
+            mod = r[1]
+            mod_lbl = "Partner / Operator Onboarding" if mod == "operator_onboarding" else "Driver Onboarding"
+            pending.append({"id": r[0], "module": mod, "module_label": mod_lbl,
                             "title": r[2], "city": r[3], "subtitle": r[4],
                             "approval_status": r[5], "created_at": r[6].isoformat() if r[6] else None,
-                            "submitted_by": r[7], "submitted_by_name": r[8].strip() if r[8] else "Staff",
-                            "current_approver": r[9], "current_approver_name": r[10].strip() if r[10] else "Assigned Approver"})
+                            "submitted_by": r[7], "submitted_by_name": r[8].strip(),
+                            "current_approver": r[9], "current_approver_name": r[10].strip(),
+                            "daily_rent": float(r[11]) if r[11] is not None else 850.0,
+                            "security_deposit": float(r[12]) if r[12] is not None else 10000.0})
 
         # Vehicles pending
         cur.execute(f"""
             SELECT v.vehicle_id, 'vehicle_onboarding' AS module,
                    v.vehicle_number AS title, v.city, v.manufacturer || ' ' || v.model AS subtitle,
                    v.approval_status, v.created_at,
-                   sub.username AS submitted_by, COALESCE(sub_e.first_name || ' ' || COALESCE(sub_e.last_name,''), sub.username) AS submitted_by_name,
-                   app_u.username AS current_approver, COALESCE(app_e.first_name || ' ' || COALESCE(app_e.last_name,''), app_u.username) AS current_approver_name
+                   sub.username AS submitted_by,
+                   COALESCE(sub_e.first_name || ' ' || COALESCE(sub_e.last_name,'') || ' (' || COALESCE(sub_r.role_name, 'Onboarding Executive') || ' — ' || COALESCE(sub_e.city, 'Hyderabad') || ')', sub.username, 'Onboarding Executive 1 (Onboarding Executive — Hyderabad)') AS submitted_by_name,
+                   app_u.username AS current_approver,
+                   COALESCE(app_e.first_name || ' ' || COALESCE(app_e.last_name,'') || ' (' || COALESCE(app_r.role_name, 'City Manager') || ' — ' || COALESCE(app_e.city, 'Hyderabad') || ')', app_u.username, 'City Manager 1 (City Manager — Hyderabad)') AS current_approver_name,
+                   v.daily_rent, v.security_deposit
             FROM july_vehicles v
             LEFT JOIN july_portal_users sub ON sub.portal_user_id = v.created_by
             LEFT JOIN july_employees sub_e ON sub_e.employee_id = sub.employee_id
+            LEFT JOIN july_roles sub_r ON sub_r.role_id = sub.role_id
             LEFT JOIN july_portal_users app_u ON app_u.portal_user_id = v.current_approver_id
             LEFT JOIN july_employees app_e ON app_e.employee_id = app_u.employee_id
+            LEFT JOIN july_roles app_r ON app_r.role_id = app_u.role_id
             {where_v_cond};
         """)
         for r in cur.fetchall():
             pending.append({"id": r[0], "module": r[1], "module_label": "Vehicle Onboarding",
                             "title": r[2], "city": r[3], "subtitle": r[4],
                             "approval_status": r[5], "created_at": r[6].isoformat() if r[6] else None,
-                            "submitted_by": r[7], "submitted_by_name": r[8].strip() if r[8] else "Staff",
-                            "current_approver": r[9], "current_approver_name": r[10].strip() if r[10] else "Assigned Approver"})
+                            "submitted_by": r[7], "submitted_by_name": r[8].strip(),
+                            "current_approver": r[9], "current_approver_name": r[10].strip(),
+                            "daily_rent": float(r[11]) if r[11] is not None else 950.0,
+                            "security_deposit": float(r[12]) if r[12] is not None else 12000.0})
 
         # Tickets pending escalation
         cur.execute(f"""
             SELECT t.ticket_id, 'tickets_desk' AS module,
                    t.ticket_number AS title, t.city, t.issue_type AS subtitle,
                    t.approval_status, t.created_at,
-                   sub.username AS submitted_by, COALESCE(sub_e.first_name || ' ' || COALESCE(sub_e.last_name,''), sub.username) AS submitted_by_name,
-                   app_u.username AS current_approver, COALESCE(app_e.first_name || ' ' || COALESCE(app_e.last_name,''), app_u.username) AS current_approver_name
+                   sub.username AS submitted_by,
+                   COALESCE(sub_e.first_name || ' ' || COALESCE(sub_e.last_name,'') || ' (' || COALESCE(sub_r.role_name, 'Support Executive') || ' — ' || COALESCE(sub_e.city, 'Hyderabad') || ')', sub.username, 'Support Executive 1 (Support Executive — Hyderabad)') AS submitted_by_name,
+                   app_u.username AS current_approver,
+                   COALESCE(app_e.first_name || ' ' || COALESCE(app_e.last_name,'') || ' (' || COALESCE(app_r.role_name, 'City Manager') || ' — ' || COALESCE(app_e.city, 'Hyderabad') || ')', app_u.username, 'City Manager 1 (City Manager — Hyderabad)') AS current_approver_name
             FROM july_tickets t
             LEFT JOIN july_portal_users sub ON sub.portal_user_id = t.created_by
             LEFT JOIN july_employees sub_e ON sub_e.employee_id = sub.employee_id
+            LEFT JOIN july_roles sub_r ON sub_r.role_id = sub.role_id
             LEFT JOIN july_portal_users app_u ON app_u.portal_user_id = t.current_approver_id
             LEFT JOIN july_employees app_e ON app_e.employee_id = app_u.employee_id
+            LEFT JOIN july_roles app_r ON app_r.role_id = app_u.role_id
             {where_t_cond};
         """)
         for r in cur.fetchall():
             pending.append({"id": r[0], "module": r[1], "module_label": "Tickets Desk",
                             "title": r[2], "city": r[3], "subtitle": r[4],
                             "approval_status": r[5], "created_at": r[6].isoformat() if r[6] else None,
-                            "submitted_by": r[7], "submitted_by_name": r[8].strip() if r[8] else "Staff",
-                            "current_approver": r[9], "current_approver_name": r[10].strip() if r[10] else "Assigned Approver"})
+                            "submitted_by": r[7], "submitted_by_name": r[8].strip(),
+                            "current_approver": r[9], "current_approver_name": r[10].strip(),
+                            "daily_rent": 0.0, "security_deposit": 0.0})
 
         return pending
     finally:
@@ -4911,12 +5235,23 @@ def get_my_submissions(authorization: Optional[str] = Header(None)):
         submissions = []
 
         cur.execute("""
-            SELECT o.onboarding_id, 'individual_onboarding', 'Individual Onboarding',
+            SELECT o.onboarding_id, 
+                   CASE WHEN o.driver_plan ILIKE '%%Operator%%' OR o.driver_plan ILIKE '%%Partner%%' THEN 'operator_onboarding' ELSE 'individual_onboarding' END,
+                   CASE WHEN o.driver_plan ILIKE '%%Operator%%' OR o.driver_plan ILIKE '%%Partner%%' THEN 'Partner / Operator Onboarding' ELSE 'Driver Onboarding' END,
                    o.driver_name, o.city, o.driver_plan, o.approval_status, o.created_at,
-                   app_u.username, app_e.first_name || ' ' || COALESCE(app_e.last_name,'')
+                   app_u.username,
+                   COALESCE(app_e.first_name || ' ' || COALESCE(app_e.last_name,'') || ' (' || COALESCE(app_r.role_name, 'City Manager') || ' — ' || COALESCE(app_e.city, 'Hyderabad') || ')', app_u.username, 'City Manager 1 (City Manager — Hyderabad)') AS current_approver_name,
+                   o.approval_remarks,
+                   sub.username,
+                   COALESCE(sub_e.first_name || ' ' || COALESCE(sub_e.last_name,'') || ' (' || COALESCE(sub_r.role_name, 'Onboarding Executive') || ' — ' || COALESCE(sub_e.city, 'Hyderabad') || ')', sub.username, 'Onboarding Executive 1 (Onboarding Executive — Hyderabad)') AS submitted_by_name,
+                   o.daily_rent, o.security_deposit
             FROM july_onboarding o
             LEFT JOIN july_portal_users app_u ON app_u.portal_user_id = o.current_approver_id
             LEFT JOIN july_employees app_e ON app_e.employee_id = app_u.employee_id
+            LEFT JOIN july_roles app_r ON app_r.role_id = app_u.role_id
+            LEFT JOIN july_portal_users sub ON sub.portal_user_id = o.created_by
+            LEFT JOIN july_employees sub_e ON sub_e.employee_id = sub.employee_id
+            LEFT JOIN july_roles sub_r ON sub_r.role_id = sub.role_id
             WHERE o.created_by = %s ORDER BY o.created_at DESC;
         """, (uid,))
         for r in cur.fetchall():
@@ -4924,15 +5259,28 @@ def get_my_submissions(authorization: Optional[str] = Header(None)):
                                 "title": r[3], "city": r[4], "subtitle": r[5],
                                 "approval_status": r[6],
                                 "created_at": r[7].isoformat() if r[7] else None,
-                                "current_approver": r[8], "current_approver_name": r[9].strip() if r[9] else None})
+                                "current_approver": r[8], "current_approver_name": r[9].strip() if r[9] else "City Manager 1 (City Manager — Hyderabad)",
+                                "approval_remarks": r[10],
+                                "submitted_by": r[11], "submitted_by_name": r[12].strip() if r[12] else "Onboarding Executive 1 (Onboarding Executive — Hyderabad)",
+                                "daily_rent": float(r[13]) if r[13] is not None else 850.0,
+                                "security_deposit": float(r[14]) if r[14] is not None else 10000.0})
 
         cur.execute("""
             SELECT v.vehicle_id, 'vehicle_onboarding', 'Vehicle Onboarding',
                    v.vehicle_number, v.city, v.manufacturer || ' ' || v.model, v.approval_status, v.created_at,
-                   app_u.username, app_e.first_name || ' ' || COALESCE(app_e.last_name,'')
+                   app_u.username,
+                   COALESCE(app_e.first_name || ' ' || COALESCE(app_e.last_name,'') || ' (' || COALESCE(app_r.role_name, 'City Manager') || ' — ' || COALESCE(app_e.city, 'Hyderabad') || ')', app_u.username, 'City Manager 1 (City Manager — Hyderabad)') AS current_approver_name,
+                   NULL AS approval_remarks,
+                   sub.username,
+                   COALESCE(sub_e.first_name || ' ' || COALESCE(sub_e.last_name,'') || ' (' || COALESCE(sub_r.role_name, 'Onboarding Executive') || ' — ' || COALESCE(sub_e.city, 'Hyderabad') || ')', sub.username, 'Onboarding Executive 1 (Onboarding Executive — Hyderabad)') AS submitted_by_name,
+                   v.daily_rent, v.security_deposit
             FROM july_vehicles v
             LEFT JOIN july_portal_users app_u ON app_u.portal_user_id = v.current_approver_id
             LEFT JOIN july_employees app_e ON app_e.employee_id = app_u.employee_id
+            LEFT JOIN july_roles app_r ON app_r.role_id = app_u.role_id
+            LEFT JOIN july_portal_users sub ON sub.portal_user_id = v.created_by
+            LEFT JOIN july_employees sub_e ON sub_e.employee_id = sub.employee_id
+            LEFT JOIN july_roles sub_r ON sub_r.role_id = sub.role_id
             WHERE v.created_by = %s ORDER BY v.created_at DESC;
         """, (uid,))
         for r in cur.fetchall():
@@ -4940,7 +5288,11 @@ def get_my_submissions(authorization: Optional[str] = Header(None)):
                                 "title": r[3], "city": r[4], "subtitle": r[5],
                                 "approval_status": r[6],
                                 "created_at": r[7].isoformat() if r[7] else None,
-                                "current_approver": r[8], "current_approver_name": r[9].strip() if r[9] else None})
+                                "current_approver": r[8], "current_approver_name": r[9].strip() if r[9] else "City Manager 1 (City Manager — Hyderabad)",
+                                "approval_remarks": r[10],
+                                "submitted_by": r[11], "submitted_by_name": r[12].strip() if r[12] else "Onboarding Executive 1 (Onboarding Executive — Hyderabad)",
+                                "daily_rent": float(r[13]) if r[13] is not None else 950.0,
+                                "security_deposit": float(r[14]) if r[14] is not None else 12000.0})
 
         return submissions
     finally:
@@ -4953,6 +5305,19 @@ class ApprovalAction(BaseModel):
     forward_to_user_id: Optional[int] = None
 
 
+MODULE_TABLE_MAP = {
+    "individual_onboarding": ("july_onboarding", "onboarding_id"),
+    "operator_onboarding": ("july_onboarding", "onboarding_id"),
+    "onboarding": ("july_onboarding", "onboarding_id"),
+    "vehicle_onboarding": ("july_vehicles", "vehicle_id"),
+    "tickets_desk": ("july_tickets", "ticket_id"),
+    "adjustment_form": ("copy_rent_adjustments", "id"),
+    "accidents_form": ("copy_accidents", "id"),
+    "expenses_form": ("copy_expense_ledger", "id"),
+    "workshops_desk": ("copy_workshops", "id"),
+}
+
+
 @app.post("/api/july/approval/{module}/{record_id}")
 def process_approval(module: str, record_id: int, body: ApprovalAction,
                      authorization: Optional[str] = Header(None)):
@@ -4963,15 +5328,10 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
         cur = conn.cursor()
         uid = user["portal_user_id"]
 
-        table_map = {
-            "individual_onboarding": ("july_onboarding", "onboarding_id"),
-            "vehicle_onboarding": ("july_vehicles", "vehicle_id"),
-            "tickets_desk": ("july_tickets", "ticket_id"),
-        }
-        if module not in table_map:
+        if module not in MODULE_TABLE_MAP:
             raise HTTPException(status_code=400, detail=f"Unknown module: {module}")
 
-        table, pk = table_map[module]
+        table, pk = MODULE_TABLE_MAP[module]
 
         if body.action == "APPROVE":
             cur.execute(f"""
@@ -5047,16 +5407,11 @@ def get_approval_logs(module: str, record_id: int, authorization: Optional[str] 
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        table_map = {
-            "individual_onboarding": ("july_onboarding", "onboarding_id"),
-            "vehicle_onboarding": ("july_vehicles", "vehicle_id"),
-            "tickets_desk": ("july_tickets", "ticket_id"),
-        }
         logs = []
 
         # 1. Synthesize initial SUBMITTED log by creator if record exists
-        if module in table_map:
-            table, pk = table_map[module]
+        if module in MODULE_TABLE_MAP:
+            table, pk = MODULE_TABLE_MAP[module]
             cur.execute(f"""
                 SELECT r.created_at, r.created_by,
                        COALESCE(sub_e.first_name || ' ' || COALESCE(sub_e.last_name,''), sub_u.username) AS sub_name, sub_u.username,
@@ -5090,9 +5445,9 @@ def get_approval_logs(module: str, record_id: int, authorization: Optional[str] 
             LEFT JOIN july_employees fe ON fe.employee_id = fu.employee_id
             LEFT JOIN july_portal_users tu ON tu.portal_user_id = l.to_user_id
             LEFT JOIN july_employees te ON te.employee_id = tu.employee_id
-            WHERE l.module_name = %s AND l.record_id = %s
+            WHERE (l.module_name = %s OR (l.module_name IN ('individual_onboarding', 'operator_onboarding', 'onboarding') AND %s IN ('individual_onboarding', 'operator_onboarding', 'onboarding'))) AND l.record_id = %s
             ORDER BY l.action_at ASC;
-        """, (module, record_id))
+        """, (module, module, record_id))
         for r in cur.fetchall():
             logs.append({
                 "action": r[0],
@@ -5122,17 +5477,12 @@ def process_batch_approval(body: BatchApprovalAction, authorization: Optional[st
     try:
         cur = conn.cursor()
         uid = user["portal_user_id"]
-        table_map = {
-            "individual_onboarding": ("july_onboarding", "onboarding_id"),
-            "vehicle_onboarding": ("july_vehicles", "vehicle_id"),
-            "tickets_desk": ("july_tickets", "ticket_id"),
-        }
         processed_count = 0
         for item in body.items:
             mod = item.get("module")
             rec_id = item.get("id")
-            if mod in table_map and rec_id:
-                table, pk = table_map[mod]
+            if mod in MODULE_TABLE_MAP and rec_id:
+                table, pk = MODULE_TABLE_MAP[mod]
                 cur.execute(f"""
                     UPDATE {table} SET approval_status = 'Approved',
                         current_approver_id = NULL, approved_by = %s, approval_remarks = %s
@@ -5160,14 +5510,9 @@ def get_record_details(module: str, record_id: int, authorization: Optional[str]
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        table_map = {
-            "individual_onboarding": ("july_onboarding", "onboarding_id"),
-            "vehicle_onboarding": ("july_vehicles", "vehicle_id"),
-            "tickets_desk": ("july_tickets", "ticket_id"),
-        }
-        if module not in table_map:
+        if module not in MODULE_TABLE_MAP:
             raise HTTPException(status_code=400, detail="Invalid module")
-        table, pk = table_map[module]
+        table, pk = MODULE_TABLE_MAP[module]
         cur.execute(f"SELECT * FROM {table} WHERE {pk} = %s;", (record_id,))
         row = cur.fetchone()
         if not row:
@@ -5182,3 +5527,6 @@ def get_record_details(module: str, record_id: int, authorization: Optional[str]
 # Static files — must be last
 # ─────────────────────────────────────────────────────────
 app.mount("/", StaticFiles(directory="dist", html=True), name="static")
+
+if __name__ == "__main__":
+    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)

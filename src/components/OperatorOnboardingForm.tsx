@@ -11,6 +11,9 @@ interface OperatorOnboardingFormProps {
   user: UserSession;
   onBackToSelector: () => void;
   onLogout: () => void;
+  initialEditId?: number;
+  initialStep?: number;
+  isReviewMode?: boolean;
 }
 
 interface DriverSubForm {
@@ -41,7 +44,10 @@ interface DriverSubForm {
 export default function OperatorOnboardingForm({ 
   user, 
   onBackToSelector, 
-  onLogout
+  onLogout,
+  initialEditId,
+  initialStep,
+  isReviewMode
 }: OperatorOnboardingFormProps) {
   const [activeTab, setActiveTab] = useState<"form" | "registry">("form");
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString("en-IN", {
@@ -54,6 +60,14 @@ export default function OperatorOnboardingForm({
   const [entryMode, setEntryMode] = useState<"new" | "walkin" | "edit">("new");
   const [retrieveIdInput, setRetrieveIdInput] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    if (initialEditId) {
+      loadRecordForEdit(initialEditId).then(() => {
+        if (initialStep) setCurrentStep(Math.min(initialStep, 4));
+      });
+    }
+  }, [initialEditId, initialStep]);
 
   useEffect(() => {
     const timer = setInterval(() => {

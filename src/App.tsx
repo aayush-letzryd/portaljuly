@@ -29,6 +29,8 @@ const LOCAL_STORAGE_TOKEN_KEY = "lr_token";
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [screen, setScreen] = useState<"login" | "selector" | "walkin" | "onboarding" | "operator_onboarding" | "adjustment" | "allocation" | "expenses" | "vehicle_onboarding" | "workshops" | "hubs_parking" | "rents" | "accident" | "inspection" | "users" | "vehicle_models" | "cities" | "roles" | "tickets" | "employees" | "maintenance" | "challans" | "approvals">("login");
+  const [editTarget, setEditTarget] = useState<{ formType: string; id: number; isReview?: boolean } | null>(null);
+  const [activeApprovalsTab, setActiveApprovalsTab] = useState<"pending" | "my-submissions" | "revisions">("pending");
   const [isInitializing, setIsInitializing] = useState(true);
 
   // Load user session from API using token on startup
@@ -101,7 +103,10 @@ export default function App() {
       {screen === "selector" && user && (
         <FormSelector 
           user={user} 
-          onSelectForm={(formType) => setScreen(formType as any)} 
+          onSelectForm={(formType) => {
+            setEditTarget(null);
+            setScreen(formType as any);
+          }} 
           onLogout={handleLogout}
         />
       )}
@@ -115,15 +120,29 @@ export default function App() {
       {screen === "onboarding" && user && (
         <OnboardingForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
-          onLogout={handleLogout} 
+          onBackToSelector={() => {
+            const dest = editTarget ? "approvals" : "selector";
+            setEditTarget(null);
+            setScreen(dest);
+          }} 
+          onLogout={handleLogout}
+          initialEditId={(editTarget?.formType === "individual_onboarding" || editTarget?.formType === "operator_onboarding") ? editTarget.id : undefined}
+          initialStep={1}
+          isReviewMode={editTarget?.isReview}
         />
       )}
       {screen === "operator_onboarding" && user && (
         <OperatorOnboardingForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
-          onLogout={handleLogout} 
+          onBackToSelector={() => {
+            const dest = editTarget ? "approvals" : "selector";
+            setEditTarget(null);
+            setScreen(dest);
+          }} 
+          onLogout={handleLogout}
+          initialEditId={editTarget?.formType === "operator_onboarding" ? editTarget.id : undefined}
+          initialStep={1}
+          isReviewMode={editTarget?.isReview}
         />
       )}
       {screen === "adjustment" && user && (
@@ -136,8 +155,14 @@ export default function App() {
       {screen === "allocation" && user && (
         <AllocationForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={() => {
+            const dest = editTarget ? "approvals" : "selector";
+            setEditTarget(null);
+            setScreen(dest);
+          }} 
           onLogout={handleLogout} 
+          initialEditId={editTarget?.formType === "vehicle_allocation" ? editTarget.id : undefined}
+          isReviewMode={editTarget?.isReview}
         />
       )}
       {screen === "expenses" && user && (
@@ -150,8 +175,15 @@ export default function App() {
       {screen === "vehicle_onboarding" && user && (
         <VehicleOnboardingForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
-          onLogout={handleLogout} 
+          onBackToSelector={() => {
+            const dest = editTarget ? "approvals" : "selector";
+            setEditTarget(null);
+            setScreen(dest);
+          }} 
+          onLogout={handleLogout}
+          initialEditId={editTarget?.formType === "vehicle_onboarding" ? editTarget.id : undefined}
+          initialStep={1}
+          isReviewMode={editTarget?.isReview}
         />
       )}
       {screen === "workshops" && user && (
@@ -249,8 +281,22 @@ export default function App() {
       {screen === "approvals" && user && (
         <ApprovalsDesk 
           user={user as any} 
+          initialTab={activeApprovalsTab}
           onBackToSelector={() => setScreen("selector")} 
           onLogout={handleLogout} 
+          onEditRecord={(module, id, isReview, fromTab) => {
+            if (fromTab) setActiveApprovalsTab(fromTab);
+            setEditTarget({ formType: module, id, isReview });
+            let targetScreen = module;
+            if (module === "individual_onboarding" || module === "operator_onboarding") targetScreen = "onboarding";
+            else if (module === "vehicle_allocation") targetScreen = "allocation";
+            else if (module === "adjustment_form") targetScreen = "adjustment";
+            else if (module === "accidents_form") targetScreen = "accident";
+            else if (module === "expenses_form") targetScreen = "expenses";
+            else if (module === "workshops_desk") targetScreen = "workshops";
+            else if (module === "tickets_desk") targetScreen = "tickets";
+            setScreen(targetScreen as any);
+          }}
         />
       )}
     </div>

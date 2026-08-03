@@ -102,7 +102,7 @@ export interface AdjustmentRecord {
 export interface AllocationRecord {
   id: number;
   allocation_date: string;
-  allocation_type: "New Allocation" | "Car Swap" | "Reallocation";
+  allocation_type: string;
   city_name: string;
   driver_id: string;
   driver_name: string;
@@ -117,6 +117,20 @@ export interface AllocationRecord {
   dropoff_photo?: string;
   is_migrated?: boolean;
   created_at: string;
+  
+  // NEW FIELDS
+  sub_type?: string;
+  ola_negative_balance?: string;
+  ola_negative_balance_proof?: string;
+  photo_lh_side?: string;
+  photo_rh_side?: string;
+  photo_front_side?: string;
+  photo_back_side?: string;
+  gps_active?: string;
+  duplicate_key_status?: string;
+  fastag_balance_amount?: string;
+  fastag_balance_proof?: string;
+  dropoff_location?: string;
 }
 
 export interface ExpenseRecord {

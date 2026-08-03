@@ -11,14 +11,106 @@ interface VehicleOnboardingFormProps {
   user: UserSession;
   onBackToSelector: () => void;
   onLogout: () => void;
+  initialEditId?: number;
+  initialStep?: number;
+  isReviewMode?: boolean;
+}
+
+function SearchableApproverSelect({ 
+  approvers, 
+  selectedId, 
+  onSelect, 
+  label 
+}: { 
+  approvers: any[]; 
+  selectedId: number | null; 
+  onSelect: (id: number) => void; 
+  label: string; 
+}) {
+  const [search, setSearch] = useState("");
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = React.useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (selectedId) {
+      const match = approvers.find(a => a.id === selectedId);
+      if (match) setSearch(`${match.name} (${match.role} — ${match.city})`);
+    } else {
+      setSearch("");
+    }
+  }, [selectedId, approvers]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        setIsOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const selectedMatch = selectedId ? approvers.find(a => a.id === selectedId) : null;
+  const isExactSelectedDisplay = selectedMatch && search === `${selectedMatch.name} (${selectedMatch.role} — ${selectedMatch.city})`;
+
+  const filtered = (search.trim() === "" || isExactSelectedDisplay)
+    ? approvers
+    : approvers.filter(a =>
+        a.name?.toLowerCase().includes(search.toLowerCase()) ||
+        a.role?.toLowerCase().includes(search.toLowerCase()) ||
+        a.city?.toLowerCase().includes(search.toLowerCase())
+      );
+
+  return (
+    <div ref={containerRef} className="space-y-1.5 relative w-full text-left">
+      <label className="text-xs font-bold text-slate-800">{label}</label>
+      <div className="relative">
+        <input
+          type="text"
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setIsOpen(true);
+          }}
+          onFocus={() => setIsOpen(true)}
+          placeholder="Type to search approver..."
+          className="w-full h-11 px-4 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-emerald-600 shadow-inner"
+        />
+        {isOpen && (
+          <div className="absolute z-50 left-0 right-0 top-full mt-1 max-h-52 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl divide-y divide-slate-100">
+            {filtered.map(a => (
+              <div
+                key={a.id}
+                onClick={() => {
+                  onSelect(a.id);
+                  setSearch(`${a.name} (${a.role} — ${a.city})`);
+                  setIsOpen(false);
+                }}
+                className={`p-3 hover:bg-emerald-50 transition-colors cursor-pointer text-xs ${a.id === selectedId ? "bg-emerald-50 font-bold text-emerald-700" : "text-slate-800"}`}
+              >
+                <span className="font-bold block text-slate-900">{a.name}</span>
+                <span className="text-[11px] text-slate-500">{a.role} · <strong className="text-slate-600">{a.city}</strong></span>
+              </div>
+            ))}
+            {filtered.length === 0 && (
+              <div className="p-3 text-center text-slate-400 italic text-xs">No matching approvers found</div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
 
 export default function VehicleOnboardingForm({ 
   user, 
   onBackToSelector, 
-  onLogout
+  onLogout,
+  initialEditId,
+  initialStep,
+  isReviewMode
 }: VehicleOnboardingFormProps) {
-  const [activeTab, setActiveTab] = useState<"form" | "registry">("form");
+  const [activeTab, setActiveTab] = useState<"form" | "drafts" | "registry">("form");
   
   // Header clock state
   const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString("en-IN", {
@@ -39,6 +131,65 @@ export default function VehicleOnboardingForm({
   // Form Fields State
   const [editingId, setEditingId] = useState<number | null>(null);
   const [currentStep, setCurrentStep] = useState(1);
+
+  // Approval states
+  const [approversList, setApproversList] = useState<any[]>([]);
+  const [approvalRequestedTo, setApprovalRequestedTo] = useState<number | null>(null);
+  const [approvalRemarks, setApprovalRemarks] = useState<string | null>(null);
+  const [approvalStatus, setApprovalStatus] = useState<string | null>(null);
+  const [approvalSubmissionNote, setApprovalSubmissionNote] = useState("");
+
+  const fetchApprovers = async () => {
+    try {
+      const token = localStorage.getItem("lr_token");
+      const res = await fetch("/api/july/approvers", {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const validApprovers = data.filter((a: any) =>
+          a.role_code !== "SA" &&
+          !a.name?.toLowerCase().includes("super admin") &&
+          !a.role?.toLowerCase().includes("super admin")
+        );
+        setApproversList(validApprovers);
+        
+        // Auto-select preferred default approver based on role hierarchy
+        if (validApprovers.length > 0) {
+          const uRole = (user.role || "").toLowerCase();
+          let preferred = null;
+          if (uRole.includes("city manager") || uRole.includes("cm")) {
+            preferred = validApprovers.find((a: any) => a.role?.toLowerCase().includes("general manager") || a.role_code === "GM") ||
+                        validApprovers.find((a: any) => a.role?.toLowerCase().includes("business head") || a.role_code === "BH");
+          } else if (uRole.includes("general manager") || uRole.includes("gm")) {
+            preferred = validApprovers.find((a: any) => a.role?.toLowerCase().includes("business head") || a.role_code === "BH");
+          } else {
+            preferred = validApprovers.find((a: any) => a.role?.toLowerCase().includes("city manager") || a.role_code === "CM");
+          }
+          
+          if (preferred) {
+            setApprovalRequestedTo(preferred.id);
+          } else {
+            setApprovalRequestedTo(validApprovers[0].id);
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching approvers:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchApprovers();
+  }, []);
+
+  useEffect(() => {
+    if (initialEditId) {
+      loadRecordForEdit(initialEditId).then(() => {
+        if (initialStep) setCurrentStep(Math.min(initialStep, 5));
+      });
+    }
+  }, [initialEditId, initialStep]);
   
   // Panel 1: Identity & Status
   const [vehicleNumber, setVehicleNumber] = useState("");
@@ -412,6 +563,8 @@ export default function VehicleOnboardingForm({
       setInsuranceDocument(data.insurance_document || null);
       setAuthorizationCertificateDoc(data.authorization_certificate_doc || null);
       setRtoTaxReceipt(data.rto_tax_receipt || null);
+      setApprovalStatus(data.approval_status || null);
+      setApprovalRemarks(data.approval_remarks || null);
 
       setActiveTab("form");
       setCurrentStep(1);
@@ -581,7 +734,11 @@ export default function VehicleOnboardingForm({
       rc_document: rcDocument || undefined,
       insurance_document: insuranceDocument || undefined,
       authorization_certificate_doc: authorizationCertificateDoc || undefined,
-      rto_tax_receipt: rtoTaxReceipt || undefined
+      rto_tax_receipt: rtoTaxReceipt || undefined,
+      approval_status: isDraft ? "Draft" : "Pending Approval",
+      current_approver_id: isDraft ? undefined : (approvalRequestedTo || undefined),
+      approval_remarks: undefined,
+      created_by: user.portal_user_id || undefined
     };
 
     try {
@@ -709,7 +866,7 @@ export default function VehicleOnboardingForm({
             />
             <span className="hidden h-5 border-l border-border sm:inline-block" />
             <span className="hidden font-sans text-xs font-medium text-text-muted sm:inline-block">
-              Vehicle Form
+              Vehicle Onboarding
             </span>
           </div>
 
@@ -717,15 +874,29 @@ export default function VehicleOnboardingForm({
             {!isReadOnly && (
               <button
                 onClick={() => setActiveTab("form")}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold tracking-wide transition-all cursor-pointer ${ activeTab === "form" ? "bg-primary text-white shadow-sm" : "text-text-muted hover:bg-slate-100 hover:text-primary" }`}
+                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold tracking-wide transition-all cursor-pointer ${ activeTab === "form" ? "bg-primary text-white shadow-sm shadow-primary/20" : "text-text-muted hover:bg-slate-100 hover:text-primary" }`}
               >
                 <FileText className="h-4 w-4" />
-                Onboarding Form
+                Vehicle Form
+              </button>
+            )}
+            {!isReadOnly && (
+              <button
+                onClick={() => setActiveTab("drafts")}
+                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold tracking-wide transition-all cursor-pointer ${ activeTab === "drafts" ? "bg-amber-600 text-white shadow-sm shadow-amber-600/20" : "text-text-muted hover:bg-slate-100 hover:text-amber-600" }`}
+              >
+                <Clock className="h-4 w-4" />
+                Saved Drafts
+                {records.filter(r => r.approval_status === "Draft").length > 0 && (
+                  <span className="ml-1 px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded-full text-[10px] font-extrabold">
+                    {records.filter(r => r.approval_status === "Draft").length}
+                  </span>
+                )}
               </button>
             )}
             <button
               onClick={() => setActiveTab("registry")}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold tracking-wide transition-all cursor-pointer ${ activeTab === "registry" ? "bg-primary text-white shadow-sm" : "text-text-muted hover:bg-slate-100 hover:text-primary" }`}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold tracking-wide transition-all cursor-pointer ${ activeTab === "registry" ? "bg-primary text-white shadow-sm shadow-primary/20" : "text-text-muted hover:bg-slate-100 hover:text-primary" }`}
             >
               <Database className="h-4 w-4" />
               Fleet Registry
@@ -843,6 +1014,18 @@ export default function VehicleOnboardingForm({
             )}
 
             <form onSubmit={(e) => e.preventDefault()} className="rounded-2xl border border-border bg-white p-6 shadow-xs md:p-8 flex flex-col gap-8">
+              
+              {(isReviewMode || approvalStatus === "Changes Requested") && approvalRemarks && (
+                <div className="mb-2 p-4 bg-orange-50 border-2 border-orange-300 rounded-2xl">
+                  <div className="flex items-start gap-3">
+                    <AlertTriangle className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-xs font-extrabold text-orange-900 uppercase tracking-wider mb-1">Manager's Revision Instructions</p>
+                      <p className="text-sm font-semibold text-orange-800">{approvalRemarks}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               {/* MULTI-STEP PROGRESS BAR (5 STEPS) */}
               <div className="mb-4">
@@ -1471,6 +1654,32 @@ export default function VehicleOnboardingForm({
                     />
                   </div>
                 </div>
+
+                {/* APPROVER & NOTES SUBMISSION */}
+                <div className="mt-6 border-t border-slate-100 pt-6 space-y-6">
+                  <h4 className="font-sans text-xs font-bold text-slate-400 uppercase tracking-widest">
+                    Approval Workflow
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <SearchableApproverSelect
+                      approvers={approversList}
+                      selectedId={approvalRequestedTo}
+                      onSelect={(id) => setApprovalRequestedTo(id)}
+                      label="Send Approval Request To *"
+                    />
+
+                    <div className="space-y-1.5">
+                      <label className="text-xs font-bold text-slate-800">Executive Notes / Submission Remarks</label>
+                      <textarea
+                        value={approvalSubmissionNote}
+                        onChange={(e) => setApprovalSubmissionNote(e.target.value)}
+                        placeholder="Add notes for approver regarding compliance, registration, or physical condition..."
+                        rows={2}
+                        className="w-full p-2.5 bg-white border border-slate-200 rounded-xl text-xs outline-none focus:border-emerald-600 resize-none shadow-inner"
+                      />
+                    </div>
+                  </div>
+                </div>
               </div>
 
               {/* Form footer step navigation & actions */}
@@ -1514,13 +1723,142 @@ export default function VehicleOnboardingForm({
                       className="flex items-center justify-center gap-2 h-11 rounded-lg bg-green hover:bg-emerald-600 text-white px-6 font-sans text-sm font-bold shadow-md shadow-green/10 transition-all cursor-pointer active:scale-98"
                     >
                       <CheckCircle className="w-4 h-4" />
-                      {editingId ? "Save Changes" : "Submit Vehicle Onboarding"}
+                      {approvalStatus === "Changes Requested" ? "Resubmit for Approval" : (editingId ? "Save Changes" : "Submit Vehicle Onboarding")}
                     </button>
                   )}
                 </div>
               </div>
 
             </form>
+          </div>
+        )}
+
+        {/* TAB 1.5: SAVED DRAFTS */}
+        {activeTab === "drafts" && (
+          <div className="space-y-6">
+            
+            {/* Bento Grid Metrics for Drafts */}
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-5 shadow-xs flex justify-between items-center">
+                <div className="flex flex-col">
+                  <span className="font-sans text-[10px] font-bold text-amber-800 uppercase tracking-wider">Total Saved Drafts</span>
+                  <span className="font-sans text-3xl font-extrabold text-amber-700 mt-1">
+                    {records.filter(r => r.approval_status === "Draft").length}
+                  </span>
+                  <span className="font-sans text-[10px] text-amber-600 mt-1">Unsent vehicle forms saved locally</span>
+                </div>
+                <div className="rounded-xl bg-amber-100 text-amber-700 p-3">
+                  <Clock className="h-6 w-6" />
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-border bg-white p-5 shadow-xs flex justify-between items-center">
+                <div className="flex flex-col">
+                  <span className="font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">In Progress Forms</span>
+                  <span className="font-sans text-3xl font-extrabold text-primary mt-1">
+                    {records.filter(r => r.approval_status === "Draft").length}
+                  </span>
+                  <span className="font-sans text-[10px] text-text-muted mt-1">Waiting to be submitted for approval</span>
+                </div>
+                <div className="rounded-xl bg-blue-50 text-primary p-3">
+                  <Truck className="h-6 w-6" />
+                </div>
+              </div>
+            </div>
+
+            {/* Drafts List Table */}
+            <div className="bg-surface rounded-2xl shadow-sm border border-border/60 overflow-hidden relative">
+              <div className="bg-white p-6 border-b border-border/40 flex justify-between items-center">
+                <div>
+                  <h2 className="font-display text-xl font-bold text-primary flex items-center gap-2">
+                    <Clock className="h-6 w-6 text-amber-600" />
+                    Saved Draft Records
+                  </h2>
+                  <p className="font-sans text-sm text-text-muted mt-1">Unsent vehicle onboarding forms. Click 'Edit Draft' to complete and submit for approval.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { resetForm(); setActiveTab("form"); }}
+                  className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-green hover:bg-green/95 px-4 font-sans text-xs font-bold text-white transition-colors cursor-pointer shadow-xs"
+                >
+                  <Plus className="h-4 w-4" /> New Vehicle Entry
+                </button>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left whitespace-nowrap border-collapse">
+                  <thead className="bg-slate-50 border-b border-border/60">
+                    <tr>
+                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">Draft ID</th>
+                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">Vehicle Reg No</th>
+                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">Model & City</th>
+                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">Fuel Type</th>
+                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">Status</th>
+                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-center">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/40">
+                    {records.filter(r => r.approval_status === "Draft").length === 0 ? (
+                      <tr>
+                        <td colSpan={6} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">
+                          <div className="flex flex-col items-center justify-center gap-2">
+                            <CheckCircle className="h-8 w-8 text-emerald-500 mb-2 opacity-60" />
+                            <p className="font-semibold text-slate-800">No saved drafts found!</p>
+                            <p className="text-xs">All records have been sent for approval or fully onboarded.</p>
+                          </div>
+                        </td>
+                      </tr>
+                    ) : (
+                      records.filter(r => r.approval_status === "Draft").map((r) => {
+                        const appStatus = r.approval_status || "Draft";
+
+                        return (
+                          <tr key={r.id} className="hover:bg-amber-50/20 transition-colors group">
+                            <td className="px-6 py-4 font-mono text-xs font-bold text-slate-900">
+                              #{r.id}
+                            </td>
+                            <td className="px-6 py-4 font-sans text-sm font-bold text-slate-900">
+                              {r.vehicle_number}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="font-sans text-[10px] font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-lg">
+                                {r.model} · <strong className="text-slate-600">{r.city_name || r.city}</strong>
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 font-sans text-xs font-semibold text-text">
+                              {r.fuel_type}
+                            </td>
+                            <td className="px-6 py-4">
+                              <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                                {appStatus}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 text-center">
+                              <div className="flex items-center justify-center gap-2">
+                                <button 
+                                  onClick={() => loadRecordForEdit(r.id)}
+                                  className="px-3 py-1.5 border border-slate-200 bg-white hover:bg-amber-50 text-slate-700 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                  title="Edit / Open Draft"
+                                >
+                                  <Edit className="w-3.5 h-3.5 text-amber-600" /> Edit Draft
+                                </button>
+                                <button 
+                                  onClick={() => handleDeleteRecord(r.id)}
+                                  className="h-8 w-8 rounded-xl flex items-center justify-center text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
+                                  title="Delete Draft"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         )}
 
