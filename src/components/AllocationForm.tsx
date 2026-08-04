@@ -179,10 +179,6 @@ export default function AllocationForm({
   const [retrieveIdInput, setRetrieveIdInput] = useState("");
 
   const [records, setRecords] = useState<AllocationRecord[]>([]);
-  const [approversList, setApproversList] = useState<any[]>([]);
-  const [approvalRequestedTo, setApprovalRequestedTo] = useState<number | null>(null);
-  const [approvalStatus, setApprovalStatus] = useState<string | null>(null);
-  const [approvalRemarks, setApprovalRemarks] = useState<string | null>(null);
   const [stats, setStats] = useState({
     total_allocations: 0,
     new_allocations: 0,
@@ -228,50 +224,9 @@ export default function AllocationForm({
     }
   };
   
-  const fetchApprovers = async () => {
-    try {
-      const token = localStorage.getItem("lr_token");
-      const res = await fetch("/api/july/approvers", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        const validApprovers = data.filter((a: any) =>
-          a.role_code !== "SA" &&
-          !a.name?.toLowerCase().includes("super admin") &&
-          !a.role?.toLowerCase().includes("super admin")
-        );
-        setApproversList(validApprovers);
-        
-        // Auto-select preferred default approver based on role hierarchy
-        if (validApprovers.length > 0) {
-          const uRole = (user.role || "").toLowerCase();
-          let preferred = null;
-          if (uRole.includes("city manager") || uRole.includes("cm")) {
-            preferred = validApprovers.find((a: any) => a.role?.toLowerCase().includes("general manager") || a.role_code === "GM") ||
-                        validApprovers.find((a: any) => a.role?.toLowerCase().includes("business head") || a.role_code === "BH");
-          } else if (uRole.includes("general manager") || uRole.includes("gm")) {
-            preferred = validApprovers.find((a: any) => a.role?.toLowerCase().includes("business head") || a.role_code === "BH");
-          } else {
-            preferred = validApprovers.find((a: any) => a.role?.toLowerCase().includes("city manager") || a.role_code === "CM");
-          }
-          
-          if (preferred) {
-            setApprovalRequestedTo(preferred.id);
-          } else {
-            setApprovalRequestedTo(validApprovers[0].id);
-          }
-        }
-      }
-    } catch (err) {
-      console.error("Error fetching approvers:", err);
-    }
-  };
-
   useEffect(() => {
     fetchStats();
     fetchRecords();
-    fetchApprovers();
   }, []);
 
   useEffect(() => {
@@ -352,9 +307,6 @@ export default function AllocationForm({
       setFastagBalanceAmount(data.fastag_balance_amount || "");
       setFastagBalanceProof(data.fastag_balance_proof || null);
       setDropoffLocation(data.dropoff_location || "Hub");
-      setApprovalStatus(data.approval_status || null);
-      setApprovalRequestedTo(data.current_approver_id || null);
-      setApprovalRemarks(data.approval_remarks || null);
 
       if (data.vehicle_number) {
         fetchLastInspectionForGiven(data.vehicle_number);
@@ -430,7 +382,7 @@ export default function AllocationForm({
     setOldInspectionRemarks("");
   };
 
-  const handleSubmit = async (e: React.FormEvent, targetStatus: "Draft" | "Pending Approval" | "Approved" = "Pending Approval") => {
+  const handleSubmit = async (e: React.FormEvent, targetStatus: "Draft" | "Submitted" = "Submitted") => {
     e.preventDefault();
     const isDraft = targetStatus === "Draft";
 
@@ -551,9 +503,7 @@ export default function AllocationForm({
         fastag_balance_amount: (allocationMainType === "Drop-Off" || allocationSubType === "Swap") ? fastagBalanceAmount.trim() || null : null,
         fastag_balance_proof: (allocationMainType === "Drop-Off" || allocationSubType === "Swap") ? fastagBalanceProof : null,
         dropoff_location: (allocationMainType === "Drop-Off" || allocationSubType === "Swap") ? dropoffLocation : null,
-        approval_status: targetStatus,
-        current_approver_id: targetStatus === "Pending Approval" ? approvalRequestedTo : null,
-        approval_remarks: null
+        status: targetStatus
       };
 
       const url = editingId ? `/api/allocation/${editingId}` : "/api/allocation";
@@ -798,19 +748,7 @@ export default function AllocationForm({
               </div>
 
               {/* Form Content */}
-              <form onSubmit={(e) => handleSubmit(e, "Pending Approval")} className="p-8 space-y-10">
-                
-                {(isReviewMode || approvalStatus === "Changes Requested") && approvalRemarks && (
-                  <div className="p-4 bg-orange-50 border-2 border-orange-300 rounded-2xl">
-                    <div className="flex items-start gap-3">
-                      <AlertTriangle className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-xs font-extrabold text-orange-900 uppercase tracking-wider mb-1">Manager's Revision Instructions</p>
-                        <p className="text-sm font-semibold text-orange-800">{approvalRemarks}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
+              <form onSubmit={(e) => handleSubmit(e, "Submitted")} className="p-8 space-y-10">
                 
                 {/* 3 COLUMN DETAILS GRID */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
@@ -1610,57 +1548,41 @@ export default function AllocationForm({
                   </div>
                 )}
 
-                {/* APPROVER SELECT & FORM ACTIONS */}
-                <div className="border-t border-border pt-6 mt-8 space-y-6">
-                  <div className="space-y-2 text-left max-w-sm">
-                    <label className="text-xs font-bold text-slate-800">Select Approving Manager *</label>
-                    <select
-                      value={approvalRequestedTo || ""}
-                      onChange={(e) => setApprovalRequestedTo(Number(e.target.value))}
-                      className="w-full h-11 px-4 bg-white border border-border rounded-xl text-sm font-semibold outline-none focus:border-primary shadow-2xs"
-                    >
-                      {approversList.map(a => (
-                        <option key={a.id} value={a.id}>{a.name} ({a.role} — {a.city})</option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row justify-between items-center gap-4 pt-4 border-t border-border/40">
-                    <div className="flex flex-col gap-1 text-left w-full sm:w-auto">
-                      <p className="text-[10px] font-bold text-red-500">* means mandatory</p>
-                    </div>
-                    <div className="flex flex-wrap gap-3 w-full sm:w-auto justify-end">
+                {/* FORM ACTIONS */}
+                <div className="flex items-center justify-between border-t border-border pt-6 mt-8">
+                  <p className="text-[10px] font-bold text-red-500">* Mandatory Fields</p>
+                  <div className="flex gap-3">
+                    {editingId ? (
                       <button 
-                        type="button"
-                        onClick={resetForm}
-                        className="rounded-xl border border-border bg-white px-6 py-3.5 font-sans text-xs font-bold text-text hover:bg-bg transition-colors shadow-2xs cursor-pointer"
+                        type="button" 
+                        onClick={() => { resetForm(); setActiveTab("registry"); }} 
+                        className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer transition-colors"
+                      >
+                        Cancel Edit
+                      </button>
+                    ) : (
+                      <button 
+                        type="button" 
+                        onClick={resetForm} 
+                        className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer transition-colors"
                       >
                         Reset Form
                       </button>
-                      <button 
-                        type="button"
-                        onClick={(e) => handleSubmit(e, "Draft")}
-                        className="rounded-xl border border-blue-200 bg-blue-50 hover:bg-blue-100 text-blue-700 px-6 py-3.5 font-sans text-xs font-bold transition-all shadow-2xs cursor-pointer"
-                      >
-                        Save as Draft
-                      </button>
-                      <button 
-                        type="button"
-                        onClick={(e) => handleSubmit(e, "Pending Approval")}
-                        className="rounded-xl bg-primary hover:bg-primary-hover px-6 py-3.5 font-sans text-sm font-bold text-white shadow-sm transition-all cursor-pointer"
-                      >
-                        {approvalStatus === "Changes Requested" ? "Resubmit for Approval" : "Submit for Approval"}
-                      </button>
-                      {user.role_code !== "OE" && user.role_code !== "ops_executive" && (
-                        <button 
-                          type="button"
-                          onClick={(e) => handleSubmit(e, "Approved")}
-                          className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-6 py-3.5 font-sans text-sm font-bold text-white shadow-sm transition-all cursor-pointer"
-                        >
-                          Save &amp; Approve Directly
-                        </button>
-                      )}
-                    </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={(e) => handleSubmit(e, "Draft")}
+                      className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer transition-colors"
+                    >
+                      Save as Draft
+                    </button>
+                    <button 
+                      type="submit" 
+                      onClick={(e) => handleSubmit(e, "Submitted")}
+                      className="h-11 rounded-lg bg-primary hover:bg-primary-hover text-white px-6 font-sans text-sm font-semibold shadow-md cursor-pointer transition-colors"
+                    >
+                      {editingId ? "Update Allocation Entry" : "Save Allocation Entry"}
+                    </button>
                   </div>
                 </div>
               </form>
@@ -1678,7 +1600,7 @@ export default function AllocationForm({
                 <div className="flex flex-col">
                   <span className="font-sans text-[10px] font-bold text-amber-800 uppercase tracking-wider">Total Saved Drafts</span>
                   <span className="font-sans text-3xl font-extrabold text-amber-700 mt-1">
-                    {records.filter(r => r.approval_status === "Draft").length}
+                    {records.filter(r => r.status === "Draft").length}
                   </span>
                   <span className="font-sans text-[10px] text-amber-600 mt-1">Unsent allocation forms saved locally</span>
                 </div>
@@ -1691,9 +1613,9 @@ export default function AllocationForm({
                 <div className="flex flex-col">
                   <span className="font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">In Progress Allocations</span>
                   <span className="font-sans text-3xl font-extrabold text-primary mt-1">
-                    {records.filter(r => r.approval_status === "Draft").length}
+                    {records.filter(r => r.status === "Draft").length}
                   </span>
-                  <span className="font-sans text-[10px] text-text-muted mt-1">Waiting to be submitted for approval</span>
+                  <span className="font-sans text-[10px] text-text-muted mt-1">Saved as draft entries</span>
                 </div>
                 <div className="rounded-xl bg-blue-50 text-primary p-3">
                   <Settings className="h-6 w-6" />
@@ -1709,7 +1631,7 @@ export default function AllocationForm({
                     <Clock className="h-6 w-6 text-amber-600" />
                     Saved Draft Records
                   </h2>
-                  <p className="font-sans text-sm text-text-muted mt-1">Unsent vehicle allocations. Click 'Edit Draft' to complete and submit for approval.</p>
+                  <p className="font-sans text-sm text-text-muted mt-1">Unsent vehicle allocations. Click 'Edit Draft' to complete and save entry.</p>
                 </div>
                 <button
                   type="button"
@@ -1733,19 +1655,19 @@ export default function AllocationForm({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
-                    {records.filter(r => r.approval_status === "Draft").length === 0 ? (
+                    {records.filter(r => r.status === "Draft").length === 0 ? (
                       <tr>
                         <td colSpan={6} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <CheckCircle className="h-8 w-8 text-emerald-500 mb-2 opacity-60" />
                             <p className="font-semibold text-slate-800">No saved drafts found!</p>
-                            <p className="text-xs">All records have been sent for approval or fully active.</p>
+                            <p className="text-xs">All records have been saved to registry.</p>
                           </div>
                         </td>
                       </tr>
                     ) : (
-                      records.filter(r => r.approval_status === "Draft").map((r) => {
-                        const appStatus = r.approval_status || "Draft";
+                      records.filter(r => r.status === "Draft").map((r) => {
+                        const appStatus = r.status || "Draft";
 
                         return (
                           <tr key={r.id} className="hover:bg-amber-50/20 transition-colors group">
@@ -2022,6 +1944,7 @@ export default function AllocationForm({
       {/* Camera Capture Modal */}
       {(cameraActive || activeCameraTarget) && (
         <CameraCapture 
+          title="Capture Photo"
           onCapture={(base64) => {
             if (activeCameraTarget === "olaProof") setOlaNegativeBalanceProof(base64);
             else if (activeCameraTarget === "fastagProof") setFastagBalanceProof(base64);

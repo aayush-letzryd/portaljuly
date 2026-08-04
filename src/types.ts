@@ -138,6 +138,7 @@ export interface AllocationRecord {
   fastag_balance_amount?: string;
   fastag_balance_proof?: string;
   dropoff_location?: string;
+  status?: string;
 }
 
 export interface ExpenseRecord {

@@ -13,6 +13,7 @@ import traceback
 import json
 import uuid
 import uvicorn
+import asyncio
 from datetime import datetime
 from starlette.concurrency import run_in_threadpool
 
@@ -87,12 +88,6 @@ if os.path.exists(".env"):
                     key, val = line.split("=", 1)
                     os.environ[key.strip()] = val.strip()
 
-from datetime import datetime, timezone, timedelta
-IST = timezone(timedelta(hours=5, minutes=30))
-
-def get_ist_now():
-    return datetime.now(IST)
-
 # ─────────────────────────────────────────────────────────
 # Connection Pool
 # ─────────────────────────────────────────────────────────
@@ -101,7 +96,7 @@ postgreSQL_pool = None
 try:
     db_url = os.environ.get("DATABASE_URL")
     if db_url:
-        postgreSQL_pool = psycopg2.pool.SimpleConnectionPool(1, 20, dsn=db_url, options="-c timezone=Asia/Kolkata")
+        postgreSQL_pool = psycopg2.pool.SimpleConnectionPool(1, 20, dsn=db_url)
     else:
         postgreSQL_pool = psycopg2.pool.SimpleConnectionPool(
             1, 20,
@@ -109,11 +104,10 @@ try:
             password=os.environ.get("DB_PASS"),
             host=os.environ.get("DB_HOST"),
             port=os.environ.get("DB_PORT", "5432"),
-            database=os.environ.get("DB_NAME"),
-            options="-c timezone=Asia/Kolkata"
+            database=os.environ.get("DB_NAME")
         )
     if postgreSQL_pool:
-        print("[OK] Connection pool created successfully with Asia/Kolkata IST timezone")
+        print("[OK] Connection pool created successfully")
 except (Exception, psycopg2.DatabaseError) as error:
     print("[ERROR] Error connecting to PostgreSQL:", error)
     if not postgreSQL_pool:
@@ -152,19 +146,24 @@ def startup_event():
         print("[OK] july_cities table initialized with Bengaluru, Mumbai, and Hyderabad")
 
         # ── copy_cities ──────────────────────────────────────
-        cur.execute("""
-            CREATE TABLE IF NOT EXISTS copy_cities (
-                id   SERIAL PRIMARY KEY,
-                name VARCHAR(255) NOT NULL UNIQUE
-            );
-        """)
-        cur.execute("TRUNCATE TABLE copy_cities RESTART IDENTITY CASCADE;")
-        cur.execute("""
-            INSERT INTO copy_cities (id, name) VALUES
-            (1, 'Bengaluru'), (2, 'Mumbai'), (3, 'Hyderabad')
-            ON CONFLICT (name) DO NOTHING;
-        """)
-        cur.execute("SELECT setval('copy_cities_id_seq', (SELECT MAX(id) FROM copy_cities));")
+        try:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS copy_cities (
+                    id   SERIAL PRIMARY KEY,
+                    name VARCHAR(255) NOT NULL
+                );
+            """)
+            cur.execute("TRUNCATE TABLE copy_cities RESTART IDENTITY CASCADE;")
+            cur.execute("""
+                INSERT INTO copy_cities (id, name) VALUES
+                (1, 'Bengaluru'), (2, 'Mumbai'), (3, 'Hyderabad');
+            """)
+            cur.execute("SELECT setval('copy_cities_id_seq', (SELECT MAX(id) FROM copy_cities));")
+            conn.commit()
+        except Exception as err:
+            conn.rollback()
+            print(f"[WARN] copy_cities setup notice: {err}")
+
 
         # ── copy_users (executives / employees) ───────────────
         cur.execute("""
@@ -608,6 +607,139 @@ def startup_event():
             "dropoff_photo TEXT"
         ]:
             cur.execute(f"ALTER TABLE copy_vehicle_allocation ADD COLUMN IF NOT EXISTS {col};")
+
+        # ── july_allocation_form (new production table) ──────────────────
+        try:
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS july_allocation_form (
+                    id                          SERIAL PRIMARY KEY,
+
+                    -- Allocation Meta
+                    allocation_date             DATE,
+                    allocation_type             VARCHAR(50),
+                    sub_type                    VARCHAR(100),
+                    city_name                   VARCHAR(100),
+
+                    -- Driver / Partner Information
+                    driver_id                   VARCHAR(100),
+                    driver_name                 VARCHAR(255),
+                    driver_phone                VARCHAR(20),
+                    driver_plan                 VARCHAR(100),
+                    type_of_plan                VARCHAR(100),
+                    car_model                   VARCHAR(100),
+
+                    -- Allocated / Given Vehicle
+                    vehicle_number              VARCHAR(50),
+                    gps_active                  VARCHAR(10)  DEFAULT 'Yes',
+                    ola_negative_balance        NUMERIC(12, 2),
+                    ola_negative_balance_proof  TEXT,
+
+                    -- 4-Side Car Condition Photos (at handover)
+                    photo_lh_side               TEXT,
+                    photo_rh_side               TEXT,
+                    photo_front_side            TEXT,
+                    photo_back_side             TEXT,
+
+                    -- Allocated Vehicle Inspection Checklist
+                    insp_jack                   VARCHAR(30)  DEFAULT 'Available',
+                    insp_jack_rod               VARCHAR(30)  DEFAULT 'Available',
+                    insp_spanner                VARCHAR(30)  DEFAULT 'Available',
+                    insp_parking_triangle       VARCHAR(30)  DEFAULT 'Available',
+                    insp_fire_extinguishers     VARCHAR(30)  DEFAULT 'Available',
+                    insp_seat_cover             VARCHAR(30)  DEFAULT 'Available',
+                    insp_floor_carpet           VARCHAR(30)  DEFAULT 'Available',
+                    insp_music_system           VARCHAR(30)  DEFAULT 'Available',
+                    insp_remarks                TEXT,
+
+                    -- Drop-Off / Returned Vehicle Fields
+                    old_vehicle_number          VARCHAR(50),
+                    dropoff_odometer            NUMERIC(10, 1),
+                    dropoff_remarks             TEXT,
+                    dropoff_photo               TEXT,
+                    dropoff_location            VARCHAR(50),
+                    duplicate_key_status        VARCHAR(10),
+                    fastag_balance_amount       NUMERIC(10, 2),
+                    fastag_balance_proof        TEXT,
+
+                    -- Returned Vehicle Inspection Checklist
+                    ret_jack                    VARCHAR(30)  DEFAULT 'Available',
+                    ret_jack_rod                VARCHAR(30)  DEFAULT 'Available',
+                    ret_spanner                 VARCHAR(30)  DEFAULT 'Available',
+                    ret_parking_triangle        VARCHAR(30)  DEFAULT 'Available',
+                    ret_fire_extinguishers      VARCHAR(30)  DEFAULT 'Available',
+                    ret_seat_cover              VARCHAR(30)  DEFAULT 'Available',
+                    ret_floor_carpet            VARCHAR(30)  DEFAULT 'Available',
+                    ret_music_system            VARCHAR(30)  DEFAULT 'Available',
+                    ret_insp_remarks            TEXT,
+
+                    -- Status & Audit Columns
+                    status                      VARCHAR(50)  NOT NULL DEFAULT 'Submitted',
+                    created_by                  INTEGER,
+                    updated_by                  INTEGER,
+                    created_at                  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    updated_at                  TIMESTAMP WITH TIME ZONE
+                );
+            """)
+
+            # Indexes for july_allocation_form
+            for idx_sql in [
+                "CREATE INDEX IF NOT EXISTS idx_jaf_driver_id       ON july_allocation_form (driver_id);",
+                "CREATE INDEX IF NOT EXISTS idx_jaf_vehicle_number  ON july_allocation_form (vehicle_number);",
+                "CREATE INDEX IF NOT EXISTS idx_jaf_old_vehicle     ON july_allocation_form (old_vehicle_number);",
+                "CREATE INDEX IF NOT EXISTS idx_jaf_city            ON july_allocation_form (city_name);",
+                "CREATE INDEX IF NOT EXISTS idx_jaf_status          ON july_allocation_form (status);",
+                "CREATE INDEX IF NOT EXISTS idx_jaf_alloc_date      ON july_allocation_form (allocation_date DESC);",
+                "CREATE INDEX IF NOT EXISTS idx_jaf_created_at      ON july_allocation_form (created_at DESC);",
+            ]:
+                cur.execute(idx_sql)
+
+            # ── july_allocation_form_logs (audit trail) ──────────────────────
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS july_allocation_form_logs (
+                    log_id              SERIAL PRIMARY KEY,
+
+                    -- Reference (no hard FK so logs survive DELETE)
+                    allocation_id       INTEGER      NOT NULL,
+                    allocation_date     DATE,
+                    vehicle_number      VARCHAR(50),
+                    driver_id           VARCHAR(100),
+                    driver_name         VARCHAR(255),
+
+                    -- Action
+                    action              VARCHAR(30)  NOT NULL,
+                    old_status          VARCHAR(50),
+                    new_status          VARCHAR(50),
+
+                    -- Change Payload
+                    changed_fields      JSONB,
+                    previous_data       JSONB,
+                    new_data            JSONB,
+
+                    -- Notes
+                    remarks             TEXT,
+
+                    -- Who & When
+                    performed_by        INTEGER,
+                    performed_by_name   VARCHAR(255),
+                    performed_at        TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
+            """)
+
+            for idx_sql in [
+                "CREATE INDEX IF NOT EXISTS idx_jafl_allocation_id  ON july_allocation_form_logs (allocation_id);",
+                "CREATE INDEX IF NOT EXISTS idx_jafl_performed_at   ON july_allocation_form_logs (performed_at DESC);",
+                "CREATE INDEX IF NOT EXISTS idx_jafl_action         ON july_allocation_form_logs (action);",
+                "CREATE INDEX IF NOT EXISTS idx_jafl_driver_id      ON july_allocation_form_logs (driver_id);",
+                "CREATE INDEX IF NOT EXISTS idx_jafl_changed_fields ON july_allocation_form_logs USING GIN (changed_fields);",
+            ]:
+                cur.execute(idx_sql)
+
+            conn.commit()
+            print("[OK] july_allocation_form and july_allocation_form_logs tables ready and committed")
+        except Exception as alloc_err:
+            conn.rollback()
+            print(f"[ERROR] Failed to create allocation tables: {alloc_err}")
+
 
         # ── copy_partner_expenses ───────────────────────────
         cur.execute("""
@@ -1310,9 +1442,7 @@ class AllocationData(BaseModel):
     fastag_balance_amount: Optional[str] = None
     fastag_balance_proof: Optional[Any] = None
     dropoff_location: Optional[str] = None
-    approval_status: Optional[str] = None
-    current_approver_id: Optional[int] = None
-    approval_remarks: Optional[str] = None
+    status: Optional[str] = None
     created_by: Optional[int] = None
 
 
@@ -2344,7 +2474,7 @@ def get_stats(
         elif time_period and time_period != "all":
             from datetime import datetime
             from dateutil.relativedelta import relativedelta
-            today = get_ist_now()
+            today = datetime.now()
             if time_period == "beginning_of_month":
                 start_dt = today.replace(day=1).strftime("%Y-%m-%d")
                 where_clause += " AND w.event_date >= %s"
@@ -2459,8 +2589,7 @@ def get_all_walkins(
                 w.created_at,
                 COALESCE(w.submission_status, 'Submitted') AS submission_status,
                 COALESCE(w.updated_at, w.created_at) AS updated_at,
-                COALESCE(e_up.first_name || ' ' || COALESCE(e_up.last_name, ''), e.first_name || ' ' || COALESCE(e.last_name, ''), 'Onboarding Executive 1') AS updated_by_name,
-                COALESCE(w.updated_by, w.created_by, w.executive_id) AS updated_by
+                COALESCE(e_up.first_name || ' ' || COALESCE(e_up.last_name, ''), e.first_name || ' ' || COALESCE(e.last_name, ''), 'Onboarding Executive 1') AS updated_by_name
             FROM july_walkins w
             LEFT JOIN july_portal_users pu ON pu.portal_user_id = COALESCE(w.created_by, w.executive_id)
             LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
@@ -2513,7 +2642,7 @@ def get_all_walkins(
             from datetime import datetime
             from dateutil.relativedelta import relativedelta
             
-            today = get_ist_now()
+            today = datetime.now()
             
             if time_period == "beginning_of_month":
                 start_dt = today.replace(day=1).strftime("%Y-%m-%d")
@@ -2536,7 +2665,7 @@ def get_all_walkins(
         cur.execute(count_query, params)
         total_count = cur.fetchone()[0]
         
-        base_query += " ORDER BY COALESCE(w.updated_at, w.created_at) DESC, w.id DESC LIMIT %s OFFSET %s"
+        base_query += " ORDER BY w.id DESC LIMIT %s OFFSET %s"
         offset = (page - 1) * limit
         params.extend([limit, offset])
         
@@ -2572,8 +2701,7 @@ def get_all_walkins(
                 "created_at": r[22].isoformat() if r[22] else None,
                 "submission_status": r[23],
                 "updated_at": r[24].isoformat() if r[24] else (r[22].isoformat() if r[22] else None),
-                "updated_by_name": r[25],
-                "updated_by": r[26]
+                "updated_by_name": r[25]
             })
             
         return {
@@ -3892,97 +4020,139 @@ def delete_adjustment(id: int):
 
 
 # ─────────────────────────────────────────────────────────
-# Vehicle Allocation Endpoints
+# Vehicle Allocation Endpoints  (→ july_allocation_form)
 # ─────────────────────────────────────────────────────────
+
+def _write_alloc_log(cur, allocation_id, action, old_status, new_status,
+                     changed_fields, previous_data, new_data, remarks,
+                     performed_by, performed_by_name,
+                     alloc_date=None, vehicle_number=None,
+                     driver_id=None, driver_name=None):
+    """Insert one audit row into july_allocation_form_logs."""
+    cur.execute("""
+        INSERT INTO july_allocation_form_logs (
+            allocation_id, allocation_date, vehicle_number, driver_id, driver_name,
+            action, old_status, new_status,
+            changed_fields, previous_data, new_data, remarks,
+            performed_by, performed_by_name
+        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);
+    """, (
+        allocation_id,
+        alloc_date, vehicle_number, driver_id, driver_name,
+        action, old_status, new_status,
+        json.dumps(changed_fields) if changed_fields else None,
+        json.dumps(previous_data)  if previous_data  else None,
+        json.dumps(new_data)       if new_data        else None,
+        remarks,
+        performed_by, performed_by_name
+    ))
+
+
 @app.get("/api/allocation")
 def get_allocations(
     query: Optional[str] = None,
     city: Optional[str] = None,
-    alloc_type: Optional[str] = None
+    alloc_type: Optional[str] = None,
+    authorization: Optional[str] = Header(None)
 ):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        base_query = "SELECT * FROM copy_vehicle_allocation WHERE 1=1"
+        base_query = "SELECT * FROM july_allocation_form WHERE 1=1"
         params = []
-        
+
         if query:
             base_query += """ AND (
-                LOWER(driver_name) LIKE %s OR 
-                LOWER(driver_id) LIKE %s OR 
-                driver_phone LIKE %s OR 
-                LOWER(vehicle_number) LIKE %s OR 
-                LOWER(old_vehicle_number) LIKE %s
+                LOWER(driver_name)        LIKE %s OR
+                LOWER(driver_id)          LIKE %s OR
+                driver_phone              LIKE %s OR
+                LOWER(vehicle_number)     LIKE %s OR
+                LOWER(old_vehicle_number) LIKE %s OR
+                CAST(id AS TEXT)          LIKE %s
             )"""
             q = f"%{query.lower()}%"
-            params.extend([q, q, q, q, q])
-            
+            params.extend([q, q, q, q, q, q])
+
         if city and city != "all":
             base_query += " AND city_name = %s"
             params.append(city)
-            
+
         if alloc_type and alloc_type != "all":
             base_query += " AND allocation_type = %s"
             params.append(alloc_type)
-            
+
         base_query += " ORDER BY id DESC"
         cur.execute(base_query, params)
         cols = [d[0] for d in cur.description]
-        return [dict(zip(cols, row)) for row in cur.fetchall()]
+        result = []
+        for row in cur.fetchall():
+            rec = dict(zip(cols, row))
+            # Serialise date/timestamp fields so JSON can handle them
+            for df in ["allocation_date", "created_at", "updated_at"]:
+                if rec.get(df) and hasattr(rec[df], "isoformat"):
+                    rec[df] = rec[df].isoformat()
+            result.append(rec)
+        return result
     finally:
         postgreSQL_pool.putconn(conn)
 
+
 @app.get("/api/allocation/stats")
-def get_allocation_stats():
+def get_allocation_stats(authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        
-        cur.execute("SELECT COUNT(*) FROM copy_vehicle_allocation;")
+
+        cur.execute("SELECT COUNT(*) FROM july_allocation_form;")
         total = cur.fetchone()[0]
-        
+
         cur.execute("""
-            SELECT COUNT(*) FROM copy_vehicle_allocation 
-            WHERE allocation_type IN ('New Allocation', 'New allocation') 
-               OR (allocation_type = 'Allocation' AND sub_type IN ('New Allocation', 'Rejoining'));
+            SELECT COUNT(*) FROM july_allocation_form
+            WHERE allocation_type = 'Allocation'
+              AND sub_type IN ('New Allocation', 'Rejoining');
         """)
         new_alloc = cur.fetchone()[0]
-        
+
         cur.execute("""
-            SELECT COUNT(*) FROM copy_vehicle_allocation 
-            WHERE allocation_type IN ('Car Swap', 'Swap') 
-               OR (allocation_type = 'Allocation' AND sub_type = 'Swap');
+            SELECT COUNT(*) FROM july_allocation_form
+            WHERE allocation_type = 'Allocation' AND sub_type = 'Swap';
         """)
         swap_alloc = cur.fetchone()[0]
-        
+
         cur.execute("""
-            SELECT COUNT(*) FROM copy_vehicle_allocation 
-            WHERE allocation_type = 'Reallocation';
+            SELECT COUNT(*) FROM july_allocation_form
+            WHERE allocation_type = 'Drop-Off';
         """)
-        realloc = cur.fetchone()[0]
-        
+        dropoffs = cur.fetchone()[0]
+
         return {
             "total_allocations": total,
-            "new_allocations": new_alloc,
-            "car_swaps": swap_alloc,
-            "reallocations": realloc
+            "new_allocations":   new_alloc,
+            "car_swaps":         swap_alloc,
+            "reallocations":     dropoffs      # kept for frontend compat
         }
     finally:
         postgreSQL_pool.putconn(conn)
 
+
 @app.get("/api/allocation/{id}")
-def get_allocation_record(id: int):
+def get_allocation_record(id: int, authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM copy_vehicle_allocation WHERE id = %s;", (id,))
+        cur.execute("SELECT * FROM july_allocation_form WHERE id = %s;", (id,))
         r = cur.fetchone()
         if not r:
             raise HTTPException(status_code=404, detail="Allocation record not found")
         cols = [d[0] for d in cur.description]
-        return dict(zip(cols, r))
+        rec = dict(zip(cols, r))
+        for df in ["allocation_date", "created_at", "updated_at"]:
+            if rec.get(df) and hasattr(rec[df], "isoformat"):
+                rec[df] = rec[df].isoformat()
+        return rec
     finally:
         postgreSQL_pool.putconn(conn)
+
 
 @app.post("/api/allocation")
 def create_allocation_record(data: AllocationData, authorization: Optional[str] = Header(None)):
@@ -3992,86 +4162,217 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
             user = get_july_user(authorization)
         except Exception:
             pass
-    uid = user["portal_user_id"] if user else None
+    uid   = user["portal_user_id"] if user else None
+    uname = user["name"]           if user else "System"
+
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO copy_vehicle_allocation (
-                allocation_date, allocation_type, city_name, driver_id, driver_name, 
-                driver_phone, driver_plan, type_of_plan, car_model, vehicle_number, 
-                old_vehicle_number, dropoff_odometer, dropoff_remarks, dropoff_photo,
-                sub_type, ola_negative_balance, ola_negative_balance_proof,
+            INSERT INTO july_allocation_form (
+                allocation_date, allocation_type, sub_type, city_name,
+                driver_id, driver_name, driver_phone,
+                driver_plan, type_of_plan, car_model,
+                vehicle_number, gps_active,
+                ola_negative_balance, ola_negative_balance_proof,
                 photo_lh_side, photo_rh_side, photo_front_side, photo_back_side,
-                gps_active, duplicate_key_status, fastag_balance_amount, fastag_balance_proof,
-                dropoff_location, approval_status, current_approver_id, approval_remarks,
-                created_by, created_at
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,NOW())
-            RETURNING id;
+                old_vehicle_number, dropoff_odometer, dropoff_remarks, dropoff_photo,
+                dropoff_location, duplicate_key_status,
+                fastag_balance_amount, fastag_balance_proof,
+                status, created_by, created_at
+            ) VALUES (
+                %s,%s,%s,%s, %s,%s,%s, %s,%s,%s, %s,%s,
+                %s,%s, %s,%s,%s,%s,
+                %s,%s,%s,%s, %s,%s, %s,%s,
+                %s, %s, NOW()
+            ) RETURNING id;
         """, (
-            data.allocation_date, data.allocation_type, data.city_name, data.driver_id, data.driver_name,
-            data.driver_phone, data.driver_plan, data.type_of_plan, data.car_model, data.vehicle_number,
-            data.old_vehicle_number, data.dropoff_odometer, data.dropoff_remarks,
-            extract_image(data.dropoff_photo),
-            data.sub_type, data.ola_negative_balance, extract_image(data.ola_negative_balance_proof),
-            extract_image(data.photo_lh_side), extract_image(data.photo_rh_side), extract_image(data.photo_front_side), extract_image(data.photo_back_side),
-            data.gps_active, data.duplicate_key_status, data.fastag_balance_amount, extract_image(data.fastag_balance_proof),
-            data.dropoff_location, data.approval_status or "Draft", data.current_approver_id, data.approval_remarks,
+            data.allocation_date, data.allocation_type, data.sub_type, data.city_name,
+            data.driver_id, data.driver_name, data.driver_phone,
+            data.driver_plan, data.type_of_plan, data.car_model,
+            data.vehicle_number, data.gps_active,
+            data.ola_negative_balance, extract_image(data.ola_negative_balance_proof),
+            extract_image(data.photo_lh_side), extract_image(data.photo_rh_side),
+            extract_image(data.photo_front_side), extract_image(data.photo_back_side),
+            data.old_vehicle_number,
+            float(data.dropoff_odometer) if data.dropoff_odometer else None,
+            data.dropoff_remarks, extract_image(data.dropoff_photo),
+            data.dropoff_location, data.duplicate_key_status,
+            float(data.fastag_balance_amount) if data.fastag_balance_amount else None,
+            extract_image(data.fastag_balance_proof),
+            data.status or "Submitted",
             data.created_by or uid
         ))
         new_id = cur.fetchone()[0]
+
+        # Write CREATE log
+        _write_alloc_log(
+            cur, new_id, "CREATE",
+            old_status=None, new_status=data.status or "Submitted",
+            changed_fields=None, previous_data=None,
+            new_data={
+                "driver_id":       data.driver_id,
+                "driver_name":     data.driver_name,
+                "vehicle_number":  data.vehicle_number,
+                "allocation_type": data.allocation_type,
+                "sub_type":        data.sub_type,
+                "status":          data.status or "Submitted"
+            },
+            remarks=None,
+            performed_by=uid, performed_by_name=uname,
+            alloc_date=data.allocation_date,
+            vehicle_number=data.vehicle_number,
+            driver_id=data.driver_id, driver_name=data.driver_name
+        )
+
         conn.commit()
         return {"success": True, "id": new_id}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         postgreSQL_pool.putconn(conn)
 
+
 @app.put("/api/allocation/{id}")
-def update_allocation_record(id: int, data: AllocationData):
+def update_allocation_record(id: int, data: AllocationData, authorization: Optional[str] = Header(None)):
+    user = None
+    if authorization:
+        try:
+            user = get_july_user(authorization)
+        except Exception:
+            pass
+    uid   = user["portal_user_id"] if user else None
+    uname = user["name"]           if user else "System"
+
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
+
+        # Snapshot previous state for the audit log
+        cur.execute("SELECT * FROM july_allocation_form WHERE id = %s;", (id,))
+        prev_row = cur.fetchone()
+        if not prev_row:
+            raise HTTPException(status_code=404, detail="Allocation record not found")
+        prev_cols = [d[0] for d in cur.description]
+        prev_data = dict(zip(prev_cols, prev_row))
+        old_status = prev_data.get("status")
+        # Serialise dates before storing as JSON
+        for df in ["allocation_date", "created_at", "updated_at"]:
+            if prev_data.get(df) and hasattr(prev_data[df], "isoformat"):
+                prev_data[df] = prev_data[df].isoformat()
+
         cur.execute("""
-            UPDATE copy_vehicle_allocation SET
-                allocation_date=%s, allocation_type=%s, city_name=%s, driver_id=%s, driver_name=%s, 
-                driver_phone=%s, driver_plan=%s, type_of_plan=%s, car_model=%s, vehicle_number=%s, 
-                old_vehicle_number=%s, dropoff_odometer=%s, dropoff_remarks=%s, dropoff_photo=%s,
-                sub_type=%s, ola_negative_balance=%s, ola_negative_balance_proof=%s,
+            UPDATE july_allocation_form SET
+                allocation_date=%s, allocation_type=%s, sub_type=%s, city_name=%s,
+                driver_id=%s, driver_name=%s, driver_phone=%s,
+                driver_plan=%s, type_of_plan=%s, car_model=%s,
+                vehicle_number=%s, gps_active=%s,
+                ola_negative_balance=%s, ola_negative_balance_proof=%s,
                 photo_lh_side=%s, photo_rh_side=%s, photo_front_side=%s, photo_back_side=%s,
-                gps_active=%s, duplicate_key_status=%s, fastag_balance_amount=%s, fastag_balance_proof=%s,
-                dropoff_location=%s, approval_status=%s, current_approver_id=%s, approval_remarks=%s,
-                created_by=%s
+                old_vehicle_number=%s, dropoff_odometer=%s, dropoff_remarks=%s, dropoff_photo=%s,
+                dropoff_location=%s, duplicate_key_status=%s,
+                fastag_balance_amount=%s, fastag_balance_proof=%s,
+                status=%s, updated_by=%s, updated_at=NOW()
             WHERE id=%s RETURNING id;
         """, (
-            data.allocation_date, data.allocation_type, data.city_name, data.driver_id, data.driver_name,
-            data.driver_phone, data.driver_plan, data.type_of_plan, data.car_model, data.vehicle_number,
-            data.old_vehicle_number, data.dropoff_odometer, data.dropoff_remarks,
-            extract_image(data.dropoff_photo),
-            data.sub_type, data.ola_negative_balance, extract_image(data.ola_negative_balance_proof),
-            extract_image(data.photo_lh_side), extract_image(data.photo_rh_side), extract_image(data.photo_front_side), extract_image(data.photo_back_side),
-            data.gps_active, data.duplicate_key_status, data.fastag_balance_amount, extract_image(data.fastag_balance_proof),
-            data.dropoff_location, data.approval_status, data.current_approver_id, data.approval_remarks,
-            data.created_by,
-            id
+            data.allocation_date, data.allocation_type, data.sub_type, data.city_name,
+            data.driver_id, data.driver_name, data.driver_phone,
+            data.driver_plan, data.type_of_plan, data.car_model,
+            data.vehicle_number, data.gps_active,
+            data.ola_negative_balance, extract_image(data.ola_negative_balance_proof),
+            extract_image(data.photo_lh_side), extract_image(data.photo_rh_side),
+            extract_image(data.photo_front_side), extract_image(data.photo_back_side),
+            data.old_vehicle_number,
+            float(data.dropoff_odometer) if data.dropoff_odometer else None,
+            data.dropoff_remarks, extract_image(data.dropoff_photo),
+            data.dropoff_location, data.duplicate_key_status,
+            float(data.fastag_balance_amount) if data.fastag_balance_amount else None,
+            extract_image(data.fastag_balance_proof),
+            data.status or "Submitted",
+            uid, id
         ))
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Allocation record not found")
+
+        # Decide action label
+        new_stat = data.status or "Submitted"
+        action = "STATUS_CHANGE" if old_status != new_stat else "UPDATE"
+        _write_alloc_log(
+            cur, id, action,
+            old_status=old_status, new_status=new_stat,
+            changed_fields=None, previous_data=prev_data,
+            new_data={
+                "driver_id":       data.driver_id,
+                "vehicle_number":  data.vehicle_number,
+                "status":          new_stat
+            },
+            remarks=None,
+            performed_by=uid, performed_by_name=uname,
+            alloc_date=data.allocation_date,
+            vehicle_number=data.vehicle_number,
+            driver_id=data.driver_id, driver_name=data.driver_name
+        )
+
         conn.commit()
         return {"success": True, "id": id}
+    except Exception as e:
+        conn.rollback()
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         postgreSQL_pool.putconn(conn)
 
+
 @app.delete("/api/allocation/{id}")
-def delete_allocation_record(id: int):
+def delete_allocation_record(id: int, authorization: Optional[str] = Header(None)):
+    user = None
+    if authorization:
+        try:
+            user = get_july_user(authorization)
+        except Exception:
+            pass
+    uid   = user["portal_user_id"] if user else None
+    uname = user["name"]           if user else "System"
+
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("DELETE FROM copy_vehicle_allocation WHERE id = %s RETURNING id;", (id,))
-        deleted = cur.fetchone()
-        if not deleted:
+        # Snapshot before delete so the log captures who was deleted
+        cur.execute("""
+            SELECT driver_id, driver_name, vehicle_number, allocation_date, status
+            FROM july_allocation_form WHERE id = %s;
+        """, (id,))
+        snap = cur.fetchone()
+        if not snap:
             raise HTTPException(status_code=404, detail="Allocation record not found")
+        drv_id, drv_name, veh_num, alloc_dt, status = snap
+
+        cur.execute("DELETE FROM july_allocation_form WHERE id = %s RETURNING id;", (id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Allocation record not found")
+
+        _write_alloc_log(
+            cur, id, "DELETE",
+            old_status=status, new_status=None,
+            changed_fields=None,
+            previous_data={"id": id, "driver_id": drv_id, "vehicle_number": veh_num},
+            new_data=None,
+            remarks="Record permanently deleted",
+            performed_by=uid, performed_by_name=uname,
+            alloc_date=str(alloc_dt) if alloc_dt else None,
+            vehicle_number=veh_num, driver_id=drv_id, driver_name=drv_name
+        )
+
         conn.commit()
         return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         postgreSQL_pool.putconn(conn)
 
@@ -6248,9 +6549,13 @@ def get_record_details(module: str, record_id: int, authorization: Optional[str]
 
 
 # ─────────────────────────────────────────────────────────
-# Static files — must be last
+# Static files — only mounted when dist/ exists (production build)
+# During development the React dev server (npm run dev) serves the frontend
 # ─────────────────────────────────────────────────────────
-app.mount("/", StaticFiles(directory="dist", html=True), name="static")
+if os.path.isdir("dist"):
+    app.mount("/", StaticFiles(directory="dist", html=True), name="static")
+else:
+    print("[INFO] dist/ not found — skipping static file mount (run 'npm run build' for production)")
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
