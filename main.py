@@ -2536,7 +2536,7 @@ def get_all_walkins(
         cur.execute(count_query, params)
         total_count = cur.fetchone()[0]
         
-        base_query += " ORDER BY w.id DESC LIMIT %s OFFSET %s"
+        base_query += " ORDER BY COALESCE(w.updated_at, w.created_at) DESC, w.id DESC LIMIT %s OFFSET %s"
         offset = (page - 1) * limit
         params.extend([limit, offset])
         
