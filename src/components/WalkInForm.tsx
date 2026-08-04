@@ -44,56 +44,6 @@ const normalizeCity = (cityVal: string): string => {
   return "Hyderabad"; // Fallback
 };
 
-const formatDisplayDate = (createdAt?: string, fallbackDate?: string): string => {
-  if (createdAt) {
-    try {
-      const d = new Date(createdAt);
-      if (!isNaN(d.getTime())) {
-        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
-      }
-    } catch (e) {}
-  }
-  if (fallbackDate) {
-    try {
-      const cleanDate = fallbackDate.trim();
-      const parts = cleanDate.split("-");
-      if (parts.length === 3) {
-        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-      }
-    } catch (e) {}
-    return fallbackDate;
-  }
-  return "—";
-};
-
-const formatDisplayTime = (createdAt?: string, fallbackTime?: string): string => {
-  if (createdAt) {
-    try {
-      const d = new Date(createdAt);
-      if (!isNaN(d.getTime())) {
-        return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
-      }
-    } catch (e) {}
-  }
-  if (fallbackTime) {
-    const cleaned = fallbackTime.trim();
-    if (/^(0?[1-9]|1[0-2]):[0-5][0-9]\s*(AM|PM)?$/i.test(cleaned)) {
-      return cleaned.toUpperCase();
-    }
-    const match = cleaned.match(/^(\d{1,2}):(\d{2})/);
-    if (match) {
-      let hours = parseInt(match[1], 10);
-      const minutes = match[2];
-      const ampm = hours >= 12 ? "pm" : "am";
-      hours = hours % 12 || 12;
-      return `${hours.toString().padStart(2, "0")}:${minutes} ${ampm}`;
-    }
-    return fallbackTime;
-  }
-  return "—";
-};
-
 export default function WalkInForm({ 
   user, 
   onBackToSelector, 
@@ -244,10 +194,8 @@ export default function WalkInForm({
   useEffect(() => {
     if (!editingId && !enquiryDate) {
       const now = new Date();
-      const istDate = now.toLocaleDateString("en-CA", { timeZone: "Asia/Kolkata" });
-      const istTime = now.toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: '2-digit', minute: '2-digit', hour12: false });
-      setEnquiryDate(istDate);
-      setEnquiryTime(istTime);
+      setEnquiryDate(now.toISOString().split("T")[0]);
+      setEnquiryTime(now.toTimeString().slice(0, 5));
     }
   }, [editingId, enquiryDate]);
 
@@ -1097,15 +1045,15 @@ export default function WalkInForm({
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-border/60">
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Draft ID</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Candidate Name</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">City</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Contact</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Date Created</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Created By</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Last Edited At</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Last Edited By</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center whitespace-nowrap">Action</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Draft ID</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Candidate Name</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">City</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Contact</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Created By</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Date & Time Created</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Last Edited At</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Last Edited By</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
@@ -1113,38 +1061,37 @@ export default function WalkInForm({
                       <tr><td colSpan={9} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50 text-[11px]">No drafts found.</td></tr>
                     ) : (
                       draftRecords.map((r) => {
-                        const createdDate = formatDisplayDate(r.created_at, r.event_date);
-                        const createdTime = formatDisplayTime(r.created_at, r.enquiry_time);
+                        const createdDate = r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : (r.event_date || "—");
+                        const createdTime = r.created_at ? new Date(r.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : (r.enquiry_time || "—");
                         
-                        const updatedDate = formatDisplayDate(r.updated_at, r.created_at || r.event_date);
-                        const updatedTime = formatDisplayTime(r.updated_at, r.created_at || r.enquiry_time);
+                        const updatedDate = r.updated_at ? new Date(r.updated_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : createdDate;
+                        const updatedTime = r.updated_at ? new Date(r.updated_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : createdTime;
 
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/50 transition-colors text-[11px] font-sans">
                             <td className="px-4 py-3 font-mono font-bold text-slate-900">#{r.id}</td>
-                            <td className="px-4 py-3 font-bold text-slate-900 truncate" title={r.first_name ? `${r.first_name} ${r.last_name}`.trim() : (r.person_name || 'N/A')}>
+                            <td className="px-4 py-3 font-bold text-slate-900">
                               {r.first_name ? `${r.first_name} ${r.last_name}`.trim() : (r.person_name || 'N/A')}
                             </td>
                             <td className="px-4 py-3 font-bold text-slate-700">{normalizeCity(r.city || r.city_name)}</td>
                             <td className="px-4 py-3 font-semibold text-slate-800">{r.person_number || 'N/A'}</td>
                             <td className="px-4 py-3">
-                              <div className="font-bold text-slate-800">{createdDate}</div>
-                              <div className="text-slate-400 text-[10px] font-medium">{createdTime}</div>
+                              <div className="font-bold text-slate-900">{r.executive_name || 'Onboarding Executive 1'}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.executive_id || 26}</div>
                             </td>
                             <td className="px-4 py-3">
-                              <div className="font-bold text-slate-900 truncate">{r.executive_name || 'Onboarding Executive 1'}</div>
-                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.executive_id || 3}</div>
+                              <div className="font-bold text-slate-800">{createdDate}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">{createdTime}</div>
                             </td>
                             <td className="px-4 py-3">
                               <div className="font-bold text-slate-800">{updatedDate}</div>
                               <div className="text-slate-400 text-[10px] font-medium">{updatedTime}</div>
                             </td>
-                            <td className="px-4 py-3">
-                              <div className="font-bold text-slate-900 truncate">{r.updated_by_name || r.executive_name || '—'}</div>
-                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.updated_by || r.executive_id || 3}</div>
+                            <td className="px-4 py-3 font-bold text-slate-800">
+                              {r.updated_by_name || r.executive_name || '—'}
                             </td>
                             <td className="px-4 py-3 text-center">
-                              <div className="inline-flex gap-1.5 justify-center">
+                              <div className="inline-flex gap-2 justify-center">
                                 <button type="button" onClick={() => fetchRecordDetailsForEdit(r.id)} className="rounded-lg px-2 py-1 border border-border bg-white text-text-muted hover:text-primary hover:bg-slate-50 transition-all cursor-pointer flex items-center gap-1 font-bold"><Edit className="h-3.5 w-3.5" /> Edit</button>
                                 <button type="button" onClick={() => { if (window.confirm('Delete this draft?')) handleDeleteRecord(r.id); }} className="rounded-lg p-1 border border-border bg-white text-text-muted hover:text-rose-500 hover:bg-rose-50 border-rose-200 transition-all cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button>
                               </div>
@@ -1288,17 +1235,17 @@ export default function WalkInForm({
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-border/60">
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Walk-in ID</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Candidate Name</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">City</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Contact</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Position</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Date Created</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Recorded By</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Last Edited At</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Last Edited By</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Outcome Status</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center whitespace-nowrap">Action</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Walk-in ID</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Candidate Name</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">City</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Contact</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Position</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Recorded By</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Date & Time Created</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Last Edited At</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Last Edited By</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Outcome Status</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
@@ -1312,16 +1259,16 @@ export default function WalkInForm({
                         else if (displayStatus === "Follow Up Required" || displayStatus === "Pending") statusColor = "bg-amber-50 text-amber-700 border-amber-200";
                         else if (displayStatus === "No Follow Up Required / Closed" || displayStatus === "Not Interested") statusColor = "bg-red-50 border-red-100 text-red-600";
 
-                        const createdDate = formatDisplayDate(r.created_at, r.event_date);
-                        const createdTime = formatDisplayTime(r.created_at, r.enquiry_time);
+                        const createdDate = r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : (r.event_date || "—");
+                        const createdTime = r.created_at ? new Date(r.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : (r.enquiry_time || "—");
                         
-                        const updatedDate = formatDisplayDate(r.updated_at, r.created_at || r.event_date);
-                        const updatedTime = formatDisplayTime(r.updated_at, r.created_at || r.enquiry_time);
+                        const updatedDate = r.updated_at ? new Date(r.updated_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : createdDate;
+                        const updatedTime = r.updated_at ? new Date(r.updated_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : createdTime;
 
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/50 transition-colors text-[11px] font-sans">
                             <td className="px-4 py-3 font-mono font-bold text-slate-900">#{r.id}</td>
-                            <td className="px-4 py-3 font-bold text-slate-900 truncate" title={r.first_name ? `${r.first_name} ${r.last_name}`.trim() : (r.person_name || 'N/A')}>
+                            <td className="px-4 py-3 font-bold text-slate-900">
                               {r.first_name ? `${r.first_name} ${r.last_name}`.trim() : (r.person_name || 'N/A')}
                             </td>
                             <td className="px-4 py-3 font-bold text-slate-700">{normalizeCity(r.city || r.city_name)}</td>
@@ -1330,20 +1277,19 @@ export default function WalkInForm({
                               <span className="inline-block rounded-md px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-700">{r.visitor_type}</span>
                             </td>
                             <td className="px-4 py-3">
-                              <div className="font-bold text-slate-800">{createdDate}</div>
-                              <div className="text-slate-400 text-[10px] font-medium">{createdTime}</div>
+                              <div className="font-bold text-slate-900">{r.executive_name}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.executive_id}</div>
                             </td>
                             <td className="px-4 py-3">
-                              <div className="font-bold text-slate-900 truncate">{r.executive_name || 'Onboarding Executive 1'}</div>
-                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.executive_id || 3}</div>
+                              <div className="font-bold text-slate-800">{createdDate}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">{createdTime}</div>
                             </td>
                             <td className="px-4 py-3">
                               <div className="font-bold text-slate-800">{updatedDate}</div>
                               <div className="text-slate-400 text-[10px] font-medium">{updatedTime}</div>
                             </td>
-                            <td className="px-4 py-3">
-                              <div className="font-bold text-slate-900 truncate">{r.updated_by_name || r.executive_name || '—'}</div>
-                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.updated_by || r.executive_id || 3}</div>
+                            <td className="px-4 py-3 font-bold text-slate-800">
+                              {r.updated_by_name || r.executive_name || '—'}
                             </td>
                             <td className="px-4 py-3"><span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${statusColor}`}>{displayStatus}</span></td>
                             <td className="px-4 py-3 text-center">
