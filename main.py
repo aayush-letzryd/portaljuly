@@ -2274,7 +2274,11 @@ def get_stats(
     city: Optional[str] = "all",
     visitor_type: Optional[str] = "all",
     status: Optional[str] = "all",
-    time_period: Optional[str] = "all"
+    time_period: Optional[str] = "all",
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None
 ):
     user_city = None
     is_global = True
@@ -2291,7 +2295,7 @@ def get_stats(
     try:
         cur = conn.cursor()
         
-        where_clause = "WHERE 1=1"
+        where_clause = "WHERE (w.submission_status IS NULL OR w.submission_status != 'Draft')"
         params = []
 
         if city and city != "all":
@@ -2321,7 +2325,16 @@ def get_stats(
             where_clause += " AND w.joined_status = %s"
             params.append(status)
             
-        if time_period and time_period != "all":
+        if time_period == "custom" or start_date or end_date or from_date or to_date:
+            s_date = start_date or from_date
+            e_date = end_date or to_date
+            if s_date:
+                where_clause += " AND (w.event_date >= %s OR w.created_at >= %s)"
+                params.extend([s_date, s_date])
+            if e_date:
+                where_clause += " AND (w.event_date <= %s OR w.created_at <= %s)"
+                params.extend([e_date, e_date + " 23:59:59"])
+        elif time_period and time_period != "all":
             from datetime import datetime
             from dateutil.relativedelta import relativedelta
             today = datetime.now()
@@ -2346,7 +2359,7 @@ def get_stats(
             SELECT 
                 COUNT(*) as total,
                 SUM(CASE WHEN w.joined_status IN ('Successfully Onboarded', 'Joined', 'Onboarded', 'Completed') THEN 1 ELSE 0 END) as joined,
-                SUM(CASE WHEN w.joined_status IN ('Follow Up Required', 'Pending', 'Initiated', 'Onboarding Process Initiated') THEN 1 ELSE 0 END) as pending,
+                SUM(CASE WHEN w.joined_status IN ('Follow Up Required', 'Onboarding Process Initiated', 'Initiated', 'Pending') THEN 1 ELSE 0 END) as pending,
                 SUM(CASE WHEN w.joined_status IN ('No Follow Up Required / Closed', 'Not Interested') THEN 1 ELSE 0 END) as not_interested,
                 SUM(CASE WHEN w.visitor_type ILIKE '%%Driver%%' THEN 1 ELSE 0 END) as individuals,
                 SUM(CASE WHEN w.visitor_type ILIKE '%%Operator%%' THEN 1 ELSE 0 END) as operators
@@ -2392,6 +2405,8 @@ def get_all_walkins(
     time_period: Optional[str] = "all",
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
+    from_date: Optional[str] = None,
+    to_date: Optional[str] = None,
     page: Optional[int] = 1,
     limit: Optional[int] = 10
 ):
@@ -2477,7 +2492,16 @@ def get_all_walkins(
         else:
             base_query += " AND (w.submission_status IS NULL OR w.submission_status != 'Draft')"
             
-        if time_period and time_period != "all":
+        if time_period == "custom" or start_date or end_date or from_date or to_date:
+            s_date = start_date or from_date
+            e_date = end_date or to_date
+            if s_date:
+                base_query += " AND (w.event_date >= %s OR w.created_at >= %s)"
+                params.extend([s_date, s_date])
+            if e_date:
+                base_query += " AND (w.event_date <= %s OR w.created_at <= %s)"
+                params.extend([e_date, e_date + " 23:59:59"])
+        elif time_period and time_period != "all":
             from datetime import datetime
             from dateutil.relativedelta import relativedelta
             

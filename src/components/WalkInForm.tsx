@@ -167,10 +167,12 @@ export default function WalkInForm({
 
   // Registry Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterCity, setFilterCity] = useState(isGlobalRole ? "all" : userAssignedCity);
+  const [filterCity, setFilterCity] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterTimePeriod, setFilterTimePeriod] = useState("all");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
   
   const [page, setPage] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -256,6 +258,10 @@ export default function WalkInForm({
       if (filterType !== "all") queryParams.append("visitor_type", filterType);
       if (filterStatus !== "all") queryParams.append("status", filterStatus);
       if (filterTimePeriod !== "all") queryParams.append("time_period", filterTimePeriod);
+      if (filterTimePeriod === "custom") {
+        if (customStartDate) queryParams.append("from_date", customStartDate);
+        if (customEndDate) queryParams.append("to_date", customEndDate);
+      }
       queryParams.append("page", pageNum.toString());
       queryParams.append("limit", "10");
       
@@ -308,7 +314,7 @@ export default function WalkInForm({
 
   useEffect(() => {
     fetchData(page);
-  }, [searchQuery, filterCity, filterType, filterStatus, filterTimePeriod, page]);
+  }, [searchQuery, filterCity, filterType, filterStatus, filterTimePeriod, customStartDate, customEndDate, page]);
 
   useEffect(() => {
     if (debouncedRetrieveQuery.trim().length > 1 && !isReadOnly) {
@@ -1122,6 +1128,7 @@ export default function WalkInForm({
                   <option value="this_quarter">This Quarter</option>
                   <option value="this_year">This Year</option>
                   <option value="last_1_year">Last 1 Year</option>
+                  <option value="custom">Custom Range</option>
                 </select>
               </div>
 
@@ -1129,17 +1136,10 @@ export default function WalkInForm({
                 <select 
                   value={filterCity} 
                   onChange={(e) => {setFilterCity(e.target.value); setPage(1);}} 
-                  disabled={!isGlobalRole}
-                  className="h-10 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  className="h-10 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer"
                 >
-                  {isGlobalRole ? (
-                    <>
-                      <option value="all">All Cities</option>
-                      {CITIES.map(c => <option key={c.value} value={c.value}>{c.text}</option>)}
-                    </>
-                  ) : (
-                    <option value={userAssignedCity}>{userAssignedCity}</option>
-                  )}
+                  <option value="all">All Cities</option>
+                  {CITIES.map(c => <option key={c.value} value={c.value}>{c.text}</option>)}
                 </select>
               </div>
 
@@ -1153,6 +1153,29 @@ export default function WalkInForm({
                   <option value="Others">Others</option>
                 </select>
               </div>
+
+              {filterTimePeriod === "custom" && (
+                <div className="col-span-1 sm:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-border/60">
+                  <div className="flex flex-col gap-1">
+                    <label className="font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">From Date</label>
+                    <input 
+                      type="date" 
+                      value={customStartDate} 
+                      onChange={(e) => { setCustomStartDate(e.target.value); setPage(1); }} 
+                      className="h-9 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">To Date</label>
+                    <input 
+                      type="date" 
+                      value={customEndDate} 
+                      onChange={(e) => { setCustomEndDate(e.target.value); setPage(1); }} 
+                      className="h-9 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Bento Grid Metrics */}
