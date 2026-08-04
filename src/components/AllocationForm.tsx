@@ -390,11 +390,17 @@ export default function AllocationForm({
     if (!isDraft) {
       if (!driverId.trim()) return alert("Driver ID is required");
       if (!driverName.trim()) return alert("Driver Name is required");
-      if (!driverPhone.trim()) return alert("Driver Phone is required");
+      
+      const cleanPhone = driverPhone.replace(/\D/g, "");
+      if (cleanPhone.length !== 10) {
+        return alert("Please enter a valid 10-digit Indian mobile number.");
+      }
 
       // Allocation fields check
-      if (allocationMainType === "Allocation" && !vehicleNumber.trim()) {
-        return alert("Vehicle Number is required");
+      if (allocationMainType === "Allocation") {
+        if (!vehicleNumber.trim()) return alert("Vehicle Number is required");
+        const cleanVeh = vehicleNumber.trim().toUpperCase().replace(/\s+/g, "");
+        if (cleanVeh.length < 6) return alert("Please enter a valid Vehicle Registration Number (e.g. TS09FA1234).");
       }
 
       // Mandatory Car Condition Photos check for new allocation or swap
@@ -408,7 +414,12 @@ export default function AllocationForm({
       // Drop-Off fields check
       if (allocationMainType === "Drop-Off" || allocationSubType === "Swap") {
         if (!oldVehicleNumber.trim()) return alert("Returned Vehicle Number is required");
+        const cleanOldVeh = oldVehicleNumber.trim().toUpperCase().replace(/\s+/g, "");
+        if (cleanOldVeh.length < 6) return alert("Please enter a valid Returned Vehicle Registration Number (e.g. TS09FA1234).");
+
         if (!dropoffOdometer.trim()) return alert("Dropoff Odometer reading is required");
+        if (isNaN(Number(dropoffOdometer)) || Number(dropoffOdometer) < 0) return alert("Please enter a valid positive numeric Odometer reading.");
+        
         if (!dropoffLocation) return alert("Drop-off Location is required");
         
         // Photo is mandatory for Attraction drop-off
@@ -889,11 +900,12 @@ export default function AllocationForm({
                         <label className="block font-sans text-xs font-bold text-text-muted mb-2">Driver Phone Number <span className="text-red-500">*</span></label>
                         <input 
                           type="tel" 
-                          placeholder="+91 10-digit mobile..."
+                          placeholder="10-digit mobile number..."
+                          maxLength={10}
                           value={driverPhone}
-                          onChange={(e) => setDriverPhone(e.target.value)}
+                          onChange={(e) => setDriverPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                           required
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs"
+                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs font-mono font-semibold"
                         />
                       </div>
 
