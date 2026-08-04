@@ -1479,36 +1479,36 @@ class ExpenseData(BaseModel):
 
 
 class VehicleOnboardingData(BaseModel):
-    vehicle_number: str
+    vehicle_number: Optional[str] = None
     letzryd_unique_no: Optional[str] = None
-    city_name: str
-    model: str
-    received_allocated: str
+    city_name: Optional[str] = "Hyderabad"
+    model: Optional[str] = None
+    received_allocated: Optional[str] = "In Process"
     fuel_type: Optional[str] = None
     delivery_month: Optional[str] = None
-    registration_date: str
+    registration_date: Optional[str] = None
     rto_tax_validity: Optional[str] = None
     permit_validity: Optional[str] = None
-    fitness_validity: str
+    fitness_validity: Optional[str] = None
     pollution_validity: Optional[str] = None
-    insurance_validity: str
+    insurance_validity: Optional[str] = None
     insurance_broker: Optional[str] = None
     insurance_underwriter: Optional[str] = None
     insurance_start_date: Optional[str] = None
     insurance_idv: Optional[str] = None
-    cover_engine_protect: Optional[bool] = False
-    cover_consumables: Optional[bool] = False
-    cover_zero_dep: Optional[bool] = False
-    cover_rsa: Optional[bool] = False
+    cover_engine_protect: Optional[Union[bool, str]] = False
+    cover_consumables: Optional[Union[bool, str]] = False
+    cover_zero_dep: Optional[Union[bool, str]] = False
+    cover_rsa: Optional[Union[bool, str]] = False
     chassis_number: Optional[str] = None
     engine_number: Optional[str] = None
     cng_tank_number: Optional[str] = None
     authorization_certificate: Optional[str] = None
     insurance_mapping: Optional[str] = None
-    kms_reading: str
+    kms_reading: Optional[str] = None
     tracking_device_vendor: Optional[str] = None
     tracking_device_type: Optional[str] = None
-    cng_installed: str
+    cng_installed: Optional[str] = "No"
     cng_plate: Optional[str] = None
     cng_installation_date: Optional[str] = None
     jack: Optional[str] = None
@@ -1541,7 +1541,7 @@ class VehicleOnboardingData(BaseModel):
     insurance_document: Optional[Any] = None
     authorization_certificate_doc: Optional[Any] = None
     rto_tax_receipt: Optional[Any] = None
-    approval_status: Optional[str] = None
+    approval_status: Optional[str] = "Draft"
     current_approver_id: Optional[int] = None
     approval_remarks: Optional[str] = None
     created_by: Optional[int] = None
@@ -4585,7 +4585,7 @@ def get_all_vehicles(search: Optional[str] = None, city: Optional[str] = None, t
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        query = "SELECT * FROM july_vehicle_onboarding WHERE 1=1"
+        query = "SELECT * FROM july_vehicle_onboarding_1 WHERE 1=1"
         params = []
         if search:
             query += " AND (vehicle_number ILIKE %s OR model ILIKE %s OR letzryd_unique_no ILIKE %s)"
@@ -4609,13 +4609,13 @@ def get_vehicle_stats(authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding;")
+        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding_1;")
         total = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding WHERE received_allocated = 'In Process';")
+        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding_1 WHERE received_allocated = 'In Process';")
         receiving = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding WHERE received_allocated = 'PDI Done';")
+        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding_1 WHERE received_allocated = 'PDI Done';")
         allocation = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding WHERE cng_installed = 'Yes';")
+        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding_1 WHERE cng_installed = 'Yes';")
         cng = cur.fetchone()[0]
         return {
             "total_fleet": total,
@@ -4632,7 +4632,7 @@ def get_single_vehicle(id: int, authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM july_vehicle_onboarding WHERE id = %s;", (id,))
+        cur.execute("SELECT * FROM july_vehicle_onboarding_1 WHERE id = %s;", (id,))
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Vehicle record not found")
@@ -4642,6 +4642,7 @@ def get_single_vehicle(id: int, authorization: Optional[str] = Header(None)):
         postgreSQL_pool.putconn(conn)
 
 @app.post("/api/vehicle")
+@app.post("/api/vehicle/draft")
 def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[str] = Header(None)):
     user = None
     user_name = "Unknown"
@@ -4651,12 +4652,12 @@ def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[s
             user_name = user.get("name") or user.get("username") or "Unknown"
         except Exception:
             pass
-    uid = user["portal_user_id"] if user else None
+    uid = user.get("portal_user_id") or user.get("user_id") if user else None
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO july_vehicle_onboarding (
+            INSERT INTO july_vehicle_onboarding_1 (
                 vehicle_number, letzryd_unique_no, city_name, model, received_allocated, delivery_month,
                 registration_date, rto_tax_validity, permit_validity, fitness_validity, pollution_validity, insurance_validity,
                 insurance_broker, insurance_underwriter, insurance_start_date,
@@ -4682,7 +4683,7 @@ def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[s
                 %s,%s,%s,%s
             ) RETURNING id;
         """, (
-            data.vehicle_number, data.letzryd_unique_no, data.city_name, data.model, data.received_allocated, data.delivery_month,
+            data.vehicle_number or "DRAFT-VEH", data.letzryd_unique_no, data.city_name, data.model, data.received_allocated, data.delivery_month,
             data.registration_date, data.rto_tax_validity, data.permit_validity, data.fitness_validity, data.pollution_validity, data.insurance_validity,
             data.insurance_broker, data.insurance_underwriter, data.insurance_start_date,
             data.authorization_certificate, data.insurance_mapping,
@@ -4693,56 +4694,29 @@ def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[s
             extract_image(data.rh_rear_tyre_img), extract_image(data.lh_rear_tyre_img), extract_image(data.spare_wheel_img),
             extract_image(data.rc_document), extract_image(data.insurance_document), extract_image(data.authorization_certificate_doc), extract_image(data.rto_tax_receipt),
             data.fuel_type,
-            data.insurance_idv, data.cover_engine_protect, data.cover_consumables, data.cover_zero_dep, data.cover_rsa,
+            data.insurance_idv, str(data.cover_engine_protect), str(data.cover_consumables), str(data.cover_zero_dep), str(data.cover_rsa),
             data.chassis_number, data.engine_number, data.cng_tank_number, data.fast_tag_number, data.fast_tag_vendor,
             data.approval_status or "Draft", data.current_approver_id, data.approval_remarks, data.created_by or uid
         ))
         new_id = cur.fetchone()[0]
 
-        # Sync with july_vehicles table
-        cur.execute("SELECT vehicle_id FROM july_vehicles WHERE vehicle_number = %s;", (data.vehicle_number,))
-        exists_row = cur.fetchone()
-        if exists_row:
-            cur.execute("""
-                UPDATE july_vehicles SET
-                    manufacturer='Tata Motors', model=%s, fuel_type=%s, city=%s,
-                    chassis_number=%s, approval_status=%s, current_approver_id=%s,
-                    approval_remarks=%s, created_by=%s
-                WHERE vehicle_number=%s;
-            """, (
-                data.model, data.fuel_type or 'EV', data.city_name,
-                data.chassis_number, data.approval_status or 'Draft', data.current_approver_id,
-                data.approval_remarks, data.created_by or uid, data.vehicle_number
-            ))
-        else:
-            cur.execute("""
-                INSERT INTO july_vehicles (
-                    vehicle_number, manufacturer, model, fuel_type, city,
-                    chassis_number, approval_status, current_approver_id,
-                    approval_remarks, created_by, created_at
-                ) VALUES (%s, 'Tata Motors', %s, %s, %s, %s, %s, %s, %s, %s, NOW());
-            """, (
-                data.vehicle_number, data.model, data.fuel_type or 'EV', data.city_name,
-                data.chassis_number, data.approval_status or 'Draft', data.current_approver_id,
-                data.approval_remarks, data.created_by or uid
-            ))
-
-        # ── Audit log ────────────────────────────────────────────────────────
+        import json
         cur.execute("""
-            INSERT INTO july_vehicle_logs
-              (vehicle_ob_id, vehicle_number, action, old_status, new_status,
+            INSERT INTO july_vehicle_onboarding_1_logs
+              (vehicle_id, vehicle_ob_id, vehicle_number, action, old_status, new_status,
                changed_fields, performed_by, performed_by_name)
-            VALUES (%s, %s, 'CREATE', NULL, %s, %s, %s, %s);
-        """, (new_id, data.vehicle_number,
+            VALUES (%s, %s, %s, 'CREATE', NULL, %s, %s, %s, %s);
+        """, (new_id, new_id, data.vehicle_number or "DRAFT-VEH",
               data.approval_status or 'Draft',
-              f'{{"city":"{data.city_name}","model":"{data.model}"}}',
+              json.dumps({"city": data.city_name, "model": data.model}),
               uid, user_name))
 
         conn.commit()
-        return {"success": True, "id": new_id}
+        return {"success": True, "id": new_id, "message": "Vehicle entry saved successfully"}
     finally:
         postgreSQL_pool.putconn(conn)
 
+@app.post("/api/vehicle/save-draft/{id}")
 @app.put("/api/vehicle/{id}")
 def update_vehicle_record(id: int, data: VehicleOnboardingData, authorization: Optional[str] = Header(None)):
     user = None
@@ -4753,32 +4727,41 @@ def update_vehicle_record(id: int, data: VehicleOnboardingData, authorization: O
             user_name = user.get("name") or user.get("username") or "Unknown"
         except Exception:
             pass
-    uid = user["portal_user_id"] if user else None
+    uid = user.get("portal_user_id") or user.get("user_id") if user else None
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        # Capture old status before update
-        cur.execute("SELECT approval_status, vehicle_number FROM july_vehicle_onboarding WHERE id=%s;", (id,))
+        if id == 0:
+            return create_vehicle_record(data, authorization)
+
+        cur.execute("SELECT approval_status, vehicle_number FROM july_vehicle_onboarding_1 WHERE id=%s;", (id,))
         old_veh = cur.fetchone()
-        old_veh_status = old_veh[0] if old_veh else None
-        old_veh_number = old_veh[1] if old_veh else data.vehicle_number
+        if not old_veh:
+            return create_vehicle_record(data, authorization)
+        
+        old_veh_status = old_veh[0]
+        old_veh_number = old_veh[1] or data.vehicle_number
+
         cur.execute("""
-            UPDATE july_vehicle_onboarding SET
+            UPDATE july_vehicle_onboarding_1 SET
                 vehicle_number=%s, letzryd_unique_no=%s, city_name=%s, model=%s, received_allocated=%s, delivery_month=%s,
                 registration_date=%s, rto_tax_validity=%s, permit_validity=%s, fitness_validity=%s, pollution_validity=%s, insurance_validity=%s, 
                 insurance_broker=%s, insurance_underwriter=%s, insurance_start_date=%s,
                 authorization_certificate=%s, insurance_mapping=%s,
                 kms_reading=%s, tracking_device_vendor=%s, tracking_device_type=%s, cng_installed=%s, cng_plate=%s, cng_installation_date=%s, jack=%s, jack_rod=%s, spanner=%s, parking_triangle=%s, fire_extinguishers=%s, seat_cover=%s, floor_carpet=%s, fast_tag=%s, music_system=%s, key_quantity=%s,
-                image_front=%s, image_lh=%s, image_back=%s, image_rh=%s, engine_chasis_no_img=%s, battery_sl_no_img=%s, engine_compartment_img=%s, fast_tag_img=%s, music_system_img=%s, rh_fr_tyre_img=%s, lh_fr_tyre_img=%s, rh_rear_tyre_img=%s, lh_rear_tyre_img=%s, spare_wheel_img=%s,
-                rc_document=%s, insurance_document=%s, authorization_certificate_doc=%s, rto_tax_receipt=%s,
+                image_front=COALESCE(%s, image_front), image_lh=COALESCE(%s, image_lh), image_back=COALESCE(%s, image_back), image_rh=COALESCE(%s, image_rh), 
+                engine_chasis_no_img=COALESCE(%s, engine_chasis_no_img), battery_sl_no_img=COALESCE(%s, battery_sl_no_img), engine_compartment_img=COALESCE(%s, engine_compartment_img), fast_tag_img=COALESCE(%s, fast_tag_img),
+                music_system_img=COALESCE(%s, music_system_img), rh_fr_tyre_img=COALESCE(%s, rh_fr_tyre_img), lh_fr_tyre_img=COALESCE(%s, lh_fr_tyre_img),
+                rh_rear_tyre_img=COALESCE(%s, rh_rear_tyre_img), lh_rear_tyre_img=COALESCE(%s, lh_rear_tyre_img), spare_wheel_img=COALESCE(%s, spare_wheel_img),
+                rc_document=COALESCE(%s, rc_document), insurance_document=COALESCE(%s, insurance_document), authorization_certificate_doc=COALESCE(%s, authorization_certificate_doc), rto_tax_receipt=COALESCE(%s, rto_tax_receipt),
                 fuel_type=%s,
                 insurance_idv=%s, cover_engine_protect=%s, cover_consumables=%s, cover_zero_dep=%s, cover_rsa=%s,
                 chassis_number=%s, engine_number=%s, cng_tank_number=%s, fast_tag_number=%s, fast_tag_vendor=%s,
-                approval_status=%s, current_approver_id=%s, approval_remarks=%s, created_by=%s,
+                approval_status=%s, current_approver_id=%s, approval_remarks=%s,
                 updated_by=%s, updated_at=NOW()
             WHERE id=%s RETURNING id;
         """, (
-            data.vehicle_number, data.letzryd_unique_no, data.city_name, data.model, data.received_allocated, data.delivery_month,
+            data.vehicle_number or old_veh_number, data.letzryd_unique_no, data.city_name, data.model, data.received_allocated, data.delivery_month,
             data.registration_date, data.rto_tax_validity, data.permit_validity, data.fitness_validity, data.pollution_validity, data.insurance_validity, 
             data.insurance_broker, data.insurance_underwriter, data.insurance_start_date,
             data.authorization_certificate, data.insurance_mapping,
@@ -4789,45 +4772,26 @@ def update_vehicle_record(id: int, data: VehicleOnboardingData, authorization: O
             extract_image(data.rh_rear_tyre_img), extract_image(data.lh_rear_tyre_img), extract_image(data.spare_wheel_img),
             extract_image(data.rc_document), extract_image(data.insurance_document), extract_image(data.authorization_certificate_doc), extract_image(data.rto_tax_receipt),
             data.fuel_type,
-            data.insurance_idv, data.cover_engine_protect, data.cover_consumables, data.cover_zero_dep, data.cover_rsa,
+            data.insurance_idv, str(data.cover_engine_protect), str(data.cover_consumables), str(data.cover_zero_dep), str(data.cover_rsa),
             data.chassis_number, data.engine_number, data.cng_tank_number, data.fast_tag_number, data.fast_tag_vendor,
-            data.approval_status, data.current_approver_id, data.approval_remarks, data.created_by or uid,
+            data.approval_status or old_veh_status or 'Draft', data.current_approver_id, data.approval_remarks,
+            uid,
             id
         ))
-        row = cur.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Vehicle record not found")
 
-        # Sync with july_vehicles table
-        cur.execute("SELECT vehicle_id FROM july_vehicles WHERE vehicle_number = %s;", (data.vehicle_number,))
-        exists_row = cur.fetchone()
-        if exists_row:
-            cur.execute("""
-                UPDATE july_vehicles SET
-                    manufacturer='Tata Motors', model=%s, fuel_type=%s, city=%s,
-                    chassis_number=%s, approval_status=%s, current_approver_id=%s,
-                    approval_remarks=%s, created_by=%s
-                WHERE vehicle_number=%s;
-            """, (
-                data.model, data.fuel_type or 'EV', data.city_name,
-                data.chassis_number, data.approval_status, data.current_approver_id,
-                data.approval_remarks, data.created_by or uid, data.vehicle_number
-            ))
-        else:
-            cur.execute("""
-                INSERT INTO july_vehicles (
-                    vehicle_number, manufacturer, model, fuel_type, city,
-                    chassis_number, approval_status, current_approver_id,
-                    approval_remarks, created_by, created_at
-                ) VALUES (%s, 'Tata Motors', %s, %s, %s, %s, %s, %s, %s, %s, NOW());
-            """, (
-                data.vehicle_number, data.model, data.fuel_type or 'EV', data.city_name,
-                data.chassis_number, data.approval_status, data.current_approver_id,
-                data.approval_remarks, data.created_by or uid
-            ))
+        import json
+        cur.execute("""
+            INSERT INTO july_vehicle_onboarding_1_logs
+              (vehicle_id, vehicle_ob_id, vehicle_number, action, old_status, new_status,
+               changed_fields, performed_by, performed_by_name)
+            VALUES (%s, %s, %s, 'UPDATE', %s, %s, %s, %s, %s);
+        """, (id, id, data.vehicle_number or old_veh_number, old_veh_status,
+              data.approval_status or 'Draft',
+              json.dumps({"city": data.city_name, "model": data.model}),
+              uid, user_name))
 
         conn.commit()
-        return {"success": True, "id": id}
+        return {"success": True, "id": id, "message": "Draft updated successfully"}
     finally:
         postgreSQL_pool.putconn(conn)
 
@@ -4837,7 +4801,7 @@ def delete_vehicle_record(id: int, authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("DELETE FROM july_vehicle_onboarding WHERE id = %s RETURNING id;", (id,))
+        cur.execute("DELETE FROM july_vehicle_onboarding_1 WHERE id = %s RETURNING id;", (id,))
         deleted = cur.fetchone()
         if not deleted:
             raise HTTPException(status_code=404, detail="Vehicle record not found")
