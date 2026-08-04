@@ -409,16 +409,23 @@ def startup_event():
         cur.execute("""
             CREATE TABLE IF NOT EXISTS july_walkin_logs (
                 log_id       SERIAL PRIMARY KEY,
-                walkin_id    INTEGER NOT NULL,
+                walkin_id    INTEGER NOT NULL REFERENCES july_walkins(id) ON DELETE CASCADE,
                 action       VARCHAR(30) NOT NULL,      -- CREATE / UPDATE / DELETE / STATUS_CHANGE
                 old_status   VARCHAR(50),
                 new_status   VARCHAR(50),
-                changed_fields TEXT,                    -- JSON string of fields that changed
+                changed_fields JSONB,                   -- Structured JSON of changed fields
+                previous_data  JSONB,                   -- Full row snapshot before edit
+                new_data       JSONB,                   -- Full row snapshot after edit
                 remarks      TEXT,
-                performed_by INTEGER,                   -- portal_user_id
+                performed_by INTEGER REFERENCES july_portal_users(portal_user_id) ON DELETE SET NULL,
                 performed_by_name VARCHAR(255),
                 performed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
             );
+
+            CREATE INDEX IF NOT EXISTS idx_walkin_logs_walkin_id ON july_walkin_logs (walkin_id);
+            CREATE INDEX IF NOT EXISTS idx_walkin_logs_performed_by ON july_walkin_logs (performed_by);
+            CREATE INDEX IF NOT EXISTS idx_walkin_logs_performed_at ON july_walkin_logs (performed_at DESC);
+            CREATE INDEX IF NOT EXISTS idx_walkin_logs_changed_fields ON july_walkin_logs USING GIN (changed_fields);
         """)
 
         # ── july_onboarding_logs (audit every change to partner onboarding) ──
@@ -2822,7 +2829,7 @@ def update_walkin(walkin_id: int, data: WalkinData, authorization: Optional[str]
         }
 
         # ── Audit log ────────────────────────────────────────────────────────
-        action = 'STATUS_CHANGE' if old_status != data.joined_status else 'UPDATE'
+        action = 'UPDATE'
         cur.execute("""
             INSERT INTO july_walkin_logs
               (walkin_id, action, old_status, new_status, changed_fields,
