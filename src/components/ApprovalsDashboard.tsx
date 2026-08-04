@@ -1364,7 +1364,7 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
                     <p className="text-xs text-slate-500 flex justify-between"><span>City:</span> <strong className="text-slate-800">{selectedRecord.city}</strong></p>
                     <p className="text-xs text-slate-500 flex justify-between"><span>Status:</span> <strong className="text-slate-800">{selectedRecord.approval_status}</strong></p>
                     <p className="text-xs text-slate-500 flex justify-between"><span>Submitted By:</span> <strong className="text-slate-800">{selectedRecord.submitted_by_name}</strong></p>
-                    <p className="text-xs text-slate-500 flex justify-between"><span>Created At:</span> <strong className="text-slate-800">{selectedRecord.created_at ? new Date(selectedRecord.created_at).toLocaleString("en-IN") : "—"}</strong></p>
+                    <p className="text-xs text-slate-500 flex justify-between"><span>Created At:</span> <strong className="text-slate-800">{selectedRecord.created_at ? new Date(selectedRecord.created_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : "—"}</strong></p>
                   </div>
 
                   {/* History timeline */}
@@ -1382,7 +1382,7 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
                           <div key={i} className="bg-white p-3 rounded-xl border border-slate-200/60 text-xs shadow-xs">
                             <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
                               <span className="font-bold uppercase tracking-wider">{log.action}</span>
-                              <span>{log.action_at ? new Date(log.action_at).toLocaleDateString("en-IN") : ""}</span>
+                              <span>{log.action_at ? new Date(log.action_at).toLocaleString("en-IN", { timeZone: "Asia/Kolkata" }) : ""}</span>
                             </div>
                             <p className="font-semibold text-slate-800">
                               {log.from_name || "System"} {log.action.toLowerCase()} {log.to_name && `to ${log.to_name}`}

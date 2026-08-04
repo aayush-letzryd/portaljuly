@@ -87,6 +87,12 @@ if os.path.exists(".env"):
                     key, val = line.split("=", 1)
                     os.environ[key.strip()] = val.strip()
 
+from datetime import datetime, timezone, timedelta
+IST = timezone(timedelta(hours=5, minutes=30))
+
+def get_ist_now():
+    return datetime.now(IST)
+
 # ─────────────────────────────────────────────────────────
 # Connection Pool
 # ─────────────────────────────────────────────────────────
@@ -95,7 +101,7 @@ postgreSQL_pool = None
 try:
     db_url = os.environ.get("DATABASE_URL")
     if db_url:
-        postgreSQL_pool = psycopg2.pool.SimpleConnectionPool(1, 20, dsn=db_url)
+        postgreSQL_pool = psycopg2.pool.SimpleConnectionPool(1, 20, dsn=db_url, options="-c timezone=Asia/Kolkata")
     else:
         postgreSQL_pool = psycopg2.pool.SimpleConnectionPool(
             1, 20,
@@ -103,10 +109,11 @@ try:
             password=os.environ.get("DB_PASS"),
             host=os.environ.get("DB_HOST"),
             port=os.environ.get("DB_PORT", "5432"),
-            database=os.environ.get("DB_NAME")
+            database=os.environ.get("DB_NAME"),
+            options="-c timezone=Asia/Kolkata"
         )
     if postgreSQL_pool:
-        print("[OK] Connection pool created successfully")
+        print("[OK] Connection pool created successfully with Asia/Kolkata IST timezone")
 except (Exception, psycopg2.DatabaseError) as error:
     print("[ERROR] Error connecting to PostgreSQL:", error)
     if not postgreSQL_pool:
@@ -2337,7 +2344,7 @@ def get_stats(
         elif time_period and time_period != "all":
             from datetime import datetime
             from dateutil.relativedelta import relativedelta
-            today = datetime.now()
+            today = get_ist_now()
             if time_period == "beginning_of_month":
                 start_dt = today.replace(day=1).strftime("%Y-%m-%d")
                 where_clause += " AND w.event_date >= %s"
@@ -2452,7 +2459,8 @@ def get_all_walkins(
                 w.created_at,
                 COALESCE(w.submission_status, 'Submitted') AS submission_status,
                 COALESCE(w.updated_at, w.created_at) AS updated_at,
-                COALESCE(e_up.first_name || ' ' || COALESCE(e_up.last_name, ''), e.first_name || ' ' || COALESCE(e.last_name, ''), 'Onboarding Executive 1') AS updated_by_name
+                COALESCE(e_up.first_name || ' ' || COALESCE(e_up.last_name, ''), e.first_name || ' ' || COALESCE(e.last_name, ''), 'Onboarding Executive 1') AS updated_by_name,
+                COALESCE(w.updated_by, w.created_by, w.executive_id) AS updated_by
             FROM july_walkins w
             LEFT JOIN july_portal_users pu ON pu.portal_user_id = COALESCE(w.created_by, w.executive_id)
             LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
@@ -2505,7 +2513,7 @@ def get_all_walkins(
             from datetime import datetime
             from dateutil.relativedelta import relativedelta
             
-            today = datetime.now()
+            today = get_ist_now()
             
             if time_period == "beginning_of_month":
                 start_dt = today.replace(day=1).strftime("%Y-%m-%d")
@@ -2564,7 +2572,8 @@ def get_all_walkins(
                 "created_at": r[22].isoformat() if r[22] else None,
                 "submission_status": r[23],
                 "updated_at": r[24].isoformat() if r[24] else (r[22].isoformat() if r[22] else None),
-                "updated_by_name": r[25]
+                "updated_by_name": r[25],
+                "updated_by": r[26]
             })
             
         return {
