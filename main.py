@@ -479,6 +479,18 @@ def startup_event():
         """)
 
         for col in [
+            "vehicle_number VARCHAR(100)",
+            "old_status VARCHAR(50)",
+            "new_status VARCHAR(50)",
+            "changed_fields TEXT",
+            "remarks TEXT",
+            "performed_by INTEGER",
+            "performed_by_name VARCHAR(255)",
+            "performed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()"
+        ]:
+            cur.execute(f"ALTER TABLE july_vehicle_logs ADD COLUMN IF NOT EXISTS {col};")
+
+        for col in [
             "insurance_idv VARCHAR(50)",
             "cover_engine_protect BOOLEAN DEFAULT FALSE",
             "cover_consumables BOOLEAN DEFAULT FALSE",
