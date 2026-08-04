@@ -600,7 +600,7 @@ export default function WalkInForm({
             />
             <span className="hidden h-5 border-l border-border sm:inline-block" />
             <span className="hidden font-sans text-xs font-medium text-text-muted sm:inline-block">
-              Walk-In Lead Generation
+              Lead Generation
             </span>
           </div>
 
