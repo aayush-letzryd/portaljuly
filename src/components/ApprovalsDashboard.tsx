@@ -18,13 +18,8 @@ interface Props {
 
 const MODULE_CONFIG: Record<string, { label: string; textClass: string }> = {
   individual_onboarding: { label: "Driver Onboarding", textClass: "text-blue-600 font-semibold" },
-  operator_onboarding: { label: "Partner Onboarding", textClass: "text-indigo-600 font-semibold" },
+  operator_onboarding: { label: "Operator Onboarding", textClass: "text-indigo-600 font-semibold" },
   vehicle_onboarding: { label: "Vehicle Onboarding", textClass: "text-purple-600 font-semibold" },
-  tickets_desk: { label: "Tickets Desk", textClass: "text-orange-600 font-semibold" },
-  adjustment_form: { label: "Adjustments", textClass: "text-amber-600 font-semibold" },
-  workshops_desk: { label: "Workshops", textClass: "text-emerald-600 font-semibold" },
-  accidents_form: { label: "Accidents", textClass: "text-rose-600 font-semibold" },
-  expenses_form: { label: "Expenses", textClass: "text-indigo-600 font-semibold" },
 };
 
 const STATUS_TEXT_CLASSES: Record<string, string> = {

@@ -63,10 +63,12 @@ export default function App() {
       })
       .then(data => {
         setUser(data);
-        setScreen("selector");
+        const savedScreen = (sessionStorage.getItem("lr_active_screen") as any) || "selector";
+        setScreen(savedScreen);
       })
       .catch(() => {
         localStorage.removeItem(LOCAL_STORAGE_TOKEN_KEY);
+        sessionStorage.removeItem("lr_active_screen");
       })
       .finally(() => {
         setIsInitializing(false);
@@ -76,13 +78,30 @@ export default function App() {
     }
   }, []);
 
+  useEffect(() => {
+    if (screen && screen !== "login") {
+      sessionStorage.setItem("lr_active_screen", screen);
+    }
+  }, [screen]);
+
   const handleLoginSuccess = (userSession: User) => {
     setUser(userSession);
-    setScreen("selector");
+    const savedScreen = (sessionStorage.getItem("lr_active_screen") as any) || "selector";
+    setScreen(savedScreen);
   };
 
   const handleLogout = () => {
+    const token = localStorage.getItem(LOCAL_STORAGE_TOKEN_KEY);
+    if (token) {
+      fetch(`/api/auth/logout`, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${token}`
+        }
+      }).catch(err => console.error("Logout request failed:", err));
+    }
     localStorage.removeItem(LOCAL_STORAGE_TOKEN_KEY);
+    sessionStorage.removeItem("lr_active_screen");
     setUser(null);
     setScreen("login");
   };

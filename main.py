@@ -122,6 +122,28 @@ def startup_event():
     try:
         cur = conn.cursor()
 
+        # ── july_cities ──────────────────────────────────────
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS july_cities (
+                id         SERIAL PRIMARY KEY,
+                city_name  VARCHAR(255) NOT NULL UNIQUE,
+                city_code  VARCHAR(100),
+                state      VARCHAR(100) DEFAULT 'India',
+                status     VARCHAR(50) DEFAULT 'Active',
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        cur.execute("TRUNCATE TABLE july_cities RESTART IDENTITY CASCADE;")
+        cur.execute("""
+            INSERT INTO july_cities (id, city_name, city_code, state, status) VALUES
+            (1, 'Bengaluru', 'BLR', 'Karnataka', 'Active'),
+            (2, 'Mumbai', 'BOM', 'Maharashtra', 'Active'),
+            (3, 'Hyderabad', 'HYD', 'Telangana', 'Active');
+        """)
+        cur.execute("SELECT setval('july_cities_id_seq', (SELECT MAX(id) FROM july_cities));")
+        conn.commit()
+        print("[OK] july_cities table initialized with Bengaluru, Mumbai, and Hyderabad")
+
         # ── copy_cities ──────────────────────────────────────
         cur.execute("""
             CREATE TABLE IF NOT EXISTS copy_cities (
@@ -129,14 +151,13 @@ def startup_event():
                 name VARCHAR(255) NOT NULL UNIQUE
             );
         """)
-        cur.execute("SELECT COUNT(*) FROM copy_cities;")
-        if cur.fetchone()[0] == 0:
-            cur.execute("""
-                INSERT INTO copy_cities (name) VALUES
-                ('Hyderabad'), ('Bangalore'), ('Mumbai'), ('Chennai'), ('Delhi')
-                ON CONFLICT (name) DO NOTHING;
-            """)
-            print("[OK] Cities seeded")
+        cur.execute("TRUNCATE TABLE copy_cities RESTART IDENTITY CASCADE;")
+        cur.execute("""
+            INSERT INTO copy_cities (id, name) VALUES
+            (1, 'Bengaluru'), (2, 'Mumbai'), (3, 'Hyderabad')
+            ON CONFLICT (name) DO NOTHING;
+        """)
+        cur.execute("SELECT setval('copy_cities_id_seq', (SELECT MAX(id) FROM copy_cities));")
 
         # ── copy_users (executives / employees) ───────────────
         cur.execute("""
@@ -167,9 +188,37 @@ def startup_event():
             """)
             print("[OK] Executives seeded")
 
-        # ── copy_walkins ──────────────────────────────────────
+        # ── Safe live-data migrations: copy_ → july_ (runs only when old tables still exist) ──
+        legacy_renames = [
+            ("copy_walkins",                 "july_walkins"),
+            ("copy_form_onboarding",         "july_form_onboarding"),
+            ("copy_vehicle_onboarding",      "july_vehicle_onboarding"),
+            ("copy_walkin_form_links",       "july_walkin_form_links"),
+            ("copy_walkin_logs",             "july_walkin_logs"),
+            ("copy_onboarding_logs",         "july_onboarding_logs"),
+            ("copy_vehicle_logs",            "july_vehicle_logs"),
+            ("copy_driver_onboarding",       "july_driver_onboarding"),
+            ("copy_walkin_onboarding_links", "july_walkin_onboarding_links"),
+        ]
+        for old_name, new_name in legacy_renames:
+            cur.execute("""
+                DO $$
+                BEGIN
+                    IF EXISTS (SELECT 1 FROM information_schema.tables
+                               WHERE table_schema = 'public' AND table_name = %s)
+                       AND NOT EXISTS (SELECT 1 FROM information_schema.tables
+                                      WHERE table_schema = 'public' AND table_name = %s)
+                    THEN
+                        EXECUTE 'ALTER TABLE ' || %s || ' RENAME TO ' || %s;
+                    END IF;
+                END;
+                $$;
+            """, (old_name, new_name, old_name, new_name))
+        print("[OK] Legacy table renames applied")
+
+        # ── july_walkins ──────────────────────────────────────
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS copy_walkins (
+            CREATE TABLE IF NOT EXISTS july_walkins (
                 id             SERIAL PRIMARY KEY,
                 visitor_type   VARCHAR(50),
                 event_date     VARCHAR(20),
@@ -199,11 +248,11 @@ def startup_event():
             "referred_by_name VARCHAR(255)",
             "referred_by_phone VARCHAR(50)"
         ]:
-            cur.execute(f"ALTER TABLE copy_walkins ADD COLUMN IF NOT EXISTS {col};")
+            cur.execute(f"ALTER TABLE july_walkins ADD COLUMN IF NOT EXISTS {col};")
 
-        # ── copy_driver_onboarding ───────────────────────────
+        # ── july_driver_onboarding ───────────────────────────
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS copy_driver_onboarding (
+            CREATE TABLE IF NOT EXISTS july_driver_onboarding (
                 id SERIAL PRIMARY KEY,
                 driver_name VARCHAR(255),
                 phone_number VARCHAR(50),
@@ -228,19 +277,19 @@ def startup_event():
             );
         """)
 
-        # ── copy_walkin_onboarding_links ──────────────────────
+        # ── july_walkin_onboarding_links ──────────────────────
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS copy_walkin_onboarding_links (
+            CREATE TABLE IF NOT EXISTS july_walkin_onboarding_links (
                 id SERIAL PRIMARY KEY,
-                walkin_id INTEGER REFERENCES copy_walkins(id),
-                onboarding_id INTEGER REFERENCES copy_driver_onboarding(id),
+                walkin_id INTEGER REFERENCES july_walkins(id),
+                onboarding_id INTEGER REFERENCES july_driver_onboarding(id),
                 created_at TIMESTAMP DEFAULT NOW()
             );
         """)
 
-        # ── copy_form_onboarding ───────────────────────────
+        # ── july_form_onboarding ───────────────────────────
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS copy_form_onboarding (
+            CREATE TABLE IF NOT EXISTS july_form_onboarding (
                 id SERIAL PRIMARY KEY,
                 vendor_type VARCHAR(50),
                 driver_id VARCHAR(50),
@@ -304,13 +353,106 @@ def startup_event():
             "ref2_name VARCHAR(255)", "ref2_phone VARCHAR(50)", "ref2_address TEXT",
             "ref3_name VARCHAR(255)", "ref3_phone VARCHAR(50)", "ref3_address TEXT"
         ]:
-            cur.execute(f"ALTER TABLE copy_form_onboarding ADD COLUMN IF NOT EXISTS {col};")
+            cur.execute(f"ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS {col};")
 
         for col in [
             "lead_channel VARCHAR(100)",
             "lead_channel_details VARCHAR(255)"
         ]:
-            cur.execute(f"ALTER TABLE copy_walkins ADD COLUMN IF NOT EXISTS {col};")
+            cur.execute(f"ALTER TABLE july_walkins ADD COLUMN IF NOT EXISTS {col};")
+
+        # ── Extra columns needed by approval workflow ─────────────────────
+        for col in [
+            "approval_requested_to  INTEGER",
+            "approval_note          TEXT",
+            "approval_submitted_at  TIMESTAMP",
+            "cheque2_photo          TEXT",
+            "cheque3_photo          TEXT",
+        ]:
+            cur.execute(f"ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS {col};")
+
+        # ── Audit columns: july_walkins ──────────────────────────────────────
+        for col in [
+            "created_by       INTEGER",
+            "updated_by       INTEGER",
+            "updated_at       TIMESTAMP",
+            "approval_status  VARCHAR(50) DEFAULT 'Draft'",
+            "current_approver_id INTEGER",
+            "approved_by      INTEGER",
+        ]:
+            cur.execute(f"ALTER TABLE july_walkins ADD COLUMN IF NOT EXISTS {col};")
+
+        # ── Audit columns: july_form_onboarding ──────────────────────────────
+        for col in [
+            "created_by          INTEGER",
+            "updated_by          INTEGER",
+            "updated_at          TIMESTAMP",
+            "approval_status     VARCHAR(50) DEFAULT 'Draft'",
+            "current_approver_id INTEGER",
+            "approved_by         INTEGER",
+        ]:
+            cur.execute(f"ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS {col};")
+
+        # ── Audit columns: july_vehicle_onboarding ───────────────────────────
+        for col in [
+            "created_by          INTEGER",
+            "updated_by          INTEGER",
+            "updated_at          TIMESTAMP",
+            "created_at          TIMESTAMP DEFAULT NOW()",
+            "approval_status     VARCHAR(50) DEFAULT 'Draft'",
+            "current_approver_id INTEGER",
+            "approved_by         INTEGER",
+        ]:
+            cur.execute(f"ALTER TABLE july_vehicle_onboarding ADD COLUMN IF NOT EXISTS {col};")
+
+        # ── july_walkin_logs (audit every change to a walk-in) ───────────────
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS july_walkin_logs (
+                log_id       SERIAL PRIMARY KEY,
+                walkin_id    INTEGER NOT NULL,
+                action       VARCHAR(30) NOT NULL,      -- CREATE / UPDATE / DELETE / STATUS_CHANGE
+                old_status   VARCHAR(50),
+                new_status   VARCHAR(50),
+                changed_fields TEXT,                    -- JSON string of fields that changed
+                remarks      TEXT,
+                performed_by INTEGER,                   -- portal_user_id
+                performed_by_name VARCHAR(255),
+                performed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );
+        """)
+
+        # ── july_onboarding_logs (audit every change to partner onboarding) ──
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS july_onboarding_logs (
+                log_id          SERIAL PRIMARY KEY,
+                onboarding_id   INTEGER NOT NULL,
+                action          VARCHAR(30) NOT NULL,   -- CREATE / UPDATE / DELETE / STATUS_CHANGE / SEND_FOR_APPROVAL
+                old_status      VARCHAR(50),
+                new_status      VARCHAR(50),
+                changed_fields  TEXT,
+                remarks         TEXT,
+                performed_by    INTEGER,
+                performed_by_name VARCHAR(255),
+                performed_at    TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );
+        """)
+
+        # ── july_vehicle_logs (audit every change to vehicle onboarding) ─────
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS july_vehicle_logs (
+                log_id          SERIAL PRIMARY KEY,
+                vehicle_ob_id   INTEGER NOT NULL,       -- references july_vehicle_onboarding.id
+                vehicle_number  VARCHAR(100),
+                action          VARCHAR(30) NOT NULL,   -- CREATE / UPDATE / DELETE / STATUS_CHANGE
+                old_status      VARCHAR(50),
+                new_status      VARCHAR(50),
+                changed_fields  TEXT,
+                remarks         TEXT,
+                performed_by    INTEGER,
+                performed_by_name VARCHAR(255),
+                performed_at    TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );
+        """)
 
         for col in [
             "insurance_idv VARCHAR(50)",
@@ -324,7 +466,7 @@ def startup_event():
             "fast_tag_number VARCHAR(100)",
             "fast_tag_vendor VARCHAR(100)"
         ]:
-            cur.execute(f"ALTER TABLE copy_vehicle_onboarding ADD COLUMN IF NOT EXISTS {col};")
+            cur.execute(f"ALTER TABLE july_vehicle_onboarding ADD COLUMN IF NOT EXISTS {col};")
 
         # ── copy_rents ───────────────────────────────────────
         cur.execute("""
@@ -348,27 +490,27 @@ def startup_event():
         cur.execute("ALTER TABLE copy_rents ADD COLUMN IF NOT EXISTS assigned_time TIMESTAMP;")
 
 
-        # ── copy_walkin_form_links ──────────────────────
+        # ── july_walkin_form_links ──────────────────────
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS copy_walkin_form_links (
+            CREATE TABLE IF NOT EXISTS july_walkin_form_links (
                 id SERIAL PRIMARY KEY,
-                walkin_id INTEGER REFERENCES copy_walkins(id),
-                onboarding_id INTEGER REFERENCES copy_form_onboarding(id),
+                walkin_id INTEGER REFERENCES july_walkins(id),
+                onboarding_id INTEGER REFERENCES july_form_onboarding(id),
                 created_at TIMESTAMP DEFAULT NOW()
             );
         """)
 
-        cur.execute("ALTER TABLE copy_form_onboarding ADD COLUMN IF NOT EXISTS operating_place VARCHAR(255);")
-        cur.execute("ALTER TABLE copy_walkins ADD COLUMN IF NOT EXISTS operating_place VARCHAR(255);")
-        cur.execute("ALTER TABLE copy_form_onboarding ADD COLUMN IF NOT EXISTS vendor_name VARCHAR(255);")
-        cur.execute("ALTER TABLE copy_form_onboarding ADD COLUMN IF NOT EXISTS vendor_id VARCHAR(50);")
-        cur.execute("ALTER TABLE copy_form_onboarding ADD COLUMN IF NOT EXISTS aadhaar_card_photo TEXT;")
-        cur.execute("ALTER TABLE copy_form_onboarding ADD COLUMN IF NOT EXISTS father_name VARCHAR(255);")
-        cur.execute("ALTER TABLE copy_form_onboarding ADD COLUMN IF NOT EXISTS bank_name VARCHAR(255);")
-        cur.execute("ALTER TABLE copy_form_onboarding ADD COLUMN IF NOT EXISTS other_bank_name VARCHAR(255);")
-        cur.execute("ALTER TABLE copy_form_onboarding ADD COLUMN IF NOT EXISTS account_number VARCHAR(100);")
-        cur.execute("ALTER TABLE copy_form_onboarding ADD COLUMN IF NOT EXISTS ifsc_code VARCHAR(50);")
-        cur.execute("ALTER TABLE copy_form_onboarding ADD COLUMN IF NOT EXISTS upi_id VARCHAR(100);")
+        cur.execute("ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS operating_place VARCHAR(255);")
+        cur.execute("ALTER TABLE july_walkins ADD COLUMN IF NOT EXISTS operating_place VARCHAR(255);")
+        cur.execute("ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS vendor_name VARCHAR(255);")
+        cur.execute("ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS vendor_id VARCHAR(50);")
+        cur.execute("ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS aadhaar_card_photo TEXT;")
+        cur.execute("ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS father_name VARCHAR(255);")
+        cur.execute("ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS bank_name VARCHAR(255);")
+        cur.execute("ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS other_bank_name VARCHAR(255);")
+        cur.execute("ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS account_number VARCHAR(100);")
+        cur.execute("ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS ifsc_code VARCHAR(50);")
+        cur.execute("ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS upi_id VARCHAR(100);")
 
         # ── copy_partner_adjustment ───────────────────────────
         cur.execute("""
@@ -481,10 +623,10 @@ def startup_event():
             cur.execute(f"ALTER TABLE copy_partner_expenses ADD COLUMN IF NOT EXISTS {col};")
 
 
-        cur.execute("SELECT COUNT(*) FROM copy_form_onboarding;")
+        cur.execute("SELECT COUNT(*) FROM july_form_onboarding;")
         if cur.fetchone()[0] < 5:
-            cur.execute("DELETE FROM copy_walkin_form_links;")
-            cur.execute("DELETE FROM copy_form_onboarding;")
+            cur.execute("DELETE FROM july_walkin_form_links;")
+            cur.execute("DELETE FROM july_form_onboarding;")
             
             onboarding_records = [
                 ("Kavitha Nair", "9012345678", "1992-05-15", "Hyderabad", "Banjara Hills", "123 Street, Hyderabad", "123 Street, Hyderabad", "Rahul Nair", "9876543210", "TS0620181234567", "ABCDE1234F", "[Aadhaar Redacted]", "Yes", "FastFleet Logistics", "V-9901", "Gopal Nair"),
@@ -501,7 +643,7 @@ def startup_event():
             
             for item in onboarding_records:
                 cur.execute("""
-                    INSERT INTO copy_form_onboarding (
+                    INSERT INTO july_form_onboarding (
                         driver_name, phone_number, dob, city, operating_place, 
                         present_address, permanent_address, emergency_name, emergency_phone, 
                         dl_number, pan_number, aadhaar_number, pan_aadhaar_linked, vendor_name, vendor_id, father_name, vendor_type, candidate_role
@@ -510,7 +652,7 @@ def startup_event():
                 onb_id = cur.fetchone()[0]
 
             cur.execute("""
-                INSERT INTO copy_form_onboarding (
+                INSERT INTO july_form_onboarding (
                     driver_name, phone_number, dob, city, operating_place, 
                     present_address, permanent_address, emergency_name, emergency_phone, 
                     dl_number, pan_number, aadhaar_number, pan_aadhaar_linked, 
@@ -521,7 +663,7 @@ def startup_event():
             """)
 
             cur.execute("""
-                INSERT INTO copy_form_onboarding (
+                INSERT INTO july_form_onboarding (
                     driver_name, phone_number, dl_number, custom_rent_amount, driver_id,
                     vendor_name, vendor_id, vendor_type, candidate_role,
                     whatsapp_number, dob, city, present_address, permanent_address, 
@@ -579,6 +721,26 @@ def startup_event():
             );
         """)
 
+        # ── july_user_login_logs (Login/Logout Tracking) ────────
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS july_user_login_logs (
+                log_id SERIAL PRIMARY KEY,
+                user_id INTEGER,
+                username VARCHAR(100),
+                full_name VARCHAR(255),
+                role_code VARCHAR(50),
+                role_name VARCHAR(100),
+                city VARCHAR(100),
+                session_token VARCHAR(255),
+                login_time TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                logout_time TIMESTAMP WITH TIME ZONE,
+                session_duration_minutes NUMERIC(10, 2),
+                ip_address VARCHAR(100),
+                user_agent TEXT,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+
         # ── copy_vehicle_models ─────────────────────────────────
         cur.execute("""
             CREATE TABLE IF NOT EXISTS copy_vehicle_models (
@@ -592,12 +754,11 @@ def startup_event():
             );
         """)
 
-        # ── Drop existing tables for demo schema changes ──────
-        cur.execute("DROP TABLE IF EXISTS copy_vehicle_onboarding CASCADE;")
+        # NOTE: july_vehicle_onboarding is now PERMANENT — no DROP TABLE
 
-        # ── copy_vehicle_onboarding ─────────────────────────────
+        # ── july_vehicle_onboarding ─────────────────────────────
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS copy_vehicle_onboarding (
+            CREATE TABLE IF NOT EXISTS july_vehicle_onboarding (
                 id SERIAL PRIMARY KEY,
                 vehicle_number VARCHAR(100),
                 letzryd_unique_no VARCHAR(100),
@@ -1010,6 +1171,7 @@ class WalkinData(BaseModel):
     referred_by_name: Optional[str] = None
     referred_by_phone: Optional[str] = None
     joined_status:   Optional[str] = None
+    submission_status: Optional[str] = None
     remarks:         Optional[str] = None
 
 class OnboardingData(BaseModel):
@@ -1339,12 +1501,14 @@ def extract_image(val: Any) -> Optional[str]:
 # Auth Endpoints
 # ─────────────────────────────────────────────────────────
 @app.post("/api/auth/login")
-def login(req: LoginRequest):
+def login(req: LoginRequest, request: Request):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
         uname = req.username.strip().lower()
         lookup_name = 'super_admin' if uname in ['admin', 'superadmin'] else uname
+        client_ip = request.client.host if request.client else None
+        user_agent = request.headers.get("user-agent", "")
         
         # Check july_portal_users first
         cur.execute("""
@@ -1369,6 +1533,16 @@ def login(req: LoginRequest):
                 "INSERT INTO copy_app_sessions (token, user_id) VALUES (%s, %s);",
                 (token, user_id)
             )
+
+            # Record Login Log Entry
+            try:
+                cur.execute("""
+                    INSERT INTO july_user_login_logs 
+                    (user_id, username, full_name, role_code, role_name, city, session_token, login_time, ip_address, user_agent)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, CURRENT_TIMESTAMP, %s, %s);
+                """, (user_id, username, name.strip(), role_code, role, city, token, client_ip, user_agent))
+            except Exception as log_err:
+                print(f"[WARN] Failed to insert login log: {log_err}")
             
             # Fetch july_role_permissions
             cur.execute("""
@@ -1422,6 +1596,15 @@ def login(req: LoginRequest):
             "INSERT INTO copy_app_sessions (token, user_id) VALUES (%s, %s);",
             (token, user_id)
         )
+
+        try:
+            cur.execute("""
+                INSERT INTO july_user_login_logs 
+                (user_id, username, full_name, role_code, role_name, city, session_token, login_time, ip_address, user_agent)
+                VALUES (%s, %s, %s, 'USER', %s, 'Hyderabad', %s, CURRENT_TIMESTAMP, %s, %s);
+            """, (user_id, username, name or username, role, token, client_ip, user_agent))
+        except Exception as log_err:
+            print(f"[WARN] Failed to insert fallback login log: {log_err}")
         
         permissions = []
         if role_id:
@@ -1446,6 +1629,69 @@ def login(req: LoginRequest):
                 "permissions": permissions
             }
         }
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+
+@app.post("/api/auth/logout")
+def logout(request: Request, authorization: Optional[str] = Header(None), token: Optional[str] = None):
+    """Record logout timestamp and calculate session duration."""
+    auth_token = token
+    if not auth_token and authorization and authorization.startswith("Bearer "):
+        auth_token = authorization.split(" ", 1)[1]
+    if not auth_token:
+        auth_token = request.query_params.get("token")
+    
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        if auth_token:
+            cur.execute("""
+                UPDATE july_user_login_logs 
+                SET logout_time = CURRENT_TIMESTAMP,
+                    session_duration_minutes = ROUND(EXTRACT(EPOCH FROM (CURRENT_TIMESTAMP - login_time)) / 60.0, 2)
+                WHERE session_token = %s AND logout_time IS NULL;
+            """, (auth_token,))
+            cur.execute("DELETE FROM copy_app_sessions WHERE token = %s;", (auth_token,))
+            conn.commit()
+        return {"success": True, "message": "Logged out successfully"}
+    except Exception as e:
+        conn.rollback()
+        return {"success": False, "error": str(e)}
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+
+@app.get("/api/july/user-login-logs")
+def get_user_login_logs(limit: int = 100, authorization: Optional[str] = Header(None)):
+    """Fetch history of all user login & logout sessions."""
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT log_id, user_id, username, full_name, role_code, role_name, city,
+                   login_time, logout_time, session_duration_minutes, ip_address
+            FROM july_user_login_logs
+            ORDER BY login_time DESC
+            LIMIT %s;
+        """, (limit,))
+        rows = cur.fetchall()
+        return [
+            {
+                "log_id": r[0],
+                "user_id": r[1],
+                "username": r[2],
+                "full_name": r[3],
+                "role_code": r[4],
+                "role_name": r[5],
+                "city": r[6],
+                "login_time": r[7].isoformat() if r[7] else None,
+                "logout_time": r[8].isoformat() if r[8] else None,
+                "session_duration_minutes": float(r[9]) if r[9] is not None else None,
+                "ip_address": r[10]
+            }
+            for r in rows
+        ]
     finally:
         postgreSQL_pool.putconn(conn)
 
@@ -1901,21 +2147,30 @@ class CityData(BaseModel):
     country: Optional[str] = "India"
     status: Optional[str] = "Active"
 
+@app.get("/api/july/cities")
 @app.get("/api/cities")
 def get_all_cities():
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT id, name, state, country, status FROM dev_city ORDER BY id;")
+        cur.execute("SELECT id, city_name, city_code, state, status FROM july_cities ORDER BY id;")
+        rows = cur.fetchall()
+        if not rows:
+            return [
+                {"id": 1, "value": "Bengaluru", "text": "Bengaluru", "name": "Bengaluru", "code": "BLR", "state": "Karnataka", "country": "India", "status": "Active"},
+                {"id": 2, "value": "Mumbai", "text": "Mumbai", "name": "Mumbai", "code": "BOM", "state": "Maharashtra", "country": "India", "status": "Active"},
+                {"id": 3, "value": "Hyderabad", "text": "Hyderabad", "name": "Hyderabad", "code": "HYD", "state": "Telangana", "country": "India", "status": "Active"}
+            ]
         return [{
             "id": r[0],
             "value": r[1],
             "text": r[1],
             "name": r[1],
-            "state": r[2] or "",
-            "country": r[3] or "India",
+            "code": r[2] or "",
+            "state": r[3] or "",
+            "country": "India",
             "status": r[4] or "Active"
-        } for r in cur.fetchall()]
+        } for r in rows]
     finally:
         postgreSQL_pool.putconn(conn)
 
@@ -2032,10 +2287,7 @@ def get_stats(
         where_clause = "WHERE 1=1"
         params = []
 
-        if not is_global and user_city:
-            where_clause += " AND w.city ILIKE %s"
-            params.append(f"%{user_city}%")
-        elif city and city != "all":
+        if city and city != "all":
             where_clause += " AND w.city ILIKE %s"
             params.append(f"%{city}%")
         
@@ -2091,7 +2343,7 @@ def get_stats(
                 SUM(CASE WHEN w.joined_status IN ('No Follow Up Required / Closed', 'Not Interested') THEN 1 ELSE 0 END) as not_interested,
                 SUM(CASE WHEN w.visitor_type ILIKE '%%Driver%%' THEN 1 ELSE 0 END) as individuals,
                 SUM(CASE WHEN w.visitor_type ILIKE '%%Operator%%' THEN 1 ELSE 0 END) as operators
-            FROM copy_walkins w
+            FROM july_walkins w
             {where_clause}
         """
         
@@ -2164,30 +2416,28 @@ def get_all_walkins(
                 COALESCE(w.referred_by_phone, '') AS referred_by_phone,
                 w.city AS city_name,
                 w.operating_place,
-                w.executive_id,
+                COALESCE(w.created_by, w.executive_id) AS executive_id,
                 COALESCE(e.first_name || ' ' || COALESCE(e.last_name, ''), 'Onboarding Executive 1') AS executive_name,
                 w.person_name,
                 w.person_number,
                 COALESCE(w.aadhaar_number, '') AS aadhaar_number,
                 COALESCE(w.dl_number, '') AS dl_number,
                 w.visiting_reason,
-                COALESCE(w.joined_status, 'Initiated') AS joined_status,
+                COALESCE(w.joined_status, 'Onboarding Process Initiated') AS joined_status,
                 COALESCE(w.remarks, '') AS remarks,
                 COALESCE(w.lead_channel, '') AS lead_channel,
                 COALESCE(w.lead_channel_details, '') AS lead_channel_details,
-                w.created_at
-            FROM copy_walkins w
-            LEFT JOIN july_portal_users pu ON pu.portal_user_id = w.executive_id
+                w.created_at,
+                COALESCE(w.submission_status, 'Submitted') AS submission_status
+            FROM july_walkins w
+            LEFT JOIN july_portal_users pu ON pu.portal_user_id = COALESCE(w.created_by, w.executive_id)
             LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
             WHERE 1=1
         """
         
         params = []
 
-        if not is_global and user_city:
-            base_query += " AND w.city ILIKE %s"
-            params.append(f"%{user_city}%")
-        elif city and city != "all":
+        if city and city != "all":
             base_query += " AND w.city ILIKE %s"
             params.append(f"%{city}%")
         
@@ -2208,9 +2458,13 @@ def get_all_walkins(
             base_query += " AND w.visitor_type = %s"
             params.append(visitor_type)
             
-        if status and status != "all":
-            base_query += " AND w.joined_status = %s"
+        if status == "Draft":
+            base_query += " AND (w.submission_status = 'Draft' OR w.joined_status = 'Draft')"
+        elif status and status != "all":
+            base_query += " AND w.joined_status = %s AND (w.submission_status IS NULL OR w.submission_status != 'Draft')"
             params.append(status)
+        else:
+            base_query += " AND (w.submission_status IS NULL OR w.submission_status != 'Draft')"
             
         if time_period and time_period != "all":
             from datetime import datetime
@@ -2272,7 +2526,8 @@ def get_all_walkins(
                 "remarks": r[19],
                 "lead_channel": r[20],
                 "lead_channel_details": r[21],
-                "created_at": r[22].isoformat() if r[22] else None
+                "created_at": r[22].isoformat() if r[22] else None,
+                "submission_status": r[23]
             })
             
         return {
@@ -2296,7 +2551,7 @@ def search_walkins(q: str):
         search_pattern = f"%{q}%"
         cur.execute("""
             SELECT id, first_name, last_name, person_name, person_number, city, dl_number, aadhaar_number, joined_status, aadhaar_image, dl_image
-            FROM copy_walkins
+            FROM july_walkins
             WHERE id::text = %s 
                OR person_number ILIKE %s 
                OR dl_number ILIKE %s
@@ -2331,7 +2586,7 @@ def get_walkin(walkin_id: int):
                 w.referred_by_name, w.referred_by_phone,
                 w.aadhaar_image, w.dl_image,
                 w.lead_channel, w.lead_channel_details
-            FROM copy_walkins w
+            FROM july_walkins w
             LEFT JOIN copy_users u ON u.id = w.executive_id
             WHERE w.id = %s;
         """, (walkin_id,))
@@ -2358,23 +2613,36 @@ def get_walkin(walkin_id: int):
 @app.post("/api/walkins")
 def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None)):
     user = get_current_user(authorization)
-    user_p_id = user.get("portal_user_id") or user.get("user_id") or 1
+    user_p_id = user.get("portal_user_id")
+    user_name = user.get("name") or user.get("username") or "Unknown"
 
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
+
+        # If portal_user_id is missing (fallback login), resolve via username
+        if not user_p_id:
+            username = user.get("username") or ""
+            cur.execute(
+                "SELECT portal_user_id FROM july_portal_users WHERE username = %s LIMIT 1;",
+                (username,)
+            )
+            row = cur.fetchone()
+            user_p_id = row[0] if row else (user.get("user_id") or 3)
+
         f_name = (data.first_name or "").strip()
         l_name = (data.last_name or "").strip()
         full_n = (data.person_name or f"{f_name} {l_name}").strip()
+        sub_status = data.submission_status or ('Draft' if data.joined_status == 'Draft' else 'Submitted')
 
         cur.execute("""
-            INSERT INTO copy_walkins
+            INSERT INTO july_walkins
               (visitor_type, event_date, enquiry_time, city, operating_place, executive_id,
                first_name, last_name, person_name, person_number, aadhaar_number, dl_number,
                visiting_reason, mode_of_enquiry, lead_channel, lead_channel_details,
-               referred_by_name, referred_by_phone, joined_status, remarks,
-               aadhaar_image, dl_image, created_by)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+               referred_by_name, referred_by_phone, joined_status, submission_status, remarks,
+               aadhaar_image, dl_image, created_by, approval_status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id;
         """, (
             data.visitor_type or 'Driver',
@@ -2395,13 +2663,27 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
             data.lead_channel_details or '',
             data.referred_by_name or '',
             data.referred_by_phone or '',
-            data.joined_status or 'Initiated',
+            data.joined_status or 'Onboarding Process Initiated',
+            sub_status,
             data.remarks or '',
             data.aadhaar_image or None,
             data.dl_image or None,
-            user_p_id
+            user_p_id,
+            'Submitted'
         ))
         walkin_id = cur.fetchone()[0]
+
+        # ── Audit log ────────────────────────────────────────────────────────
+        cur.execute("""
+            INSERT INTO july_walkin_logs
+              (walkin_id, action, old_status, new_status, changed_fields,
+               performed_by, performed_by_name)
+            VALUES (%s, 'CREATE', NULL, %s,
+                    %s, %s, %s);
+        """, (walkin_id,
+              sub_status,
+              f'{{"person_name":"{full_n}","city":"{data.city}"}}',
+              user_p_id, user_name))
 
         conn.commit()
         return {"success": True, "walkin_id": walkin_id}
@@ -2415,23 +2697,61 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
 @app.put("/api/walkins/{walkin_id}")
 def update_walkin(walkin_id: int, data: WalkinData, authorization: Optional[str] = Header(None)):
     user = get_current_user(authorization)
-    user_p_id = user.get("portal_user_id") or user.get("user_id") or 1
+    # Resolve valid portal_user_id — fallback login users may only have user_id (copy_app_users.id)
+    user_p_id = user.get("portal_user_id")
+    user_name = user.get("name") or user.get("username") or "Unknown"
 
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
+
+        # If portal_user_id is missing, try resolving via username in july_portal_users
+        if not user_p_id:
+            username = user.get("username") or ""
+            cur.execute(
+                "SELECT portal_user_id FROM july_portal_users WHERE username = %s LIMIT 1;",
+                (username,)
+            )
+            row = cur.fetchone()
+            user_p_id = row[0] if row else (user.get("user_id") or 3)  # fallback to admin (3)
+
         f_name = (data.first_name or "").strip()
         l_name = (data.last_name or "").strip()
         full_n = (data.person_name or f"{f_name} {l_name}").strip()
+        sub_status = data.submission_status or ('Draft' if data.joined_status == 'Draft' else 'Submitted')
+
+        # Capture old record before update to calculate exact diffs
+        cur.execute("""
+            SELECT visitor_type, event_date, enquiry_time, city, operating_place,
+                   first_name, last_name, person_name, person_number, aadhaar_number, dl_number,
+                   visiting_reason, mode_of_enquiry, lead_channel, lead_channel_details,
+                   referred_by_name, referred_by_phone, joined_status, remarks, submission_status
+            FROM july_walkins WHERE id=%s;
+        """, (walkin_id,))
+        old_row = cur.fetchone()
+        old_data = {}
+        old_status = None
+        if old_row:
+            old_status = old_row[17]
+            old_data = {
+                "visitor_type": old_row[0], "event_date": old_row[1], "enquiry_time": old_row[2],
+                "city": old_row[3], "operating_place": old_row[4], "first_name": old_row[5],
+                "last_name": old_row[6], "person_name": old_row[7], "person_number": old_row[8],
+                "aadhaar_number": old_row[9], "dl_number": old_row[10], "visiting_reason": old_row[11],
+                "mode_of_enquiry": old_row[12], "lead_channel": old_row[13], "lead_channel_details": old_row[14],
+                "referred_by_name": old_row[15], "referred_by_phone": old_row[16], "joined_status": old_row[17],
+                "remarks": old_row[18], "submission_status": old_row[19]
+            }
 
         cur.execute("""
-            UPDATE copy_walkins SET
+            UPDATE july_walkins SET
                 visitor_type=%s, event_date=%s, enquiry_time=%s, city=%s, operating_place=%s,
                 first_name=%s, last_name=%s, person_name=%s, person_number=%s,
                 aadhaar_number=%s, dl_number=%s, visiting_reason=%s, mode_of_enquiry=%s,
                 lead_channel=%s, lead_channel_details=%s, referred_by_name=%s, referred_by_phone=%s,
-                joined_status=%s, remarks=%s,
-                aadhaar_image=COALESCE(%s, aadhaar_image), dl_image=COALESCE(%s, dl_image)
+                joined_status=%s, submission_status=%s, remarks=%s,
+                aadhaar_image=COALESCE(%s, aadhaar_image), dl_image=COALESCE(%s, dl_image),
+                updated_by=%s, updated_at=NOW()
             WHERE id=%s;
         """, (
             data.visitor_type,
@@ -2451,12 +2771,69 @@ def update_walkin(walkin_id: int, data: WalkinData, authorization: Optional[str]
             data.lead_channel_details,
             data.referred_by_name,
             data.referred_by_phone,
-            data.joined_status,
+            data.joined_status or 'Onboarding Process Initiated',
+            sub_status,
             data.remarks,
             data.aadhaar_image,
             data.dl_image,
+            user_p_id,
             walkin_id
         ))
+
+        # Calculate exact changed fields for audit log
+        new_data_map = {
+            "visitor_type": data.visitor_type, "event_date": data.event_date, "enquiry_time": data.enquiry_time,
+            "city": str(data.city) if data.city is not None else 'Hyderabad', "operating_place": data.operating_place,
+            "first_name": f_name, "last_name": l_name, "person_name": full_n,
+            "person_number": str(data.person_number) if data.person_number else '',
+            "aadhaar_number": data.aadhaar_number, "dl_number": data.dl_number,
+            "visiting_reason": data.visiting_reason, "mode_of_enquiry": data.mode_of_enquiry,
+            "lead_channel": data.lead_channel, "lead_channel_details": data.lead_channel_details,
+            "referred_by_name": data.referred_by_name, "referred_by_phone": data.referred_by_phone,
+            "joined_status": data.joined_status or 'Onboarding Process Initiated',
+            "submission_status": sub_status,
+            "remarks": data.remarks
+        }
+        
+        diffs = {}
+        for k, new_v in new_data_map.items():
+            old_v = old_data.get(k)
+            if old_v != new_v and not (not old_v and not new_v):
+                diffs[k] = {"old": old_v, "new": new_v}
+
+        changed_json = json.dumps(diffs) if diffs else json.dumps({"person_name": full_n})
+
+        # Full row snapshots for previous_data and new_data
+        new_data_snapshot = {
+            "visitor_type": data.visitor_type, "event_date": data.event_date,
+            "enquiry_time": data.enquiry_time,
+            "city": str(data.city) if data.city is not None else 'Hyderabad',
+            "operating_place": data.operating_place, "first_name": f_name,
+            "last_name": l_name, "person_name": full_n,
+            "person_number": str(data.person_number) if data.person_number else '',
+            "aadhaar_number": data.aadhaar_number, "dl_number": data.dl_number,
+            "visiting_reason": data.visiting_reason, "mode_of_enquiry": data.mode_of_enquiry,
+            "lead_channel": data.lead_channel, "lead_channel_details": data.lead_channel_details,
+            "referred_by_name": data.referred_by_name, "referred_by_phone": data.referred_by_phone,
+            "joined_status": data.joined_status or 'Onboarding Process Initiated',
+            "submission_status": sub_status,
+            "remarks": data.remarks,
+            "updated_by": user_p_id
+        }
+
+        # ── Audit log ────────────────────────────────────────────────────────
+        action = 'STATUS_CHANGE' if old_status != data.joined_status else 'UPDATE'
+        cur.execute("""
+            INSERT INTO july_walkin_logs
+              (walkin_id, action, old_status, new_status, changed_fields,
+               previous_data, new_data,
+               performed_by, performed_by_name)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
+        """, (walkin_id, action, old_status, data.joined_status,
+              changed_json,
+              json.dumps(old_data),
+              json.dumps(new_data_snapshot),
+              user_p_id, user_name))
 
         conn.commit()
         return {"success": True}
@@ -2469,32 +2846,30 @@ def update_walkin(walkin_id: int, data: WalkinData, authorization: Optional[str]
 @app.delete("/api/walkins/{walkin_id}")
 def delete_walkin(walkin_id: int, authorization: Optional[str] = Header(None)):
     user = get_current_user(authorization)
+    user_p_id = user.get("portal_user_id") or user.get("user_id") or 1
+    user_name = user.get("name") or user.get("username") or "Unknown"
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("DELETE FROM copy_walkins WHERE id = %s RETURNING id;", (walkin_id,))
-        deleted = cur.fetchone()
-        if not deleted:
+        # Capture name before delete for log
+        cur.execute("SELECT person_name, joined_status FROM july_walkins WHERE id = %s;", (walkin_id,))
+        old = cur.fetchone()
+        if not old:
             raise HTTPException(status_code=404, detail="Walkin record not found")
-        conn.commit()
-        return {"success": True}
-    finally:
-        postgreSQL_pool.putconn(conn)
+        old_name, old_status = old
 
-    conn = postgreSQL_pool.getconn()
-    try:
-        cur = conn.cursor()
-        cur.execute("DELETE FROM july_walkins WHERE walkin_id = %s RETURNING walkin_id;", (walkin_id,))
-        deleted = cur.fetchone()
-        if not deleted:
-            raise HTTPException(status_code=404, detail="Walkin not found")
-
-        # Audit Log
+        # Write log BEFORE delete (so walkin_id still exists for reference)
         cur.execute("""
-            INSERT INTO july_walkin_logs (walkin_id, action, performed_by)
-            VALUES (%s, 'DELETED', %s);
-        """, (walkin_id, user_p_id))
+            INSERT INTO july_walkin_logs
+              (walkin_id, action, old_status, new_status, changed_fields,
+               performed_by, performed_by_name)
+            VALUES (%s, 'DELETE', %s, 'DELETED',
+                    %s, %s, %s);
+        """, (walkin_id, old_status,
+              f'{{"person_name":"{old_name}"}}',
+              user_p_id, user_name))
 
+        cur.execute("DELETE FROM july_walkins WHERE id = %s;", (walkin_id,))
         conn.commit()
         return {"success": True}
     finally:
@@ -2505,12 +2880,21 @@ def delete_walkin(walkin_id: int, authorization: Optional[str] = Header(None)):
 # Onboarding API
 # ─────────────────────────────────────────────────────────
 @app.get("/api/onboarding")
-def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None, limit: Optional[int] = 10):
+def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None, status: Optional[str] = None, limit: Optional[int] = 10):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        base_query = "SELECT * FROM copy_form_onboarding WHERE 1=1"
+        base_query = "SELECT * FROM july_form_onboarding WHERE 1=1"
         params = []
+        
+        if status == "Draft":
+            base_query += " AND approval_status = 'Draft'"
+        elif status and status != "all":
+            base_query += " AND approval_status = %s"
+            params.append(status)
+        else:
+            base_query += " AND (approval_status IS NULL OR approval_status != 'Draft')"
+
         if search:
             base_query += """
                 AND (
@@ -2536,7 +2920,17 @@ def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None,
         postgreSQL_pool.putconn(conn)
 
 @app.post("/api/onboarding")
-def create_onboarding(data: OnboardingData):
+def create_onboarding(data: OnboardingData, authorization: Optional[str] = Header(None)):
+    # Resolve creator
+    creator_id = None
+    creator_name = "Unknown"
+    if authorization:
+        try:
+            _u = get_current_user(authorization)
+            creator_id = _u.get("portal_user_id") or _u.get("user_id")
+            creator_name = _u.get("name") or _u.get("username") or "Unknown"
+        except Exception:
+            pass
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
@@ -2545,20 +2939,20 @@ def create_onboarding(data: OnboardingData):
         # ── DUPLICATE CHECK ─────────────────────────────────────────────────────
         # Check phone number first (always present)
         cur.execute(
-            "SELECT id, driver_name FROM copy_form_onboarding WHERE phone_number = %s LIMIT 1;",
+            "SELECT id, driver_name FROM july_form_onboarding WHERE phone_number = %s LIMIT 1;",
             (data.phone_number,)
         )
         dup = cur.fetchone()
         if not dup and data.aadhaar_number:
             clean_aadhaar = data.aadhaar_number.replace(" ", "")
             cur.execute(
-                "SELECT id, driver_name FROM copy_form_onboarding WHERE REPLACE(aadhaar_number, ' ', '') = %s LIMIT 1;",
+                "SELECT id, driver_name FROM july_form_onboarding WHERE REPLACE(aadhaar_number, ' ', '') = %s LIMIT 1;",
                 (clean_aadhaar,)
             )
             dup = cur.fetchone()
         if not dup and data.pan_number:
             cur.execute(
-                "SELECT id, driver_name FROM copy_form_onboarding WHERE UPPER(pan_number) = UPPER(%s) LIMIT 1;",
+                "SELECT id, driver_name FROM july_form_onboarding WHERE UPPER(pan_number) = UPPER(%s) LIMIT 1;",
                 (data.pan_number,)
             )
             dup = cur.fetchone()
@@ -2572,12 +2966,12 @@ def create_onboarding(data: OnboardingData):
         # Ensure cheque columns exist (migration guard)
         for col in ["cheque2_photo", "cheque3_photo"]:
             cur.execute(f"""
-                ALTER TABLE copy_form_onboarding
+                ALTER TABLE july_form_onboarding
                 ADD COLUMN IF NOT EXISTS {col} TEXT;
             """)
 
         cur.execute("""
-            INSERT INTO copy_form_onboarding (
+            INSERT INTO july_form_onboarding (
                 driver_name, phone_number, whatsapp_number, dob, city, operating_place,
                 present_address, permanent_address, emergency_name, emergency_phone, 
                 dl_number, dl_expiry_date, lead_source, 
@@ -2594,8 +2988,9 @@ def create_onboarding(data: OnboardingData):
                 aadhaar_card_front, aadhaar_card_back, driver_email, local_address_proof,
                 ref1_name, ref1_phone, ref1_address,
                 ref2_name, ref2_phone, ref2_address,
-                ref3_name, ref3_phone, ref3_address
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                ref3_name, ref3_phone, ref3_address,
+                created_by, approval_status
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             RETURNING id;
         """, (
             data.driver_name, data.phone_number, data.whatsapp_number, data.dob, data.city, data.operating_place,
@@ -2617,19 +3012,20 @@ def create_onboarding(data: OnboardingData):
             extract_image(data.aadhaar_card_front), extract_image(data.aadhaar_card_back), data.driver_email, extract_image(data.local_address_proof),
             data.ref1_name, data.ref1_phone, data.ref1_address,
             data.ref2_name, data.ref2_phone, data.ref2_address,
-            data.ref3_name, data.ref3_phone, data.ref3_address
+            data.ref3_name, data.ref3_phone, data.ref3_address,
+            creator_id, 'Draft'
         ))
         new_id = cur.fetchone()[0]
         
         walkin_id = data.walkin_id
         if not walkin_id:
-            cur.execute("SELECT id FROM copy_walkins WHERE REPLACE(person_number, ' ', '') = %s LIMIT 1;", (data.phone_number.replace(" ", ""),))
+            cur.execute("SELECT id FROM july_walkins WHERE REPLACE(person_number, ' ', '') = %s LIMIT 1;", (data.phone_number.replace(" ", ""),))
             row = cur.fetchone()
             if row:
                 walkin_id = row[0]
             else:
                 cur.execute("""
-                    INSERT INTO copy_walkins (
+                    INSERT INTO july_walkins (
                         visitor_type, event_date, city, operating_place, 
                         person_name, person_number, aadhaar_number, dl_number,
                         visiting_reason, joined_status, remarks,
@@ -2654,18 +3050,18 @@ def create_onboarding(data: OnboardingData):
                 walkin_id = cur.fetchone()[0]
 
         cur.execute("""
-            INSERT INTO copy_walkin_form_links (walkin_id, onboarding_id)
+            INSERT INTO july_walkin_form_links (walkin_id, onboarding_id)
             VALUES (%s, %s);
         """, (walkin_id, new_id))
         
         cur.execute("""
-            UPDATE copy_walkins SET joined_status = 'Successfully Onboarded' WHERE id = %s;
+            UPDATE july_walkins SET joined_status = 'Successfully Onboarded' WHERE id = %s;
         """, (walkin_id,))
 
         if data.vendor_type == "Operator" and data.operator_drivers:
             for drv in data.operator_drivers:
                 cur.execute("""
-                    INSERT INTO copy_form_onboarding (
+                    INSERT INTO july_form_onboarding (
                         driver_name, phone_number, dl_number, custom_rent_amount, driver_id,
                         vendor_name, vendor_id, vendor_type,
                         whatsapp_number, dob, city, present_address, permanent_address, 
@@ -2681,66 +3077,295 @@ def create_onboarding(data: OnboardingData):
                     "Driver"
                 ))
 
+        # ── Audit log ────────────────────────────────────────────────────────
+        cur.execute("""
+            INSERT INTO july_onboarding_logs
+              (onboarding_id, action, old_status, new_status, changed_fields,
+               performed_by, performed_by_name)
+            VALUES (%s, 'CREATE', NULL, 'Draft', %s, %s, %s);
+        """, (new_id,
+              f'{{"driver_name":"{data.driver_name}","phone":"{data.phone_number}"}}',
+              creator_id, creator_name))
+
         conn.commit()
         return {"success": True, "id": new_id}
     finally:
         postgreSQL_pool.putconn(conn)
 
 
+class SendForApprovalRequest(BaseModel):
+    approver_id: Optional[int] = None   # Executive can override; defaults to city CM
+
+
 @app.post("/api/onboarding/send-for-approval/{id}")
-def send_onboarding_for_approval(id: int, authorization: Optional[str] = Header(None)):
-    """Send a Draft or Changes Requested onboarding record for City Manager approval."""
+def send_onboarding_for_approval(
+    id: int,
+    body: Optional[SendForApprovalRequest] = None,
+    authorization: Optional[str] = Header(None)
+):
+    """Send a Draft or Changes Requested onboarding record for City Manager approval.
+    The approver defaults to the City Manager of the record's city, but the executive
+    may pass a different approver_id in the request body.
+    """
     user = get_current_user(authorization)
+    submitter_id = user.get("portal_user_id") or user.get("user_id") or 1
+    submitter_name = user.get("name") or user.get("username") or "Unknown"
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        
-        # 1. Update copy_form_onboarding
+
+        # ── Fetch record
         cur.execute("""
-            UPDATE copy_form_onboarding
-            SET approval_status = 'Pending Approval',
-                approval_requested_to = 20,
-                approval_note = 'Submitted by Executive for City Manager Review',
-                approval_submitted_at = NOW()
-            WHERE id = %s
-            RETURNING driver_name, candidate_role, vendor_type, city, phone_number, father_name, present_address, emergency_name, emergency_phone, dl_number, pan_number, aadhaar_number;
+            SELECT driver_name, candidate_role, vendor_type, city,
+                   phone_number, father_name, present_address,
+                   emergency_name, emergency_phone,
+                   dl_number, pan_number, aadhaar_number, approval_status
+            FROM july_form_onboarding
+            WHERE id = %s;
         """, (id,))
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Onboarding record not found")
-        
-        driver_name, candidate_role, vendor_type, city, phone_number, father_name, present_address, emergency_name, emergency_phone, dl_number, pan_number, aadhaar_number = row
+        (driver_name, candidate_role, vendor_type, city,
+         phone_number, father_name, present_address,
+         emergency_name, emergency_phone,
+         dl_number, pan_number, aadhaar_number, old_status) = row
         role_label = vendor_type or candidate_role or "Driver"
 
-        # 2. Upsert into july_onboarding for approval workflow engine
+        if old_status not in (None, 'Draft', 'Changes Requested', 'Rejected'):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Cannot submit: record is already in '{old_status}' state"
+            )
+
+        # ── Resolve approver: explicit override > city's default CM
+        approver_id = (body.approver_id if body and body.approver_id else None)
+        if not approver_id:
+            cur.execute("""
+                SELECT id FROM copy_users
+                WHERE city = %s AND role ILIKE '%%city manager%%'
+                ORDER BY id LIMIT 1;
+            """, (city,))
+            cm_row = cur.fetchone()
+            approver_id = cm_row[0] if cm_row else 20   # fallback to id=20
+
+        # ── Update july_form_onboarding
+        cur.execute("""
+            UPDATE july_form_onboarding
+            SET approval_status    = 'Pending Approval',
+                approval_requested_to = %s,
+                current_approver_id   = %s,
+                approval_note      = 'Submitted by Executive for City Manager Review',
+                approval_submitted_at = NOW(),
+                updated_by         = %s,
+                updated_at         = NOW()
+            WHERE id = %s;
+        """, (approver_id, approver_id, submitter_id, id))
+
+        # ── Upsert into july_onboarding (approval workflow engine table)
         cur.execute("SELECT onboarding_id FROM july_onboarding WHERE onboarding_id = %s;", (id,))
         if cur.fetchone():
             cur.execute("""
                 UPDATE july_onboarding
-                SET approval_status = 'Pending Approval',
-                    current_approver_id = 20,
-                    created_at = NOW()
+                SET approval_status    = 'Pending Approval',
+                    current_approver_id = %s
                 WHERE onboarding_id = %s;
-            """, (id,))
+            """, (approver_id, id))
         else:
             cur.execute("""
                 INSERT INTO july_onboarding (
-                    onboarding_id, driver_id, driver_name, phone_number, city, driver_plan, father_name,
-                    present_address, emergency_name, emergency_phone, driving_license, pan_number, aadhaar_number,
+                    onboarding_id, driver_id, driver_name, phone_number, city, driver_plan,
+                    father_name, present_address, emergency_name, emergency_phone,
+                    driving_license, pan_number, aadhaar_number,
                     approval_status, created_by, current_approver_id, created_at
-                ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'Pending Approval', %s, 20, NOW()
-                );
-            """, (id, f"DRV-{id}", driver_name, phone_number, city, role_label, father_name, present_address, emergency_name, emergency_phone, dl_number, pan_number, aadhaar_number, user.get("user_id", 24)))
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
+                          'Pending Approval', %s, %s, NOW());
+            """, (id, f"DRV-{id}", driver_name, phone_number, city, role_label,
+                  father_name, present_address, emergency_name, emergency_phone,
+                  dl_number, pan_number, aadhaar_number, submitter_id, approver_id))
 
-        # 3. Log in july_approval_chain_logs
+        # ── Audit log
         cur.execute("""
-            INSERT INTO july_approval_chain_logs (module_name, record_id, action, from_user_id, to_user_id, remarks)
-            VALUES ('individual_onboarding', %s, 'SUBMITTED', %s, 20, 'Submitted for City Manager approval');
-        """, (id, user.get("portal_user_id", 24)))
+            INSERT INTO july_onboarding_logs
+              (onboarding_id, action, old_status, new_status,
+               changed_fields, performed_by, performed_by_name)
+            VALUES (%s, 'SEND_FOR_APPROVAL', %s, 'Pending Approval',
+                    %s, %s, %s);
+        """, (id, old_status,
+              f'{{"approver_id":{approver_id}}}',
+              submitter_id, submitter_name))
+
+        # ── july_approval_chain_logs
+        cur.execute("""
+            INSERT INTO july_approval_chain_logs
+              (module_name, record_id, action, from_user_id, to_user_id, remarks)
+            VALUES ('individual_onboarding', %s, 'SUBMITTED', %s, %s,
+                    'Submitted for City Manager approval');
+        """, (id, submitter_id, approver_id))
 
         conn.commit()
-        return {"success": True, "message": "Onboarding application sent to City Manager 1 for approval!"}
+        return {
+            "success": True,
+            "approver_id": approver_id,
+            "message": f"Onboarding application sent to approver #{approver_id} for review."
+        }
+    except Exception as e:
+        conn.rollback()
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+
+# ─────────────────────────────────────────────────────────
+# City Managers list (for approver dropdown)
+# ─────────────────────────────────────────────────────────
+@app.get("/api/city-managers")
+def get_city_managers(city: Optional[str] = None, authorization: Optional[str] = Header(None)):
+    """Return users with City Manager role, optionally filtered by city.
+    Used by the frontend to populate the approver dropdown with the default CM pre-selected.
+    """
+    get_current_user(authorization)
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        if city:
+            cur.execute("""
+                SELECT id, name, role, city
+                FROM copy_users
+                WHERE role ILIKE '%%city manager%%' AND city = %s
+                ORDER BY name;
+            """, (city,))
+        else:
+            cur.execute("""
+                SELECT id, name, role, city
+                FROM copy_users
+                WHERE role ILIKE '%%city manager%%'
+                ORDER BY city, name;
+            """)
+        cols = [d[0] for d in cur.description]
+        return [dict(zip(cols, row)) for row in cur.fetchall()]
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+
+# ─────────────────────────────────────────────────────────
+# Draft Save — save onboarding progress without submitting
+# ─────────────────────────────────────────────────────────
+@app.post("/api/onboarding/save-draft/{id}")
+def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional[str] = Header(None)):
+    """Persist partial onboarding data without changing approval_status.
+    If id == 0 (new record), a new row is created with status='Draft'.
+    """
+    user = get_current_user(authorization)
+    user_p_id = user.get("portal_user_id") or user.get("user_id") or 1
+    user_name = user.get("name") or user.get("username") or "Unknown"
+    import json
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        if id == 0:
+            # New draft — minimal insert
+            cur.execute("""
+                INSERT INTO july_form_onboarding
+                  (driver_name, phone_number, city, vendor_type, candidate_role,
+                   approval_status, created_by)
+                VALUES (%s, %s, %s, %s, %s, 'Draft', %s)
+                RETURNING id;
+            """, (
+                data.driver_name, data.phone_number,
+                data.city, data.vendor_type or 'Individual',
+                data.candidate_role or 'Driver', user_p_id
+            ))
+            new_id = cur.fetchone()[0]
+            cur.execute("""
+                INSERT INTO july_onboarding_logs
+                  (onboarding_id, action, old_status, new_status,
+                   changed_fields, performed_by, performed_by_name)
+                VALUES (%s, 'CREATE_DRAFT', NULL, 'Draft', %s, %s, %s);
+            """, (new_id,
+                  f'{{"driver_name":"{data.driver_name}"}}',
+                  user_p_id, user_name))
+            conn.commit()
+            return {"success": True, "id": new_id, "approval_status": "Draft"}
+        else:
+            # Existing record — update fields but preserve approval_status
+            cur.execute("SELECT approval_status FROM july_form_onboarding WHERE id = %s;", (id,))
+            rec = cur.fetchone()
+            if not rec:
+                raise HTTPException(status_code=404, detail="Onboarding record not found")
+            current_status = rec[0]
+            cur.execute("""
+                UPDATE july_form_onboarding SET
+                    driver_name=%s, phone_number=%s, whatsapp_number=%s,
+                    dob=%s, city=%s, operating_place=%s,
+                    present_address=%s, permanent_address=%s,
+                    emergency_name=%s, emergency_phone=%s, emergency_relationship=%s,
+                    dl_number=%s, dl_expiry_date=%s,
+                    pan_number=%s, aadhaar_number=%s, pan_aadhaar_linked=%s,
+                    vendor_name=%s, vendor_id=%s, vendor_type=%s,
+                    father_name=%s, bank_name=%s, other_bank_name=%s,
+                    account_number=%s, ifsc_code=%s, upi_id=%s,
+                    account_name=%s, account_type=%s,
+                    candidate_role=%s, rental_model=%s, security_deposit=%s,
+                    letzown_cheques=%s, is_spring_verified=%s,
+                    driver_email=%s, lead_source=%s, platform_details=%s,
+                    documents_verified=%s, custom_rental_plan=%s,
+                    ref1_name=%s, ref1_phone=%s, ref1_address=%s,
+                    ref2_name=%s, ref2_phone=%s, ref2_address=%s,
+                    ref3_name=%s, ref3_phone=%s, ref3_address=%s,
+                    updated_by=%s, updated_at=NOW()
+                WHERE id=%s;
+            """, (
+                data.driver_name, data.phone_number, data.whatsapp_number,
+                data.dob, data.city, data.operating_place,
+                data.present_address, data.permanent_address,
+                data.emergency_name, data.emergency_phone, data.emergency_relationship,
+                data.dl_number, data.dl_expiry_date,
+                data.pan_number, data.aadhaar_number, data.pan_aadhaar_linked,
+                data.vendor_name, data.vendor_id, data.vendor_type,
+                data.father_name, data.bank_name, data.other_bank_name,
+                data.account_number, data.ifsc_code, data.upi_id,
+                data.account_name, data.account_type,
+                data.candidate_role, data.rental_model, data.security_deposit,
+                data.letzown_cheques, data.is_spring_verified,
+                data.driver_email, data.lead_source,
+                json.dumps(data.platform_details) if data.platform_details else None,
+                data.documents_verified, data.custom_rental_plan,
+                data.ref1_name, data.ref1_phone, data.ref1_address,
+                data.ref2_name, data.ref2_phone, data.ref2_address,
+                data.ref3_name, data.ref3_phone, data.ref3_address,
+                user_p_id, id
+            ))
+            # Update photo fields only if new values provided
+            for field, val in [
+                ("selfie_photo",          extract_image(data.selfie_photo)),
+                ("dl_front",              extract_image(data.dl_front)),
+                ("dl_back",               extract_image(data.dl_back)),
+                ("pan_card_photo",        extract_image(data.pan_card_photo)),
+                ("aadhaar_card_photo",    extract_image(data.aadhaar_card_photo)),
+                ("aadhaar_card_front",    extract_image(data.aadhaar_card_front)),
+                ("aadhaar_card_back",     extract_image(data.aadhaar_card_back)),
+                ("local_address_proof",   extract_image(data.local_address_proof)),
+                ("cancelled_cheque_photo",extract_image(data.cancelled_cheque_photo)),
+                ("signature_photo",       extract_image(data.signature_photo)),
+            ]:
+                if val:
+                    cur.execute(
+                        f"UPDATE july_form_onboarding SET {field}=%s WHERE id=%s;",
+                        (val, id)
+                    )
+            cur.execute("""
+                INSERT INTO july_onboarding_logs
+                  (onboarding_id, action, old_status, new_status,
+                   changed_fields, performed_by, performed_by_name)
+                VALUES (%s, 'DRAFT_SAVE', %s, %s, %s, %s, %s);
+            """, (id, current_status, current_status,
+                  f'{{"driver_name":"{data.driver_name}"}}',
+                  user_p_id, user_name))
+            conn.commit()
+            return {"success": True, "id": id, "approval_status": current_status}
     except Exception as e:
         conn.rollback()
         if isinstance(e, HTTPException):
@@ -2774,7 +3399,7 @@ def get_onboarding(id: int):
                 ref1_name, ref1_phone, ref1_address,
                 ref2_name, ref2_phone, ref2_address,
                 ref3_name, ref3_phone, ref3_address
-            FROM copy_form_onboarding
+            FROM july_form_onboarding
             WHERE id = %s;
         """, (id,))
         r = cur.fetchone()
@@ -2811,7 +3436,7 @@ def get_onboarding(id: int):
                         whatsapp_number, dob, present_address, permanent_address, 
                         emergency_name, emergency_phone, pan_number, aadhaar_number, father_name,
                         selfie_photo, dl_front, dl_back, pan_card_photo, aadhaar_card_photo
-                    FROM copy_form_onboarding
+                    FROM july_form_onboarding
                     WHERE vendor_id = %s AND vendor_type = 'Operator' AND driver_id IS NOT NULL;
                 """, (r[17],))
                 drivers_rows = cur.fetchall()
@@ -2845,17 +3470,21 @@ def get_onboarding(id: int):
 
 @app.put("/api/onboarding/{id}")
 def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str] = Header(None)):
-    get_current_user(authorization)
+    user = get_current_user(authorization)
+    user_p_id = user.get("portal_user_id") or user.get("user_id") or 1
+    user_name = user.get("name") or user.get("username") or "Unknown"
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT id FROM copy_form_onboarding WHERE id = %s;", (id,))
-        if not cur.fetchone():
+        cur.execute("SELECT id, approval_status FROM july_form_onboarding WHERE id = %s;", (id,))
+        existing = cur.fetchone()
+        if not existing:
             raise HTTPException(status_code=404, detail="Onboarding record not found")
+        old_approval_status = existing[1]
             
         import json
         cur.execute("""
-            UPDATE copy_form_onboarding SET
+            UPDATE july_form_onboarding SET
                 driver_name=%s, phone_number=%s, whatsapp_number=%s, dob=%s, city=%s, operating_place=%s,
                 present_address=%s, permanent_address=%s, emergency_name=%s, emergency_phone=%s, 
                 dl_number=%s, dl_expiry_date=%s, lead_source=%s, 
@@ -2869,7 +3498,8 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
                 driver_email=%s,
                 ref1_name=%s, ref1_phone=%s, ref1_address=%s,
                 ref2_name=%s, ref2_phone=%s, ref2_address=%s,
-                ref3_name=%s, ref3_phone=%s, ref3_address=%s
+                ref3_name=%s, ref3_phone=%s, ref3_address=%s,
+                updated_by=%s, updated_at=NOW()
             WHERE id=%s;
         """, (
             data.driver_name, data.phone_number, data.whatsapp_number, data.dob, data.city, data.operating_place,
@@ -2886,6 +3516,7 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
             data.ref1_name, data.ref1_phone, data.ref1_address,
             data.ref2_name, data.ref2_phone, data.ref2_address,
             data.ref3_name, data.ref3_phone, data.ref3_address,
+            user_p_id,
             id
         ))
         
@@ -2902,24 +3533,36 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
         new_cheque3 = extract_image(data.cheque3_photo)
         new_signature = extract_image(data.signature_photo)
         
-        if new_selfie: cur.execute("UPDATE copy_form_onboarding SET selfie_photo=%s WHERE id=%s;", (new_selfie, id))
-        if new_dl_front: cur.execute("UPDATE copy_form_onboarding SET dl_front=%s WHERE id=%s;", (new_dl_front, id))
-        if new_dl_back: cur.execute("UPDATE copy_form_onboarding SET dl_back=%s WHERE id=%s;", (new_dl_back, id))
-        if new_pan: cur.execute("UPDATE copy_form_onboarding SET pan_card_photo=%s WHERE id=%s;", (new_pan, id))
-        if new_aadhaar_img: cur.execute("UPDATE copy_form_onboarding SET aadhaar_card_photo=%s WHERE id=%s;", (new_aadhaar_img, id))
-        if new_aadhaar_front: cur.execute("UPDATE copy_form_onboarding SET aadhaar_card_front=%s WHERE id=%s;", (new_aadhaar_front, id))
-        if new_aadhaar_back: cur.execute("UPDATE copy_form_onboarding SET aadhaar_card_back=%s WHERE id=%s;", (new_aadhaar_back, id))
-        if new_local_address_proof: cur.execute("UPDATE copy_form_onboarding SET local_address_proof=%s WHERE id=%s;", (new_local_address_proof, id))
-        if new_cancelled_cheque: cur.execute("UPDATE copy_form_onboarding SET cancelled_cheque_photo=%s WHERE id=%s;", (new_cancelled_cheque, id))
-        if new_cheque2: cur.execute("UPDATE copy_form_onboarding SET cheque2_photo=%s WHERE id=%s;", (new_cheque2, id))
-        if new_cheque3: cur.execute("UPDATE copy_form_onboarding SET cheque3_photo=%s WHERE id=%s;", (new_cheque3, id))
-        if new_signature: cur.execute("UPDATE copy_form_onboarding SET signature_photo=%s WHERE id=%s;", (new_signature, id))
+        if new_selfie: cur.execute("UPDATE july_form_onboarding SET selfie_photo=%s WHERE id=%s;", (new_selfie, id))
+        if new_dl_front: cur.execute("UPDATE july_form_onboarding SET dl_front=%s WHERE id=%s;", (new_dl_front, id))
+        if new_dl_back: cur.execute("UPDATE july_form_onboarding SET dl_back=%s WHERE id=%s;", (new_dl_back, id))
+        if new_pan: cur.execute("UPDATE july_form_onboarding SET pan_card_photo=%s WHERE id=%s;", (new_pan, id))
+        if new_aadhaar_img: cur.execute("UPDATE july_form_onboarding SET aadhaar_card_photo=%s WHERE id=%s;", (new_aadhaar_img, id))
+        if new_aadhaar_front: cur.execute("UPDATE july_form_onboarding SET aadhaar_card_front=%s WHERE id=%s;", (new_aadhaar_front, id))
+        if new_aadhaar_back: cur.execute("UPDATE july_form_onboarding SET aadhaar_card_back=%s WHERE id=%s;", (new_aadhaar_back, id))
+        if new_local_address_proof: cur.execute("UPDATE july_form_onboarding SET local_address_proof=%s WHERE id=%s;", (new_local_address_proof, id))
+        if new_cancelled_cheque: cur.execute("UPDATE july_form_onboarding SET cancelled_cheque_photo=%s WHERE id=%s;", (new_cancelled_cheque, id))
+        if new_cheque2: cur.execute("UPDATE july_form_onboarding SET cheque2_photo=%s WHERE id=%s;", (new_cheque2, id))
+        if new_cheque3: cur.execute("UPDATE july_form_onboarding SET cheque3_photo=%s WHERE id=%s;", (new_cheque3, id))
+        if new_signature: cur.execute("UPDATE july_form_onboarding SET signature_photo=%s WHERE id=%s;", (new_signature, id))
             
         if data.walkin_id:
-            cur.execute("DELETE FROM copy_walkin_form_links WHERE onboarding_id = %s;", (id,))
-            cur.execute("INSERT INTO copy_walkin_form_links (walkin_id, onboarding_id) VALUES (%s, %s);", (data.walkin_id, id))
-            cur.execute("UPDATE copy_walkins SET joined_status = 'Onboarded' WHERE id = %s;", (data.walkin_id,))
-            
+            cur.execute("DELETE FROM july_walkin_form_links WHERE onboarding_id = %s;", (id,))
+            cur.execute("INSERT INTO july_walkin_form_links (walkin_id, onboarding_id) VALUES (%s, %s);", (data.walkin_id, id))
+            cur.execute("UPDATE july_walkins SET joined_status = 'Onboarded' WHERE id = %s;", (data.walkin_id,))
+
+        # ── Audit log ────────────────────────────────────────────────────────
+        new_status = data.approval_status if hasattr(data, 'approval_status') and data.approval_status else old_approval_status
+        action = 'STATUS_CHANGE' if old_approval_status != new_status else 'UPDATE'
+        cur.execute("""
+            INSERT INTO july_onboarding_logs
+              (onboarding_id, action, old_status, new_status, changed_fields,
+               performed_by, performed_by_name)
+            VALUES (%s, %s, %s, %s, %s, %s, %s);
+        """, (id, action, old_approval_status, new_status,
+              f'{{"driver_name":"{data.driver_name}"}}',
+              user_p_id, user_name))
+
         conn.commit()
         return {"success": True}
     finally:
@@ -2931,20 +3574,20 @@ def get_onboarding_stats():
     try:
         cur = conn.cursor()
         
-        cur.execute("SELECT COUNT(*) FROM copy_form_onboarding;")
+        cur.execute("SELECT COUNT(*) FROM july_form_onboarding;")
         total_onboarded = cur.fetchone()[0]
         
-        cur.execute("SELECT COUNT(DISTINCT vendor_id) FROM copy_form_onboarding WHERE vendor_id IS NOT NULL AND vendor_id <> '';")
+        cur.execute("SELECT COUNT(DISTINCT vendor_id) FROM july_form_onboarding WHERE vendor_id IS NOT NULL AND vendor_id <> '';")
         vendor_count = cur.fetchone()[0]
         
-        cur.execute("SELECT MAX(created_at) FROM copy_form_onboarding;")
+        cur.execute("SELECT MAX(created_at) FROM july_form_onboarding;")
         latest_time = cur.fetchone()[0]
         if latest_time:
             latest_str = latest_time.strftime("%d-%m-%Y")
         else:
             latest_str = "-"
             
-        cur.execute("SELECT COUNT(*) FROM copy_form_onboarding WHERE created_at >= NOW() - INTERVAL '7 days';")
+        cur.execute("SELECT COUNT(*) FROM july_form_onboarding WHERE created_at >= NOW() - INTERVAL '7 days';")
         last_7_days_count = cur.fetchone()[0]
             
         return {
@@ -2957,14 +3600,31 @@ def get_onboarding_stats():
         postgreSQL_pool.putconn(conn)
 
 @app.delete("/api/onboarding/{id}")
-def delete_onboarding(id: int):
+def delete_onboarding(id: int, authorization: Optional[str] = Header(None)):
+    user = get_current_user(authorization)
+    user_p_id = user.get("portal_user_id") or user.get("user_id") or 1
+    user_name = user.get("name") or user.get("username") or "Unknown"
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("DELETE FROM copy_form_onboarding WHERE id = %s RETURNING id;", (id,))
-        deleted = cur.fetchone()
-        if not deleted:
+        cur.execute("SELECT driver_name, approval_status FROM july_form_onboarding WHERE id = %s;", (id,))
+        old = cur.fetchone()
+        if not old:
             raise HTTPException(status_code=404, detail="Record not found")
+        old_name, old_status = old
+
+        # Log before delete
+        cur.execute("""
+            INSERT INTO july_onboarding_logs
+              (onboarding_id, action, old_status, new_status, changed_fields,
+               performed_by, performed_by_name)
+            VALUES (%s, 'DELETE', %s, 'DELETED', %s, %s, %s);
+        """, (id, old_status,
+              f'{{"driver_name":"{old_name}"}}',
+              user_p_id, user_name))
+
+        cur.execute("DELETE FROM july_walkin_form_links WHERE onboarding_id = %s;", (id,))
+        cur.execute("DELETE FROM july_form_onboarding WHERE id = %s;", (id,))
         conn.commit()
         return {"success": True}
     finally:
@@ -3514,7 +4174,7 @@ def get_all_vehicles(search: Optional[str] = None, city: Optional[str] = None, t
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        query = "SELECT * FROM copy_vehicle_onboarding WHERE 1=1"
+        query = "SELECT * FROM july_vehicle_onboarding WHERE 1=1"
         params = []
         if search:
             query += " AND (vehicle_number ILIKE %s OR model ILIKE %s OR letzryd_unique_no ILIKE %s)"
@@ -3538,13 +4198,13 @@ def get_vehicle_stats(authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM copy_vehicle_onboarding;")
+        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding;")
         total = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM copy_vehicle_onboarding WHERE received_allocated = 'In Process';")
+        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding WHERE received_allocated = 'In Process';")
         receiving = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM copy_vehicle_onboarding WHERE received_allocated = 'PDI Done';")
+        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding WHERE received_allocated = 'PDI Done';")
         allocation = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM copy_vehicle_onboarding WHERE cng_installed = 'Yes';")
+        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding WHERE cng_installed = 'Yes';")
         cng = cur.fetchone()[0]
         return {
             "total_fleet": total,
@@ -3561,7 +4221,7 @@ def get_single_vehicle(id: int, authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM copy_vehicle_onboarding WHERE id = %s;", (id,))
+        cur.execute("SELECT * FROM july_vehicle_onboarding WHERE id = %s;", (id,))
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Vehicle record not found")
@@ -3573,9 +4233,11 @@ def get_single_vehicle(id: int, authorization: Optional[str] = Header(None)):
 @app.post("/api/vehicle")
 def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[str] = Header(None)):
     user = None
+    user_name = "Unknown"
     if authorization:
         try:
             user = get_current_user(authorization)
+            user_name = user.get("name") or user.get("username") or "Unknown"
         except Exception:
             pass
     uid = user["portal_user_id"] if user else None
@@ -3583,7 +4245,7 @@ def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[s
     try:
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO copy_vehicle_onboarding (
+            INSERT INTO july_vehicle_onboarding (
                 vehicle_number, letzryd_unique_no, city_name, model, received_allocated, delivery_month,
                 registration_date, rto_tax_validity, permit_validity, fitness_validity, pollution_validity, insurance_validity,
                 insurance_broker, insurance_underwriter, insurance_start_date,
@@ -3654,6 +4316,17 @@ def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[s
                 data.approval_remarks, data.created_by or uid
             ))
 
+        # ── Audit log ────────────────────────────────────────────────────────
+        cur.execute("""
+            INSERT INTO july_vehicle_logs
+              (vehicle_ob_id, vehicle_number, action, old_status, new_status,
+               changed_fields, performed_by, performed_by_name)
+            VALUES (%s, %s, 'CREATE', NULL, %s, %s, %s, %s);
+        """, (new_id, data.vehicle_number,
+              data.approval_status or 'Draft',
+              f'{{"city":"{data.city_name}","model":"{data.model}"}}',
+              uid, user_name))
+
         conn.commit()
         return {"success": True, "id": new_id}
     finally:
@@ -3662,17 +4335,24 @@ def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[s
 @app.put("/api/vehicle/{id}")
 def update_vehicle_record(id: int, data: VehicleOnboardingData, authorization: Optional[str] = Header(None)):
     user = None
+    user_name = "Unknown"
     if authorization:
         try:
             user = get_current_user(authorization)
+            user_name = user.get("name") or user.get("username") or "Unknown"
         except Exception:
             pass
     uid = user["portal_user_id"] if user else None
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
+        # Capture old status before update
+        cur.execute("SELECT approval_status, vehicle_number FROM july_vehicle_onboarding WHERE id=%s;", (id,))
+        old_veh = cur.fetchone()
+        old_veh_status = old_veh[0] if old_veh else None
+        old_veh_number = old_veh[1] if old_veh else data.vehicle_number
         cur.execute("""
-            UPDATE copy_vehicle_onboarding SET
+            UPDATE july_vehicle_onboarding SET
                 vehicle_number=%s, letzryd_unique_no=%s, city_name=%s, model=%s, received_allocated=%s, delivery_month=%s,
                 registration_date=%s, rto_tax_validity=%s, permit_validity=%s, fitness_validity=%s, pollution_validity=%s, insurance_validity=%s, 
                 insurance_broker=%s, insurance_underwriter=%s, insurance_start_date=%s,
@@ -3683,7 +4363,8 @@ def update_vehicle_record(id: int, data: VehicleOnboardingData, authorization: O
                 fuel_type=%s,
                 insurance_idv=%s, cover_engine_protect=%s, cover_consumables=%s, cover_zero_dep=%s, cover_rsa=%s,
                 chassis_number=%s, engine_number=%s, cng_tank_number=%s, fast_tag_number=%s, fast_tag_vendor=%s,
-                approval_status=%s, current_approver_id=%s, approval_remarks=%s, created_by=%s
+                approval_status=%s, current_approver_id=%s, approval_remarks=%s, created_by=%s,
+                updated_by=%s, updated_at=NOW()
             WHERE id=%s RETURNING id;
         """, (
             data.vehicle_number, data.letzryd_unique_no, data.city_name, data.model, data.received_allocated, data.delivery_month,
@@ -3745,7 +4426,7 @@ def delete_vehicle_record(id: int, authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("DELETE FROM copy_vehicle_onboarding WHERE id = %s RETURNING id;", (id,))
+        cur.execute("DELETE FROM july_vehicle_onboarding WHERE id = %s RETURNING id;", (id,))
         deleted = cur.fetchone()
         if not deleted:
             raise HTTPException(status_code=404, detail="Vehicle record not found")
@@ -5129,10 +5810,7 @@ def get_pending_approvals(authorization: Optional[str] = Header(None)):
         where_v_cond = f"WHERE v.current_approver_id = {uid} AND v.approval_status LIKE 'Pending%%'"
         where_t_cond = f"WHERE t.current_approver_id = {uid} AND t.approval_status LIKE 'Pending%%'"
 
-        if not is_global and user_city:
-            where_cond += f" AND o.city ILIKE '%%{user_city}%%'"
-            where_v_cond += f" AND v.city ILIKE '%%{user_city}%%'"
-            where_t_cond += f" AND t.city ILIKE '%%{user_city}%%'"
+
 
         # Onboarding pending
         cur.execute(f"""

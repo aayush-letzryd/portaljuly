@@ -351,9 +351,12 @@ export default function WalkInForm({
     let cleanPhone = personNumber ? personNumber.trim() : "";
     
     if (!isDraft) {
-      // Lead channel is required
       if (!leadChannel) {
         alert("Please select a Lead Channel.");
+        return;
+      }
+      if (!leadChannelDetails || !leadChannelDetails.trim()) {
+        alert("Please enter Lead Channel Name / Details.");
         return;
       }
 
@@ -392,12 +395,10 @@ export default function WalkInForm({
       operating_place: operatingPlace.trim() || undefined,
       mode_of_enquiry: leadChannel,
       lead_channel: leadChannel,
-      lead_channel_details: leadChannel === "Driver Referral"
-        ? `${referredByName.trim()} ${referredByPhone.trim() ? `(${referredByPhone.trim()})` : ''}`.trim() || undefined
-        : (leadChannelDetails.trim() || undefined),
+      lead_channel_details: leadChannelDetails.trim() || (leadChannel === "Driver Referral" && referredByName.trim() ? `${referredByName.trim()} ${referredByPhone.trim() ? `(${referredByPhone.trim()})` : ''}`.trim() : undefined),
       referred_by_name: leadChannel === "Driver Referral" ? (referredByName.trim() || undefined) : undefined,
-      referred_by_phone: leadChannel === "Driver Referral" ? (referredByPhone.trim() || undefined) : undefined,
-      joined_status: isDraft ? "Draft" : joinedStatus,
+      joined_status: joinedStatus,
+      submission_status: isDraft ? "Draft" : "Submitted",
       remarks: remarks.trim() || undefined
     };
 
@@ -640,7 +641,11 @@ export default function WalkInForm({
               <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-xs font-bold text-white">{initials}</div>
               <div className="flex flex-col">
                 <span className="font-sans text-xs font-semibold leading-none text-text">{user.name}</span>
-                {isReadOnly && <span className="font-mono text-[9px] text-red-500 mt-0.5 leading-none font-bold">Read Only</span>}
+                {isReadOnly ? (
+                  <span className="font-mono text-[9px] text-red-500 mt-1 leading-none font-bold">Read Only</span>
+                ) : (
+                  <span className="font-mono text-[9px] text-text-muted mt-1 leading-none">ID: {user.executive_id || "-"}</span>
+                )}
               </div>
             </div>
             <span className="h-5 border-l border-border" />
@@ -929,33 +934,36 @@ export default function WalkInForm({
                       </div>
                     </div>
 
-                    {leadChannel !== "Direct Walk-in" && leadChannel !== "Driver Referral" && (
-                      <div className="flex flex-col gap-1.5">
-                        <label className="font-sans text-xs font-semibold text-text-muted">Lead Channel Name / Details *</label>
-                        <input
-                          type="text"
-                          required
-                          value={leadChannelDetails}
-                          onChange={(e) => setLeadChannelDetails(e.target.value)}
-                          placeholder={
-                            leadChannel === "Telecaller" ? "Enter Telecaller Name" :
-                            leadChannel === "FSE" ? "Enter FSE Name" :
-                            "Enter Vendor Name"
-                          }
-                          className="h-10 rounded border border-border px-3 text-sm bg-white outline-none focus:border-primary"
-                        />
-                      </div>
-                    )}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="font-sans text-xs font-semibold text-text-muted">
+                        Lead Channel Name / Details <span className="text-red-500">*</span>
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={leadChannelDetails}
+                        onChange={(e) => setLeadChannelDetails(e.target.value)}
+                        placeholder={
+                          leadChannel === "Direct Walk-in" ? "Enter Walk-in Location / Branch / Hub / Notes" :
+                          leadChannel === "Telecaller" ? "Enter Telecaller Name / Agent ID" :
+                          leadChannel === "FSE" ? "Enter FSE Name / Agent ID" :
+                          leadChannel === "Vendor" ? "Enter Vendor / Partner Agency Name" :
+                          leadChannel === "Driver Referral" ? "Enter Referrer Driver Details (Name / ID / Phone)" :
+                          "Enter Lead Channel Details"
+                        }
+                        className="h-10 rounded border border-border px-3 text-sm bg-white outline-none focus:border-primary"
+                      />
+                    </div>
 
                     {leadChannel === "Driver Referral" && (
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col gap-1.5">
                           <label className="font-sans text-xs font-semibold text-text-muted">Referred By (Name) *</label>
-                          <input type="text" required value={referredByName} onChange={(e) => setReferredByName(e.target.value)} className="h-10 rounded border border-border px-3 text-sm bg-white outline-none focus:border-primary" />
+                          <input type="text" required value={referredByName} onChange={(e) => setReferredByName(e.target.value)} className="h-10 rounded border border-border px-3 text-sm bg-white outline-none focus:border-primary" placeholder="Referrer Name" />
                         </div>
                         <div className="flex flex-col gap-1.5">
                           <label className="font-sans text-xs font-semibold text-text-muted">Referred By (Phone) *</label>
-                          <input type="tel" required value={referredByPhone} onChange={(e) => setReferredByPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} className="h-10 rounded border border-border px-3 text-sm bg-white outline-none focus:border-primary" />
+                          <input type="tel" required value={referredByPhone} onChange={(e) => setReferredByPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} className="h-10 rounded border border-border px-3 text-sm bg-white outline-none focus:border-primary" placeholder="10-digit Phone" />
                         </div>
                       </div>
                     )}
@@ -1032,15 +1040,17 @@ export default function WalkInForm({
                   <thead>
                     <tr className="bg-slate-50 border-b border-border/60">
                       <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Draft ID</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Name</th>
+                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Candidate Name</th>
+                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">City</th>
                       <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Contact</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Date</th>
+                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Created By (Portal User)</th>
+                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Date & Time Saved</th>
                       <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
                     {draftRecords.length === 0 ? (
-                      <tr><td colSpan={5} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">No drafts found.</td></tr>
+                      <tr><td colSpan={7} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">No drafts found.</td></tr>
                     ) : (
                       draftRecords.map((r) => (
                         <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
@@ -1048,11 +1058,23 @@ export default function WalkInForm({
                           <td className="px-6 py-4">
                             <div className="font-sans text-sm font-bold text-gray-900">{r.first_name ? `${r.first_name} ${r.last_name}`.trim() : (r.person_name || 'N/A')}</div>
                           </td>
+                          <td className="px-6 py-4 font-sans text-xs font-bold text-slate-700 bg-slate-100/50 rounded">{normalizeCity(r.city || r.city_name)}</td>
                           <td className="px-6 py-4 font-sans text-xs font-semibold text-text">{r.person_number || 'N/A'}</td>
-                          <td className="px-6 py-4 font-sans text-[10px] text-text-dim">{r.event_date}</td>
+                          <td className="px-6 py-4 font-sans text-xs">
+                            <div className="font-bold text-slate-900">{r.executive_name || 'Onboarding Executive 1'}</div>
+                            <div className="font-mono text-[10px] text-text-dim">ID: {r.executive_id || 26}</div>
+                          </td>
+                          <td className="px-6 py-4 font-sans text-xs">
+                            <div className="font-bold text-slate-800">
+                              {r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : (r.event_date || "—")}
+                            </div>
+                            <div className="font-mono text-[10px] text-text-dim">
+                              {r.created_at ? new Date(r.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : (r.enquiry_time || "—")}
+                            </div>
+                          </td>
                           <td className="px-6 py-4 text-center">
                             <div className="inline-flex gap-2 justify-center">
-                              <button type="button" onClick={() => fetchRecordDetailsForEdit(r.id)} className="rounded-lg px-2 py-1.5 border border-border bg-white text-text-muted hover:text-primary hover:bg-slate-50 transition-all cursor-pointer flex items-center gap-1 text-xs font-bold"><Edit className="h-3.5 w-3.5" /> Edit</button>
+                              <button type="button" onClick={() => fetchRecordDetailsForEdit(r.id)} className="rounded-lg px-2.5 py-1.5 border border-border bg-white text-text-muted hover:text-primary hover:bg-slate-50 transition-all cursor-pointer flex items-center gap-1 text-xs font-bold"><Edit className="h-3.5 w-3.5" /> Edit</button>
                               <button type="button" onClick={() => { if (window.confirm('Delete this draft?')) handleDeleteRecord(r.id); }} className="rounded-lg p-1.5 border border-border bg-white text-text-muted hover:text-rose-500 hover:bg-rose-50 border-rose-200 transition-all cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button>
                             </div>
                           </td>
@@ -1116,8 +1138,8 @@ export default function WalkInForm({
                 <select value={filterStatus} onChange={(e) => {setFilterStatus(e.target.value); setPage(1);}} className="h-10 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer">
                   <option value="all">All Statuses</option>
                   <option value="Onboarding Process Initiated">Onboarding Process Initiated</option>
-                  <option value="Successfully Onboarded">Successfully Onboarded</option>
                   <option value="Follow Up Required">Follow Up Required</option>
+                  <option value="Successfully Onboarded">Successfully Onboarded</option>
                   <option value="No Follow Up Required / Closed">No Follow Up Required / Closed</option>
                   <option value="Others">Others</option>
                 </select>
@@ -1192,11 +1214,11 @@ export default function WalkInForm({
                       <tr><td colSpan={8} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">No records found.</td></tr>
                     ) : (
                       records.map((r) => {
-                        let statusColor = "bg-slate-100 text-slate-700 border-slate-200";
-                        if (r.joined_status === "Successfully Onboarded" || r.joined_status === "Joined" || r.joined_status === "Onboarded") statusColor = "bg-green-50 border-green-200 text-primary";
-                        else if (r.joined_status === "Follow Up Required" || r.joined_status === "Pending") statusColor = "bg-amber-50 text-amber-700 border-amber-200";
-                        else if (r.joined_status === "Onboarding Process Initiated") statusColor = "bg-blue-50 text-blue-700 border-blue-200";
-                        else if (r.joined_status === "No Follow Up Required / Closed" || r.joined_status === "Not Interested") statusColor = "bg-red-50 border-red-100 text-red-600";
+                        const displayStatus = r.joined_status || "Onboarding Process Initiated";
+                        let statusColor = "bg-blue-50 text-blue-700 border-blue-200";
+                        if (displayStatus === "Successfully Onboarded" || displayStatus === "Joined" || displayStatus === "Onboarded") statusColor = "bg-green-50 border-green-200 text-primary";
+                        else if (displayStatus === "Follow Up Required" || displayStatus === "Pending") statusColor = "bg-amber-50 text-amber-700 border-amber-200";
+                        else if (displayStatus === "No Follow Up Required / Closed" || displayStatus === "Not Interested") statusColor = "bg-red-50 border-red-100 text-red-600";
 
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
@@ -1214,7 +1236,7 @@ export default function WalkInForm({
                               <div className="font-sans text-xs font-semibold text-text">{r.executive_name}</div>
                               <div className="font-mono text-[10px] text-text-dim">ID: {r.executive_id}</div>
                             </td>
-                            <td className="px-6 py-4"><span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${statusColor}`}>{r.joined_status}</span></td>
+                            <td className="px-6 py-4"><span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${statusColor}`}>{displayStatus}</span></td>
                             <td className="px-6 py-4 text-center">
                               {/* RBAC: Hide Action buttons if user is read-only */}
                               {!isReadOnly ? (

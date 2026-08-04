@@ -162,9 +162,9 @@ export interface CityOption {
 }
 
 export const CITIES: CityOption[] = [
-  { value: "Hyderabad", text: "Hyderabad" },
-  { value: "Bangalore", text: "Bangalore" },
-  { value: "Mumbai", text: "Mumbai" }
+  { value: "Bengaluru", text: "Bengaluru" },
+  { value: "Mumbai", text: "Mumbai" },
+  { value: "Hyderabad", text: "Hyderabad" }
 ];
 
 export const MOCK_USERS: Record<string, { name: string; role: string; executive_id: string; password: string; role_code: RoleCode }> = {

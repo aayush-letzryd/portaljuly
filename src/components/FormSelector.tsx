@@ -13,7 +13,7 @@ const ALL_ROLES = ["SA", "BH", "CM", "DM", "OB", "SP"];
 
 const CARDS = [
   { key: "walkin",              label: "Lead Generation Form",   sub: "Log walk-in enquiries",               icon: ClipboardList, iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: ALL_ROLES, isCompleted: true },
-  { key: "onboarding",          label: "Partner Onboarding",     sub: "Onboard new drivers to the fleet",    icon: UserCheck,     iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: WRITE_ACCESS_ROLES, isCompleted: true },
+  { key: "onboarding",          label: "Operator Onboarding",    sub: "Onboard new drivers to the fleet",    icon: UserCheck,     iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: WRITE_ACCESS_ROLES, isCompleted: true },
   { key: "vehicle_onboarding",  label: "Vehicle Onboarding",     sub: "Add vehicles to the fleet registry",  icon: Truck,         iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: WRITE_ACCESS_ROLES, isCompleted: true },
   { key: "allocation",          label: "Allocation Form",        sub: "Assign vehicles to drivers",          icon: Key,           iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: ALL_ROLES, isCompleted: true },
   { key: "adjustment",          label: "Adjustment Form",        sub: "Credit / debit wallet adjustments",   icon: Settings,      iconBg: "bg-yellow-light",iconColor: "text-amber-600",   hover: "hover:border-amber-500",   allowedRoles: ALL_ROLES },
@@ -103,29 +103,15 @@ export default function FormSelector({ user, onSelectForm, onLogout }: FormSelec
 
         {/* Form Selection Grid */}
         <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
-          {CARDS.filter(({ key, allowedRoles }) => {
-            // Check permission_matrix if present
-            if (user.permission_matrix && user.permission_matrix[key]) {
-              return user.permission_matrix[key].view === true;
-            }
+          {CARDS.filter(({ key }) => {
             const role = (user.role || "").toLowerCase();
-            if (role.includes("developer") || role.includes("super admin")) return true;
-            if (role.includes("partner")) {
-              return ["walkin", "inspection", "workshops", "maintenance", "tickets", "accident"].includes(key);
+            const roleCode = (user.role_code || "").toUpperCase();
+            const isAdmin = role.includes("admin") || role.includes("founder") || role.includes("ceo") || roleCode === "SA";
+            
+            if (!isAdmin) {
+              return ["walkin", "onboarding", "vehicle_onboarding", "allocation"].includes(key);
             }
-            if (role.includes("checker")) {
-              return !["users", "roles"].includes(key);
-            }
-            if (role.includes("executive")) {
-              return !["users", "roles", "employees", "cities"].includes(key);
-            }
-            if (role.includes("manager")) {
-              return !["users", "roles", "employees", "cities"].includes(key);
-            }
-            if (role.includes("senior management")) {
-              return !["users", "roles"].includes(key);
-            }
-            return allowedRoles.includes(currentRoleCode);
+            return true;
           }).map(({ key, label, sub, icon: Icon, iconBg, iconColor, hover, isCompleted }) => {
             
             const cardStyle = isCompleted
