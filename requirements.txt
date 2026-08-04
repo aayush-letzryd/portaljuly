@@ -1,8 +1,18 @@
-fastapi
-uvicorn
-psycopg2-binary
-pydantic
-passlib
-bcrypt==4.0.1
-python-multipart
-python-dateutil
+# ── Web Framework ─────────────────────────────────────────
+fastapi==0.111.1
+uvicorn[standard]==0.30.1
+python-multipart==0.0.9       # needed for file/form uploads in FastAPI
+starlette==0.37.2             # transitive dep of FastAPI (pinned for stability)
+
+# ── Database ──────────────────────────────────────────────
+psycopg2-binary==2.9.9        # PostgreSQL adapter (binary = no local build needed)
+
+# ── Data Validation ───────────────────────────────────────
+pydantic==2.7.4               # FastAPI v0.111 works best with Pydantic v2
+
+# ── Auth / Password Hashing ───────────────────────────────
+passlib[bcrypt]==1.7.4
+bcrypt==4.0.1                 # pinned – newer bcrypt breaks passlib compat
+
+# ── Utilities ─────────────────────────────────────────────
+python-dateutil==2.9.0.post0  # used in date parsing helpers

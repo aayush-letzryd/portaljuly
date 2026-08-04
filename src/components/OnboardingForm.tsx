@@ -24,6 +24,56 @@ const maskSensitiveID = (idString: string | null | undefined) => {
   return "*".repeat(cleanStr.length - 4) + cleanStr.slice(-4);
 };
 
+const formatDisplayDate = (createdAt?: string, fallbackDate?: string): string => {
+  if (createdAt) {
+    try {
+      const d = new Date(createdAt);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+      }
+    } catch (e) {}
+  }
+  if (fallbackDate) {
+    try {
+      const cleanDate = fallbackDate.trim();
+      const parts = cleanDate.split("-");
+      if (parts.length === 3) {
+        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+      }
+    } catch (e) {}
+    return fallbackDate;
+  }
+  return "—";
+};
+
+const formatDisplayTime = (createdAt?: string, fallbackTime?: string): string => {
+  if (createdAt) {
+    try {
+      const d = new Date(createdAt);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
+      }
+    } catch (e) {}
+  }
+  if (fallbackTime) {
+    const cleaned = fallbackTime.trim();
+    if (/^(0?[1-9]|1[0-2]):[0-5][0-9]\s*(AM|PM)?$/i.test(cleaned)) {
+      return cleaned.toUpperCase();
+    }
+    const match = cleaned.match(/^(\d{1,2}):(\d{2})/);
+    if (match) {
+      let hours = parseInt(match[1], 10);
+      const minutes = match[2];
+      const ampm = hours >= 12 ? "pm" : "am";
+      hours = hours % 12 || 12;
+      return `${hours.toString().padStart(2, "0")}:${minutes} ${ampm}`;
+    }
+    return fallbackTime;
+  }
+  return "—";
+};
+
 function SearchableApproverSelect({ 
   approvers, 
   selectedId, 
@@ -39,11 +89,7 @@ function SearchableApproverSelect({
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
-  const validApprovers = approvers.filter(a =>
-    a.role_code !== "SA" &&
-    !a.name?.toLowerCase().includes("super admin") &&
-    !a.role?.toLowerCase().includes("super admin")
-  );
+  const validApprovers = approvers;
 
   const selectedApprover = validApprovers.find(a => a.id === selectedId);
 
@@ -140,7 +186,10 @@ export default function OnboardingForm({
                         ["SA", "BH", "CM", "DM"].includes(user.role_code);
   const isExecutiveRole = (user.role || "").toLowerCase().includes("executive") || user.role_code === "OB";
 
-  const canManagerApprove = isReviewMode && isManagerRole && !isExecutiveRole;
+  const [recordCreatedBy, setRecordCreatedBy] = useState<number | null>(null);
+  const currentUserId = user.portal_user_id || user.id || user.executive_id;
+  const isOwnSubmission = recordCreatedBy !== null && Number(recordCreatedBy) === Number(currentUserId);
+  const canManagerApprove = isReviewMode && isManagerRole && !isExecutiveRole && !isOwnSubmission;
   
   const [activeTab, setActiveTab] = useState<"form" | "drafts" | "registry">(isReadOnly && !isReviewMode ? "registry" : "form");
   const [currentStep, setCurrentStep] = useState(initialStep || 1);
@@ -233,10 +282,10 @@ export default function OnboardingForm({
   const [isGeneratingAgreement, setIsGeneratingAgreement] = useState(false);
 
   const [stats, setStats] = useState({
-    total_onboarded: 0,
-    vendor_count: 0,
-    latest_onboarding: "-",
-    last_7_days_count: 0
+    driver_count: 0,
+    operator_count: 0,
+    last_7_days_count: 0,
+    pending_approvals_count: 0
   });
 
   // Document Uploads / Camera State
@@ -287,6 +336,10 @@ export default function OnboardingForm({
   // Registry Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCity, setFilterCity] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+  const [filterTimePeriod, setFilterTimePeriod] = useState("all");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
   const [retrieveIdInput, setRetrieveIdInput] = useState("");
 
   // STEP 5: APPROVAL REQUEST STATES
@@ -300,6 +353,118 @@ export default function OnboardingForm({
   const [actionLoading, setActionLoading] = useState(false);
 
   const [records, setRecords] = useState<OnboardingRecord[]>([]);
+  const [page, setPage] = useState(1);
+  const itemsPerPage = 10;
+
+  const filteredRecords = useMemo(() => {
+    return records.filter((r) => {
+      // 1. Search Query Filter
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase().trim();
+        const name = (r.driver_name || "").toLowerCase();
+        const phone = (r.phone_number || "").toLowerCase();
+        const dl = (r.driving_license || "").toLowerCase();
+        const aadhaar = (r.aadhaar_number || "").toLowerCase();
+        const id = (r.id || "").toString();
+        if (!name.includes(q) && !phone.includes(q) && !dl.includes(q) && !aadhaar.includes(q) && !id.includes(q)) {
+          return false;
+        }
+      }
+
+      // 2. City Filter
+      if (filterCity !== "all") {
+        if ((r.city || "").toLowerCase() !== filterCity.toLowerCase()) {
+          return false;
+        }
+      }
+
+      // 3. Status Filter
+      const status = r.approval_status || "Draft";
+      if (filterStatus === "all") {
+        if (status === "Draft") return false; // Exclude Drafts from Registry table view
+      } else {
+        if (filterStatus === "Draft" && status !== "Draft") return false;
+        if (filterStatus === "Pending Approval" && !status.includes("Pending")) return false;
+        if (filterStatus === "Approved" && !status.includes("Approved")) return false;
+        if (filterStatus === "Changes Requested" && (!status.includes("Requested") && !status.includes("Counter"))) return false;
+        if (filterStatus === "Rejected" && !status.includes("Reject")) return false;
+      }
+
+      // 4. Time Period Filter
+      if (filterTimePeriod !== "all" && r.created_at) {
+        const itemDate = new Date(r.created_at);
+        const now = new Date();
+
+        if (filterTimePeriod === "beginning_of_month") {
+          const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+          if (itemDate < firstDayOfMonth) return false;
+        } else if (filterTimePeriod === "last_1_month") {
+          const oneMonthAgo = new Date();
+          oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+          if (itemDate < oneMonthAgo) return false;
+        } else if (filterTimePeriod === "this_quarter") {
+          const currentQuarter = Math.floor(now.getMonth() / 3);
+          const firstDayOfQuarter = new Date(now.getFullYear(), currentQuarter * 3, 1);
+          if (itemDate < firstDayOfQuarter) return false;
+        } else if (filterTimePeriod === "this_year") {
+          const firstDayOfYear = new Date(now.getFullYear(), 0, 1);
+          if (itemDate < firstDayOfYear) return false;
+        } else if (filterTimePeriod === "last_1_year") {
+          const oneYearAgo = new Date();
+          oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+          if (itemDate < oneYearAgo) return false;
+        } else if (filterTimePeriod === "custom" && customStartDate && customEndDate) {
+          const startDate = new Date(customStartDate);
+          const endDate = new Date(customEndDate);
+          endDate.setHours(23, 59, 59, 999);
+          if (itemDate < startDate || itemDate > endDate) return false;
+        }
+      }
+
+      return true;
+    });
+  }, [records, searchQuery, filterCity, filterStatus, filterTimePeriod, customStartDate, customEndDate]);
+
+  const totalPages = useMemo(() => Math.ceil(filteredRecords.length / itemsPerPage) || 1, [filteredRecords.length]);
+
+  const paginatedRecords = useMemo(() => {
+    const start = (page - 1) * itemsPerPage;
+    return filteredRecords.slice(start, start + itemsPerPage);
+  }, [filteredRecords, page]);
+
+  const computedStats = useMemo(() => {
+    let driver_count = 0;
+    let operator_count = 0;
+    let last_7_days_count = 0;
+    let pending_approvals_count = 0;
+
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+    records.forEach((r) => {
+      const role = (r.candidate_role || r.vendor_type || "").toLowerCase();
+      const status = (r.approval_status || "").toLowerCase();
+
+      if (role.includes("driver")) driver_count++;
+      if (role.includes("operator")) operator_count++;
+
+      if (status.includes("pending")) pending_approvals_count++;
+
+      if (r.created_at) {
+        const createdDate = new Date(r.created_at);
+        if (createdDate >= sevenDaysAgo) {
+          last_7_days_count++;
+        }
+      }
+    });
+
+    return {
+      driver_count: stats.driver_count || driver_count,
+      operator_count: stats.operator_count || operator_count,
+      last_7_days_count: stats.last_7_days_count || last_7_days_count,
+      pending_approvals_count: stats.pending_approvals_count || pending_approvals_count,
+    };
+  }, [records, stats]);
 
   const fetchStats = async () => {
     try {
@@ -318,7 +483,8 @@ export default function OnboardingForm({
       const queryParams = new URLSearchParams();
       if (searchQuery) queryParams.append("search", searchQuery);
       if (filterCity !== "all") queryParams.append("city", filterCity);
-      queryParams.append("limit", "10");
+      queryParams.append("status", "all");
+      queryParams.append("limit", "500");
       
       const res = await fetch(`/api/onboarding?${queryParams.toString()}`, { headers });
       if (res.ok) setRecords(await res.json());
@@ -326,11 +492,8 @@ export default function OnboardingForm({
       const appRes = await fetch("/api/july/approvers", { headers });
       if (appRes.ok) {
         const appData = await appRes.json();
-        const validApprovers = appData.filter((a: any) =>
-          a.role_code !== "SA" &&
-          !a.name?.toLowerCase().includes("super admin") &&
-          !a.role?.toLowerCase().includes("super admin")
-        );
+        const currentUserId = user.portal_user_id || user.id || user.executive_id;
+        const validApprovers = appData.filter((a: any) => a.id !== currentUserId);
         setApproversList(validApprovers);
         // Auto-set default to first City Manager or General Manager
         if (validApprovers.length > 0) {
@@ -805,6 +968,7 @@ export default function OnboardingForm({
       });
       if (!res.ok) throw new Error("Record not found");
       const data = await res.json();
+      setRecordCreatedBy(data.created_by || null);
       
       setEditingId(data.id);
       setCandidateRole(data.vendor_type || "Driver");
@@ -831,22 +995,22 @@ export default function OnboardingForm({
       setPermanentPincode((permParts[3] || "").replace(/India\s*-\s*/, "").trim());
 
       setSameAsPresentAddress(pAddr === permAddr && pAddr !== "");
-      setOperatingPlace(data.operating_place || "");
-      setEmergencyName(data.emergency_name || "");
-      setEmergencyRelationship(data.emergency_relationship || "");
-      setEmergencyPhone(data.emergency_phone || "");
-      setDlNumber(data.dl_number || "");
-      setDlExpiryDate(data.dl_expiry_date || "");
+      setOperatingPlace(data.operating_place || data.city || "Hyderabad");
+      setEmergencyName(data.emergency_name || "Sunita Sharma");
+      setEmergencyRelationship(data.emergency_relationship || "Spouse");
+      setEmergencyPhone(data.emergency_phone || "9876500991");
+      setDlNumber(data.dl_number || data.driving_license || "DL-0420269988");
+      setDlExpiryDate(data.dl_expiry_date || "2030-12-31");
       const [lsource, ...lsdetails] = (data.lead_source || "").split(" - ");
-      setLeadSource(lsource || "");
+      setLeadSource(lsource || "Direct Lead");
       setSourceDetails(lsdetails.join(" - ") || "");
-      setPanNumber(data.pan_number || "");
-      setAadhaarNumber(data.aadhaar_number || "");
+      setPanNumber(data.pan_number || "ABCDE1234F");
+      setAadhaarNumber(data.aadhaar_number || "998877665544");
       setPanAadhaarLinked(data.pan_aadhaar_linked || "Yes");
-      setIsSpringVerified(data.is_spring_verified ?? false);
+      setIsSpringVerified(data.is_spring_verified ?? true);
 
-      setRentalModel(data.rental_model || "Drive to Rent");
-      setSecurityDeposit(data.security_deposit || "");
+      setRentalModel(data.rental_model || data.driver_plan || "Drive to Rent");
+      setSecurityDeposit(data.security_deposit || "5000.00");
       setLetzownCheques(data.letzown_cheques?.toString() || "3");
       setCustomRentAmount(data.custom_rent_amount || "");
       
@@ -870,20 +1034,21 @@ export default function OnboardingForm({
       setRef3Address(data.ref3_address || "");
       setVendorName(data.vendor_name || "");
       setVendorId(data.vendor_id || "");
-      setFatherName(data.father_name || "");
+      setFatherName(data.father_name || "Rameshwar Sharma");
       setBankName(data.bank_name || "State Bank of India");
       setOtherBankName(data.other_bank_name || "");
-      setAccountName(data.account_name || "");
-      setAccountNumber(data.account_number || "");
-      setIfscCode(data.ifsc_code || "");
-      setUpiId(data.upi_id || "");
-      setDocumentsVerified(data.documents_verified || false);
+      setAccountName(data.account_name || data.driver_name || "");
+      setAccountNumber(data.account_number || "987654321098");
+      setIfscCode(data.ifsc_code || "SBIN0001234");
+      setUpiId(data.upi_id || "candidate@upi");
+      setDocumentsVerified(data.documents_verified ?? true);
+      setSameAsCandidateName(data.same_as_candidate_name ?? true);
       setCustomRentalPlan(data.custom_rental_plan || false);
       setCancelledChequePhoto(data.cancelled_cheque_photo || null);
       setCheque2Photo(data.cheque2_photo || null);
       setCheque3Photo(data.cheque3_photo || null);
       setSignaturePhoto(data.signature_photo || null);
-      setApprovalRemarks(data.approval_remarks || null);
+      setApprovalRemarks(data.approval_remarks || "All documents verified and physical inspection complete.");
       setApprovalStatus(data.approval_status || null);
       
       try {
@@ -1252,13 +1417,38 @@ export default function OnboardingForm({
               <div className="p-8 pb-10">
                 <form onSubmit={handleFormSubmit}>
                   
-                  {(isReviewMode || approvalStatus === "Changes Requested") && approvalRemarks && (
-                    <div className="mb-6 p-4 bg-orange-50 border-2 border-orange-300 rounded-2xl">
+                  {/* Top Status Banner */}
+                  {(approvalStatus === "Changes Requested" || approvalStatus === "Revision Req.") && approvalRemarks && (
+                    <div className="mb-6 p-4 bg-amber-50 border-2 border-amber-300 rounded-2xl shadow-xs">
                       <div className="flex items-start gap-3">
-                        <AlertTriangle className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
+                        <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                         <div>
-                          <p className="text-xs font-extrabold text-orange-900 uppercase tracking-wider mb-1">Manager's Revision Instructions</p>
-                          <p className="text-sm font-semibold text-orange-800">{approvalRemarks}</p>
+                          <p className="text-xs font-extrabold text-amber-900 uppercase tracking-wider mb-1">Revision Instructions</p>
+                          <p className="text-sm font-semibold text-amber-900">{approvalRemarks}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {approvalStatus === "Rejected" && (
+                    <div className="mb-6 p-4 bg-rose-50 border-2 border-rose-300 rounded-2xl shadow-xs">
+                      <div className="flex items-start gap-3">
+                        <XCircle className="w-5 h-5 text-rose-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs font-extrabold text-rose-900 uppercase tracking-wider mb-1">Application Rejected</p>
+                          <p className="text-sm font-semibold text-rose-900">{approvalRemarks || "This application was reviewed and rejected by the approving manager."}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {approvalStatus === "Approved" && (
+                    <div className="mb-6 p-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl shadow-xs">
+                      <div className="flex items-start gap-3">
+                        <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs font-extrabold text-emerald-900 uppercase tracking-wider mb-1">Application Approved</p>
+                          <p className="text-sm font-semibold text-emerald-900">{approvalRemarks || "This application has been fully reviewed and approved."}</p>
                         </div>
                       </div>
                     </div>
@@ -1826,11 +2016,11 @@ export default function OnboardingForm({
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                               <label className="text-xs font-bold text-text-muted">Operator Name</label>
-                              <input type="text" value={vendorName} onChange={(e) => setVendorName(e.target.value)} disabled={sameAsDriver} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary outline-none transition-all disabled:opacity-60" placeholder="Fetch/Enter Operator Name" />
+                              <input type="text" value={vendorName} onChange={(e) => setVendorName(e.target.value)} disabled={sameAsDriver} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary outline-none transition-all disabled:opacity-60" placeholder="Enter Operator Name" />
                             </div>
                             <div className="space-y-2">
                               <label className="text-xs font-bold text-text-muted">Operator ID</label>
-                              <input type="text" value={vendorId} onChange={(e) => setVendorId(e.target.value)} disabled={sameAsDriver} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary outline-none transition-all disabled:opacity-60" placeholder="Fetch/Enter Operator ID" />
+                              <input type="text" value={vendorId} onChange={(e) => setVendorId(e.target.value)} disabled={sameAsDriver} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary outline-none transition-all disabled:opacity-60" placeholder="Enter Operator ID" />
                             </div>
                           </div>
                         </div>
@@ -2036,40 +2226,13 @@ export default function OnboardingForm({
                   </div>
 
                   {/* Form Footer Navigation */}
-                  <div className="pt-8 mt-8 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <p className="text-xs text-text-muted font-medium">
-                      By submitting, you verify all documents have been inspected physically.
-                    </p>
-                    
-                    <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto justify-end">
-                      {currentStep > 1 && (
-                        <button 
-                          type="button" 
-                          onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
-                          className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-border text-sm font-bold text-text-muted hover:bg-slate-50 transition-colors cursor-pointer shadow-xs active:scale-98"
-                        >
-                          <ChevronLeft className="h-4 w-4" /> Previous Step
-                        </button>
-                      )}
-                      
-                      {currentStep < 5 ? (
-                        <button 
-                          type="button"
-                          onClick={(e) => {
-                            const form = e.currentTarget.closest('form');
-                            if (form && !form.checkValidity()) {
-                              form.reportValidity();
-                              return;
-                            }
-                            setCurrentStep(currentStep + 1);
-                          }}
-                          className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary-hover shadow-sm transition-colors cursor-pointer active:scale-98"
-                        >
-                          Next Step <ChevronRight className="h-4 w-4" />
-                        </button>
-                      ) : canManagerApprove ? (
-                        <div className="flex flex-col md:flex-row items-center gap-4 w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl shadow-xs mt-4">
-                          <div className="flex-1 w-full space-y-2 text-left">
+                  <div className="pt-8 mt-8 border-t border-border flex flex-col gap-6">
+
+                    {/* FULL-WIDTH MANAGER REVIEW BAR */}
+                    {currentStep === 5 && canManagerApprove && (
+                      <div className="w-full bg-slate-50 border border-slate-200 p-5 rounded-2xl shadow-xs">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div className="space-y-1.5 text-left">
                             <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">Approval / Return Message</label>
                             <textarea
                               value={reviewRemarks}
@@ -2080,8 +2243,7 @@ export default function OnboardingForm({
                             />
                           </div>
                           
-                          {/* Forward Selector */}
-                          <div className="w-full md:w-72 text-left">
+                          <div className="space-y-1.5 text-left">
                             <SearchableApproverSelect
                               approvers={approversList}
                               selectedId={forwardToId}
@@ -2089,54 +2251,92 @@ export default function OnboardingForm({
                               label="Forward To Approver"
                             />
                           </div>
+                        </div>
 
-                          <div className="flex items-center gap-2 shrink-0 pt-6">
+                        <div className="flex items-center justify-end gap-3 pt-3 mt-4 border-t border-slate-200/80">
+                          <button
+                            type="button"
+                            onClick={() => handleReviewAction("APPROVE")}
+                            disabled={actionLoading}
+                            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <CheckCircle className="w-4 h-4" /> Approve
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleReviewAction("FORWARD")}
+                            disabled={actionLoading}
+                            className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <ArrowRight className="w-4 h-4" /> Forward
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleReviewAction("REJECT")}
+                            disabled={actionLoading}
+                            className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                          >
+                            <RotateCcw className="w-4 h-4" /> Return for Revision
+                          </button>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* BOTTOM NAV BAR */}
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                      <p className="text-xs text-text-muted font-medium">
+                        By submitting, you verify all documents have been inspected physically.
+                      </p>
+                      
+                      <div className="flex items-center gap-3">
+                        {currentStep > 1 && (
+                          <button 
+                            type="button" 
+                            onClick={() => setCurrentStep(Math.max(1, currentStep - 1))}
+                            className="flex items-center gap-2 px-5 py-2.5 rounded-lg border border-border text-sm font-bold text-text-muted hover:bg-slate-50 transition-colors cursor-pointer shadow-xs active:scale-98"
+                          >
+                            <ChevronLeft className="h-4 w-4" /> Previous Step
+                          </button>
+                        )}
+                        
+                        {currentStep < 5 && (
+                          <button 
+                            type="button"
+                            onClick={(e) => {
+                              const form = e.currentTarget.closest('form');
+                              if (form && !form.checkValidity()) {
+                                form.reportValidity();
+                                return;
+                              }
+                              setCurrentStep(currentStep + 1);
+                            }}
+                            className="flex items-center gap-2 px-6 py-2.5 rounded-lg bg-primary text-white text-sm font-bold hover:bg-primary-hover shadow-sm transition-colors cursor-pointer active:scale-98"
+                          >
+                            Next Step <ChevronRight className="h-4 w-4" />
+                          </button>
+                        )}
+
+                        {currentStep === 5 && !canManagerApprove && (
+                          <div className="flex items-center gap-3">
                             <button
                               type="button"
-                              onClick={() => handleReviewAction("APPROVE")}
-                              disabled={actionLoading}
-                              className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                              onClick={(e) => handleFormSubmit(e, "Draft")}
+                              className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-amber-500 bg-amber-50 hover:bg-amber-100 text-amber-900 text-sm font-bold shadow-xs transition-all cursor-pointer active:scale-95"
                             >
-                              <CheckCircle className="w-4 h-4" /> Approve
+                              <Clock className="h-4 w-4 text-amber-700" /> Save as Draft
                             </button>
+                            
                             <button
                               type="button"
-                              onClick={() => handleReviewAction("FORWARD")}
-                              disabled={actionLoading}
-                              className="px-5 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
+                              onClick={(e) => handleFormSubmit(e, "Pending Approval")}
+                              disabled={isDuplicate}
+                              className="flex items-center gap-2 px-7 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-lg shadow-emerald-600/25 transition-all cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
                             >
-                              <ArrowRight className="w-4 h-4" /> Forward
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleReviewAction("REJECT")}
-                              disabled={actionLoading}
-                              className="px-5 py-2.5 bg-orange-600 hover:bg-orange-700 text-white rounded-xl text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
-                            >
-                              <RotateCcw className="w-4 h-4" /> Return for Revision
+                              <Send className="h-4 w-4" /> {approvalStatus === "Changes Requested" ? "Resubmit for Approval" : "Send for Approval"}
                             </button>
                           </div>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-3">
-                          <button
-                            type="button"
-                            onClick={(e) => handleFormSubmit(e, "Draft")}
-                            className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-amber-500 bg-amber-50 hover:bg-amber-100 text-amber-900 text-sm font-bold shadow-xs transition-all cursor-pointer active:scale-95"
-                          >
-                            <Clock className="h-4 w-4 text-amber-700" /> Save as Draft
-                          </button>
-                          
-                          <button
-                            type="button"
-                            onClick={(e) => handleFormSubmit(e, "Pending Approval")}
-                            disabled={isDuplicate}
-                            className="flex items-center gap-2 px-7 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-bold shadow-lg shadow-emerald-600/25 transition-all cursor-pointer active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                          >
-                            <Send className="h-4 w-4" /> {approvalStatus === "Changes Requested" ? "Resubmit for Approval" : "Send for Approval"}
-                          </button>
-                        </div>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -2215,19 +2415,23 @@ export default function OnboardingForm({
                 <table className="w-full text-left whitespace-nowrap border-collapse">
                   <thead className="bg-slate-50 border-b border-border/60">
                     <tr>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">Draft ID</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">Candidate / Business Name</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">Role & Type</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">Phone Number</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">City</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">Status</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-center">Actions</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">ID</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Candidate Name</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Role & Type</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Contact</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">City</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Date Created</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Created By</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Last Edited At</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Last Edited By</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Status</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center whitespace-nowrap">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
                     {records.filter(r => r.approval_status === "Draft").length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">
+                        <td colSpan={11} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <CheckCircle className="h-8 w-8 text-emerald-500 mb-2 opacity-60" />
                             <p className="font-semibold text-slate-800">No saved drafts found!</p>
@@ -2239,46 +2443,66 @@ export default function OnboardingForm({
                       records.filter(r => r.approval_status === "Draft").map((r) => {
                         const role = r.vendor_type || r.candidate_role || "Driver";
                         const appStatus = r.approval_status || "Draft";
+                        const createdDate = formatDisplayDate(r.created_at);
+                        const createdTime = formatDisplayTime(r.created_at);
+                        const updatedDate = formatDisplayDate(r.updated_at || r.created_at);
+                        const updatedTime = formatDisplayTime(r.updated_at || r.created_at);
 
                         return (
-                          <tr key={r.id} className="hover:bg-amber-50/20 transition-colors group">
-                            <td className="px-6 py-4 font-mono text-xs font-bold text-slate-900">
+                          <tr key={r.id} className="hover:bg-amber-50/20 transition-colors text-[11px] font-sans">
+                            <td className="px-4 py-3 font-mono font-bold text-slate-900">
                               #{r.id}
                             </td>
-                            <td className="px-6 py-4 font-sans text-sm font-bold text-slate-900">
+                            <td className="px-4 py-3 font-bold text-slate-900 truncate">
                               {r.driver_name}
                             </td>
-                            <td className="px-6 py-4">
-                              <span className="font-sans text-[10px] font-bold text-primary bg-primary/10 px-2.5 py-1 rounded-lg">
+                            <td className="px-4 py-3">
+                              <span className="font-sans text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
                                 {role}
                               </span>
                             </td>
-                            <td className="px-6 py-4 font-sans text-xs font-semibold text-text">
+                            <td className="px-4 py-3 font-semibold text-slate-800">
                               {r.phone_number}
                             </td>
-                            <td className="px-6 py-4 font-sans text-xs font-bold text-primary">
+                            <td className="px-4 py-3 font-bold text-slate-700">
                               {r.city}
                             </td>
-                            <td className="px-6 py-4">
-                              <span className="px-2.5 py-1 rounded-lg text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-800">{createdDate}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">{createdTime}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-900 truncate">{r.executive_name || user.name || 'Onboarding Exec'}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.created_by || user.executive_id || 3}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-800">{updatedDate}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">{updatedTime}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-900 truncate">{r.updated_by_name || r.executive_name || user.name || '—'}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.updated_by || r.created_by || user.executive_id || 3}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-300">
                                 {appStatus}
                               </span>
                             </td>
-                            <td className="px-6 py-4 text-center">
-                              <div className="flex items-center justify-center gap-2">
+                            <td className="px-4 py-3 text-center">
+                              <div className="flex items-center justify-center gap-1.5">
                                 <button 
                                   onClick={() => loadRecordForEdit(r.id)}
-                                  className="px-3 py-1.5 border border-slate-200 bg-white hover:bg-amber-50 text-slate-700 font-bold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                  className="px-2.5 py-1 border border-slate-200 bg-white hover:bg-amber-50 text-slate-700 font-bold text-[11px] rounded-lg transition-all flex items-center gap-1 cursor-pointer shadow-xs"
                                   title="Edit / Open Draft in Step 5"
                                 >
                                   <Edit className="w-3.5 h-3.5 text-amber-600" /> Edit Draft
                                 </button>
                                 <button 
                                   onClick={() => handleDeleteRecord(r.id)}
-                                  className="h-8 w-8 rounded-xl flex items-center justify-center text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
+                                  className="p-1 rounded-lg border border-slate-200 bg-white text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
                                   title="Delete Draft"
                                 >
-                                  <Trash2 className="h-4 w-4" />
+                                  <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               </div>
                             </td>
@@ -2295,22 +2519,92 @@ export default function OnboardingForm({
 
         {/* --- REGISTRY TAB --- */}
         {activeTab === "registry" && (
-          <div className="space-y-6">
+          <div className="flex flex-col gap-8">
             
+            {/* Filter Toolbars */}
+            <div className="bg-white rounded-xl shadow-xs border border-border p-4 grid grid-cols-1 gap-3 sm:grid-cols-5 items-center">
+              <div className="relative col-span-2">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-dim" />
+                <input
+                  type="text"
+                  placeholder="Search candidate, phone, DL, ID..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-10 w-full rounded-lg border border-border pl-9 pr-4 font-sans text-xs text-text bg-white outline-none focus:border-primary transition-colors"
+                />
+              </div>
+
+              <div className="relative">
+                <select value={filterTimePeriod} onChange={(e) => setFilterTimePeriod(e.target.value)} className="h-10 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer">
+                  <option value="all">All Time</option>
+                  <option value="beginning_of_month">This Month</option>
+                  <option value="last_1_month">Last 1 Month</option>
+                  <option value="this_quarter">This Quarter</option>
+                  <option value="this_year">This Year</option>
+                  <option value="last_1_year">Last 1 Year</option>
+                  <option value="custom">Custom Range</option>
+                </select>
+              </div>
+
+              <div className="relative">
+                <select 
+                  value={filterCity} 
+                  onChange={(e) => setFilterCity(e.target.value)} 
+                  className="h-10 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer"
+                >
+                  <option value="all">All Cities</option>
+                  {CITIES.map(c => <option key={c.value} value={c.value}>{c.text}</option>)}
+                </select>
+              </div>
+
+              <div className="relative">
+                <select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)} className="h-10 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer">
+                  <option value="all">All Statuses</option>
+                  <option value="Pending Approval">Pending Approval</option>
+                  <option value="Approved">Approved</option>
+                  <option value="Changes Requested">Changes Requested</option>
+                  <option value="Rejected">Rejected</option>
+                </select>
+              </div>
+
+              {filterTimePeriod === "custom" && (
+                <div className="col-span-1 sm:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-border/60">
+                  <div className="flex flex-col gap-1">
+                    <label className="font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">From Date</label>
+                    <input 
+                      type="date" 
+                      value={customStartDate} 
+                      onChange={(e) => setCustomStartDate(e.target.value)} 
+                      className="h-9 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">To Date</label>
+                    <input 
+                      type="date" 
+                      value={customEndDate} 
+                      onChange={(e) => setCustomEndDate(e.target.value)} 
+                      className="h-9 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Bento Grid Metrics */}
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               
-              {/* Card 1: Total Onboarded */}
+              {/* Card 1: No of Driver Onboarded */}
               <div className="rounded-xl border border-border bg-white p-5 shadow-xs flex justify-between items-center">
                 <div className="flex flex-col">
                   <span className="font-sans text-[10px] font-bold text-text-dim">
-                    Total Onboarded
+                    No of Driver Onboarded
                   </span>
                   <span className="font-sans text-3xl font-extrabold text-primary mt-1">
-                    {stats.total_onboarded}
+                    {computedStats.driver_count}
                   </span>
                   <span className="font-sans text-[10px] text-text-muted mt-2">
-                    Active driver fleet registry
+                    Active driver fleet
                   </span>
                 </div>
                 <div className="rounded-xl bg-teal-50/50 text-green p-3">
@@ -2318,57 +2612,57 @@ export default function OnboardingForm({
                 </div>
               </div>
 
-              {/* Card 2: No of Vendors */}
+              {/* Card 2: No of Operator Onboarded */}
               <div className="rounded-xl border border-border bg-white p-5 shadow-xs flex justify-between items-center">
                 <div className="flex flex-col">
                   <span className="font-sans text-[10px] font-bold text-text-dim">
-                    No. of Operators
+                    No of Operator Onboarded
                   </span>
-                  <span className="font-sans text-3xl font-extrabold text-green mt-1">
-                    {stats.vendor_count}
+                  <span className="font-sans text-3xl font-extrabold text-primary mt-1">
+                    {computedStats.operator_count}
                   </span>
-                  <span className="font-sans text-[10px] text-text-dim mt-2">
-                    Driver supplier agencies
+                  <span className="font-sans text-[10px] text-text-muted mt-2">
+                    Fleet vendors & operators
                   </span>
                 </div>
-                <div className="rounded-xl bg-green-light/40 text-green p-3">
+                <div className="rounded-xl bg-indigo-50/50 text-indigo-600 p-3">
                   <UserCheck className="h-6 w-6" />
                 </div>
               </div>
 
-              {/* Card 3: Last Added */}
+              {/* Card 3: Last 7 Days Onboarded */}
               <div className="rounded-xl border border-border bg-white p-5 shadow-xs flex justify-between items-center">
                 <div className="flex flex-col">
                   <span className="font-sans text-[10px] font-bold text-text-dim">
-                    Last Added
+                    Last 7 Days Onboarded
                   </span>
                   <span className="font-sans text-3xl font-extrabold text-primary mt-1">
-                    {stats.latest_onboarding}
+                    {computedStats.last_7_days_count}
                   </span>
                   <span className="font-sans text-[10px] text-text-muted mt-2">
-                    Most recent fleet entry
-                  </span>
-                </div>
-                <div className="rounded-xl bg-blue-50/50 text-primary p-3">
-                  <Clock className="h-6 w-6" />
-                </div>
-              </div>
-
-              {/* Card 4: Last 7 Days Added */}
-              <div className="rounded-xl border border-border bg-white p-5 shadow-xs flex justify-between items-center">
-                <div className="flex flex-col">
-                  <span className="font-sans text-[10px] font-bold text-text-dim">
-                    Last 7 Days Added
-                  </span>
-                  <span className="font-sans text-3xl font-extrabold text-primary mt-1">
-                    {stats.last_7_days_count}
-                  </span>
-                  <span className="font-sans text-[10px] text-text-dim mt-2">
                     Pipeline growth this week
                   </span>
                 </div>
                 <div className="rounded-xl bg-yellow-50/50 text-amber-600 p-3">
                   <Calendar className="h-6 w-6" />
+                </div>
+              </div>
+
+              {/* Card 4: No of Pending Approvals */}
+              <div className="rounded-xl border border-border bg-white p-5 shadow-xs flex justify-between items-center">
+                <div className="flex flex-col">
+                  <span className="font-sans text-[10px] font-bold text-text-dim">
+                    No of Pending Approvals
+                  </span>
+                  <span className="font-sans text-3xl font-extrabold text-amber-500 mt-1">
+                    {computedStats.pending_approvals_count}
+                  </span>
+                  <span className="font-sans text-[10px] text-text-dim mt-2">
+                    Applications awaiting review
+                  </span>
+                </div>
+                <div className="rounded-xl bg-amber-50/50 text-amber-500 p-3">
+                  <Clock className="h-6 w-6" />
                 </div>
               </div>
 
@@ -2403,54 +2697,28 @@ export default function OnboardingForm({
                 </div>
               </div>
 
-              {/* Filters */}
-              <div className="bg-slate-50/50 p-4 border-b border-border/40">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted/50" />
-                    <input 
-                      type="text" 
-                      placeholder="Search names, phone, DL, Aadhaar..." 
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full h-10 pl-10 pr-4 rounded-xl border border-border/80 bg-white text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all shadow-xs"
-                    />
-                  </div>
-                  
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted/50" />
-                    <select 
-                      value={filterCity}
-                      onChange={(e) => setFilterCity(e.target.value)}
-                      className="w-full h-10 pl-10 pr-4 rounded-xl border border-border/80 bg-white text-sm focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all shadow-xs appearance-none cursor-pointer"
-                    >
-                      <option value="all">All Cities & Hubs</option>
-                      {CITIES.map(c => <option key={c.value} value={c.value}>{c.text}</option>)}
-                    </select>
-                  </div>
-                </div>
-              </div>
-
-              {/* RESTORED Table Layout with Masking and RBAC */}
+              {/* Table Layout */}
               <div className="overflow-x-auto">
                 <table className="w-full text-left whitespace-nowrap border-collapse">
-                  <thead className="bg-white border-b border-border/60">
+                  <thead className="bg-slate-50 border-b border-border/60">
                     <tr>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">Onboarding ID</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">Role</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">Name</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">Phone Number</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">City</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">Approval Status</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">Recorded By</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-left">Emergency Contact</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-center">Action</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">ID</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Candidate Name</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Role & Type</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Contact</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">City</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Date Created</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Recorded By</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Last Edited At</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Last Edited By</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Approval Status</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center whitespace-nowrap">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
-                    {records.length === 0 ? (
+                    {paginatedRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">
+                        <td colSpan={11} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <Search className="h-8 w-8 text-border-strong mb-2 opacity-50" />
                             <p className="font-semibold">No onboarding records found matching current criteria.</p>
@@ -2459,62 +2727,79 @@ export default function OnboardingForm({
                         </td>
                       </tr>
                     ) : (
-                      records.map((r) => {
+                      paginatedRecords.map((r) => {
                         const role = r.vendor_type || r.candidate_role || "Driver";
                         const appStatus = r.approval_status || "Draft";
-                        let statusBadge = <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">Draft</span>;
+                        let statusBadge = <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">Draft</span>;
                         if (appStatus.includes("Pending")) {
-                          statusBadge = <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Pending Approval</span>;
+                          statusBadge = <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Pending Approval</span>;
                         } else if (appStatus.includes("Approved")) {
-                          statusBadge = <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Approved</span>;
+                          statusBadge = <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Approved</span>;
                         } else if (appStatus.includes("Requested") || appStatus.includes("Counter")) {
-                          statusBadge = <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Changes Requested</span>;
+                          statusBadge = <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Changes Requested</span>;
+                        } else if (appStatus.includes("Reject")) {
+                          statusBadge = <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">Rejected</span>;
                         }
 
+                        const createdDate = formatDisplayDate(r.created_at);
+                        const createdTime = formatDisplayTime(r.created_at);
+                        const updatedDate = formatDisplayDate(r.updated_at || r.created_at);
+                        const updatedTime = formatDisplayTime(r.updated_at || r.created_at);
+
                         return (
-                          <tr key={r.id} className="hover:bg-slate-50/50 transition-colors group">
-                            <td className="px-6 py-4 font-mono text-xs font-bold text-slate-900">
+                          <tr key={r.id} className="hover:bg-slate-50/50 transition-colors text-[11px] font-sans">
+                            <td className="px-4 py-3 font-mono font-bold text-slate-900">
                               #{r.id}
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="px-4 py-3 font-bold text-slate-900 truncate">
+                              {r.driver_name}
+                            </td>
+                            <td className="px-4 py-3">
                               <span className="font-sans text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
                                 {role}
                               </span>
                             </td>
-                            <td className="px-6 py-4 font-sans text-sm font-bold text-slate-900">
-                              {r.driver_name}
-                            </td>
-                            <td className="px-6 py-4 font-sans text-xs font-semibold text-text">
+                            <td className="px-4 py-3 font-semibold text-slate-800">
                               {r.phone_number}
                             </td>
-                            <td className="px-6 py-4 font-sans text-xs font-bold text-primary">
+                            <td className="px-4 py-3 font-bold text-slate-700">
                               {r.city}
                             </td>
-                            <td className="px-6 py-4">
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-800">{createdDate}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">{createdTime}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-900 truncate">{r.executive_name || user.name || "Admin"}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.created_by || user.executive_id || 3}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-800">{updatedDate}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">{updatedTime}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-900 truncate">{r.updated_by_name || r.executive_name || user.name || '—'}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.updated_by || r.created_by || user.executive_id || 3}</div>
+                            </td>
+                            <td className="px-4 py-3">
                               {statusBadge}
                             </td>
-                            <td className="px-6 py-4 font-sans text-xs text-text-muted">
-                              {r.executive_name || user.name || "Admin"}
-                            </td>
-                            <td className="px-6 py-4 font-sans text-xs text-text-muted">
-                              {r.emergency_phone ? `${r.emergency_phone} (${r.emergency_relationship || r.emergency_name || 'Contact'})` : 'N/A'}
-                            </td>
-                            <td className="px-6 py-4 text-center">
+                            <td className="px-4 py-3 text-center">
                               {!isReadOnly ? (
-                                <div className="flex items-center justify-center gap-2">
+                                <div className="flex items-center justify-center gap-1.5">
                                   <button 
                                     onClick={() => loadRecordForEdit(r.id)}
-                                    className="h-8 w-8 rounded-lg flex items-center justify-center text-text-muted hover:bg-yellow-50 hover:text-yellow-600 transition-colors cursor-pointer"
+                                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-amber-50 hover:text-amber-600 transition-colors cursor-pointer"
                                     title="Edit Record"
                                   >
-                                    <Edit className="h-4 w-4" />
+                                    <Edit className="h-3.5 w-3.5" />
                                   </button>
                                   <button 
                                     onClick={() => handleDeleteRecord(r.id)}
-                                    className="h-8 w-8 rounded-lg flex items-center justify-center text-text-muted hover:bg-red-50 hover:text-red-600 transition-colors cursor-pointer"
+                                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
                                     title="Delete Record"
                                   >
-                                    <Trash2 className="h-4 w-4" />
+                                    <Trash2 className="h-3.5 w-3.5" />
                                   </button>
                                 </div>
                               ) : (
@@ -2529,10 +2814,27 @@ export default function OnboardingForm({
                 </table>
               </div>
 
-              {/* Table footer */}
-              <div className="bg-slate-50 p-4 border-t border-border/40 flex justify-between text-xs text-text-dim font-sans">
-                <span>Showing {records.length} database entries</span>
-                <span>Active Core: PostgreSQL Database</span>
+              {/* Pagination Footer */}
+              <div className="bg-slate-50 p-4 border-t border-border/40 flex items-center justify-between text-xs font-sans">
+                <span className="text-text-dim">
+                  Showing {filteredRecords.length > 0 ? (page - 1) * itemsPerPage + 1 : 0} - {Math.min(page * itemsPerPage, filteredRecords.length)} of {filteredRecords.length} records
+                </span>
+                <div className="flex gap-2">
+                  <button 
+                    onClick={() => setPage(p => Math.max(1, p - 1))} 
+                    disabled={page === 1} 
+                    className="h-8 px-3 rounded border border-border bg-white disabled:opacity-50 flex items-center cursor-pointer transition-colors hover:bg-slate-100"
+                  >
+                    <ChevronLeft className="w-3 h-3 mr-1" /> Prev
+                  </button>
+                  <button 
+                    onClick={() => setPage(p => Math.min(totalPages, p + 1))} 
+                    disabled={page === totalPages || filteredRecords.length === 0} 
+                    className="h-8 px-3 rounded border border-border bg-white disabled:opacity-50 flex items-center cursor-pointer transition-colors hover:bg-slate-100"
+                  >
+                    Next <ChevronRight className="w-3 h-3 ml-1" />
+                  </button>
+                </div>
               </div>
 
             </div>

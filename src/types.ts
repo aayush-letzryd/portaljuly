@@ -9,7 +9,10 @@ export interface WalkInRecord {
   visitor_type: VisitorType;
   event_date: string; 
   city: string;
+  city_name?: string;
   operating_place?: string;
+  first_name?: string;
+  last_name?: string;
   person_name: string;
   person_number: string;
   dl_number: string;
@@ -18,9 +21,13 @@ export interface WalkInRecord {
   dl_image?: string; 
   visiting_reason: string;
   joined_status: OnboardingOutcome;
+  submission_status?: string;
   remarks?: string;
   executive_name: string;
   executive_id: string;
+  created_at?: string;
+  updated_at?: string;
+  updated_by_name?: string;
 }
 
 export interface OnboardingRecord {
@@ -131,6 +138,7 @@ export interface AllocationRecord {
   fastag_balance_amount?: string;
   fastag_balance_proof?: string;
   dropoff_location?: string;
+  status?: string;
 }
 
 export interface ExpenseRecord {

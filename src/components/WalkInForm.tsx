@@ -167,10 +167,12 @@ export default function WalkInForm({
 
   // Registry Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterCity, setFilterCity] = useState(isGlobalRole ? "all" : userAssignedCity);
+  const [filterCity, setFilterCity] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterTimePeriod, setFilterTimePeriod] = useState("all");
+  const [customStartDate, setCustomStartDate] = useState("");
+  const [customEndDate, setCustomEndDate] = useState("");
   
   const [page, setPage] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
@@ -256,6 +258,10 @@ export default function WalkInForm({
       if (filterType !== "all") queryParams.append("visitor_type", filterType);
       if (filterStatus !== "all") queryParams.append("status", filterStatus);
       if (filterTimePeriod !== "all") queryParams.append("time_period", filterTimePeriod);
+      if (filterTimePeriod === "custom") {
+        if (customStartDate) queryParams.append("from_date", customStartDate);
+        if (customEndDate) queryParams.append("to_date", customEndDate);
+      }
       queryParams.append("page", pageNum.toString());
       queryParams.append("limit", "10");
       
@@ -308,7 +314,7 @@ export default function WalkInForm({
 
   useEffect(() => {
     fetchData(page);
-  }, [searchQuery, filterCity, filterType, filterStatus, filterTimePeriod, page]);
+  }, [searchQuery, filterCity, filterType, filterStatus, filterTimePeriod, customStartDate, customEndDate, page]);
 
   useEffect(() => {
     if (debouncedRetrieveQuery.trim().length > 1 && !isReadOnly) {
@@ -577,7 +583,7 @@ export default function WalkInForm({
       
       {/* HEADER */}
       <header className="sticky top-0 z-40 border-b border-border bg-white shadow-xs">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-16 max-w-[1650px] items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <button 
               type="button" 
@@ -594,7 +600,7 @@ export default function WalkInForm({
             />
             <span className="hidden h-5 border-l border-border sm:inline-block" />
             <span className="hidden font-sans text-xs font-medium text-text-muted sm:inline-block">
-              Walk-In Lead Generation
+              Lead Generation
             </span>
           </div>
 
@@ -655,7 +661,7 @@ export default function WalkInForm({
       </header>
 
       {/* MAIN CONTENT */}
-      <main className="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <main className="flex-grow w-full max-w-[1650px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {/* TAB 1: FORM */}
         {activeTab === "form" && !isReadOnly && (
@@ -1039,47 +1045,60 @@ export default function WalkInForm({
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-border/60">
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Draft ID</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Candidate Name</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">City</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Contact</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Created By (Portal User)</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Date & Time Saved</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-center">Action</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Draft ID</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Candidate Name</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">City</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Contact</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Created By</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Date & Time Created</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Last Edited At</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Last Edited By</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
                     {draftRecords.length === 0 ? (
-                      <tr><td colSpan={7} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">No drafts found.</td></tr>
+                      <tr><td colSpan={9} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50 text-[11px]">No drafts found.</td></tr>
                     ) : (
-                      draftRecords.map((r) => (
-                        <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-6 py-4 font-mono text-xs font-bold text-slate-900">#{r.id}</td>
-                          <td className="px-6 py-4">
-                            <div className="font-sans text-sm font-bold text-gray-900">{r.first_name ? `${r.first_name} ${r.last_name}`.trim() : (r.person_name || 'N/A')}</div>
-                          </td>
-                          <td className="px-6 py-4 font-sans text-xs font-bold text-slate-700 bg-slate-100/50 rounded">{normalizeCity(r.city || r.city_name)}</td>
-                          <td className="px-6 py-4 font-sans text-xs font-semibold text-text">{r.person_number || 'N/A'}</td>
-                          <td className="px-6 py-4 font-sans text-xs">
-                            <div className="font-bold text-slate-900">{r.executive_name || 'Onboarding Executive 1'}</div>
-                            <div className="font-mono text-[10px] text-text-dim">ID: {r.executive_id || 26}</div>
-                          </td>
-                          <td className="px-6 py-4 font-sans text-xs">
-                            <div className="font-bold text-slate-800">
-                              {r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : (r.event_date || "—")}
-                            </div>
-                            <div className="font-mono text-[10px] text-text-dim">
-                              {r.created_at ? new Date(r.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : (r.enquiry_time || "—")}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            <div className="inline-flex gap-2 justify-center">
-                              <button type="button" onClick={() => fetchRecordDetailsForEdit(r.id)} className="rounded-lg px-2.5 py-1.5 border border-border bg-white text-text-muted hover:text-primary hover:bg-slate-50 transition-all cursor-pointer flex items-center gap-1 text-xs font-bold"><Edit className="h-3.5 w-3.5" /> Edit</button>
-                              <button type="button" onClick={() => { if (window.confirm('Delete this draft?')) handleDeleteRecord(r.id); }} className="rounded-lg p-1.5 border border-border bg-white text-text-muted hover:text-rose-500 hover:bg-rose-50 border-rose-200 transition-all cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                      draftRecords.map((r) => {
+                        const createdDate = r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : (r.event_date || "—");
+                        const createdTime = r.created_at ? new Date(r.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : (r.enquiry_time || "—");
+                        
+                        const updatedDate = r.updated_at ? new Date(r.updated_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : createdDate;
+                        const updatedTime = r.updated_at ? new Date(r.updated_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : createdTime;
+
+                        return (
+                          <tr key={r.id} className="hover:bg-slate-50/50 transition-colors text-[11px] font-sans">
+                            <td className="px-4 py-3 font-mono font-bold text-slate-900">#{r.id}</td>
+                            <td className="px-4 py-3 font-bold text-slate-900">
+                              {r.first_name ? `${r.first_name} ${r.last_name}`.trim() : (r.person_name || 'N/A')}
+                            </td>
+                            <td className="px-4 py-3 font-bold text-slate-700">{normalizeCity(r.city || r.city_name)}</td>
+                            <td className="px-4 py-3 font-semibold text-slate-800">{r.person_number || 'N/A'}</td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-900">{r.executive_name || 'Onboarding Executive 1'}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.executive_id || 26}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-800">{createdDate}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">{createdTime}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-800">{updatedDate}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">{updatedTime}</div>
+                            </td>
+                            <td className="px-4 py-3 font-bold text-slate-800">
+                              {r.updated_by_name || r.executive_name || '—'}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              <div className="inline-flex gap-2 justify-center">
+                                <button type="button" onClick={() => fetchRecordDetailsForEdit(r.id)} className="rounded-lg px-2 py-1 border border-border bg-white text-text-muted hover:text-primary hover:bg-slate-50 transition-all cursor-pointer flex items-center gap-1 font-bold"><Edit className="h-3.5 w-3.5" /> Edit</button>
+                                <button type="button" onClick={() => { if (window.confirm('Delete this draft?')) handleDeleteRecord(r.id); }} className="rounded-lg p-1 border border-border bg-white text-text-muted hover:text-rose-500 hover:bg-rose-50 border-rose-200 transition-all cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -1113,6 +1132,7 @@ export default function WalkInForm({
                   <option value="this_quarter">This Quarter</option>
                   <option value="this_year">This Year</option>
                   <option value="last_1_year">Last 1 Year</option>
+                  <option value="custom">Custom Range</option>
                 </select>
               </div>
 
@@ -1120,17 +1140,10 @@ export default function WalkInForm({
                 <select 
                   value={filterCity} 
                   onChange={(e) => {setFilterCity(e.target.value); setPage(1);}} 
-                  disabled={!isGlobalRole}
-                  className="h-10 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer disabled:bg-slate-100 disabled:cursor-not-allowed"
+                  className="h-10 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer"
                 >
-                  {isGlobalRole ? (
-                    <>
-                      <option value="all">All Cities</option>
-                      {CITIES.map(c => <option key={c.value} value={c.value}>{c.text}</option>)}
-                    </>
-                  ) : (
-                    <option value={userAssignedCity}>{userAssignedCity}</option>
-                  )}
+                  <option value="all">All Cities</option>
+                  {CITIES.map(c => <option key={c.value} value={c.value}>{c.text}</option>)}
                 </select>
               </div>
 
@@ -1144,6 +1157,29 @@ export default function WalkInForm({
                   <option value="Others">Others</option>
                 </select>
               </div>
+
+              {filterTimePeriod === "custom" && (
+                <div className="col-span-1 sm:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-border/60">
+                  <div className="flex flex-col gap-1">
+                    <label className="font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">From Date</label>
+                    <input 
+                      type="date" 
+                      value={customStartDate} 
+                      onChange={(e) => { setCustomStartDate(e.target.value); setPage(1); }} 
+                      className="h-9 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <label className="font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">To Date</label>
+                    <input 
+                      type="date" 
+                      value={customEndDate} 
+                      onChange={(e) => { setCustomEndDate(e.target.value); setPage(1); }} 
+                      className="h-9 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer"
+                    />
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Bento Grid Metrics */}
@@ -1199,19 +1235,22 @@ export default function WalkInForm({
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-border/60">
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Walk-in ID</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Name</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">City</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Contact</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Position</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Recorded By</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Outcome Status</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-center">Action</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Walk-in ID</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Candidate Name</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">City</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Contact</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Position</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Recorded By</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Date & Time Created</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Last Edited At</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Last Edited By</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Outcome Status</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
                     {records.length === 0 ? (
-                      <tr><td colSpan={8} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">No records found.</td></tr>
+                      <tr><td colSpan={11} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50 text-[11px]">No records found.</td></tr>
                     ) : (
                       records.map((r) => {
                         const displayStatus = r.joined_status || "Onboarding Process Initiated";
@@ -1220,29 +1259,45 @@ export default function WalkInForm({
                         else if (displayStatus === "Follow Up Required" || displayStatus === "Pending") statusColor = "bg-amber-50 text-amber-700 border-amber-200";
                         else if (displayStatus === "No Follow Up Required / Closed" || displayStatus === "Not Interested") statusColor = "bg-red-50 border-red-100 text-red-600";
 
+                        const createdDate = r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : (r.event_date || "—");
+                        const createdTime = r.created_at ? new Date(r.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : (r.enquiry_time || "—");
+                        
+                        const updatedDate = r.updated_at ? new Date(r.updated_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : createdDate;
+                        const updatedTime = r.updated_at ? new Date(r.updated_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : createdTime;
+
                         return (
-                          <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="px-6 py-4 font-mono text-xs font-bold text-slate-900">#{r.id}</td>
-                            <td className="px-6 py-4">
-                              <div className="font-sans text-sm font-bold text-gray-900">{r.first_name ? `${r.first_name} ${r.last_name}`.trim() : (r.person_name || 'N/A')}</div>
-                              <div className="font-sans text-[10px] text-text-dim">{r.event_date}</div>
+                          <tr key={r.id} className="hover:bg-slate-50/50 transition-colors text-[11px] font-sans">
+                            <td className="px-4 py-3 font-mono font-bold text-slate-900">#{r.id}</td>
+                            <td className="px-4 py-3 font-bold text-slate-900">
+                              {r.first_name ? `${r.first_name} ${r.last_name}`.trim() : (r.person_name || 'N/A')}
                             </td>
-                            <td className="px-6 py-4 font-sans text-xs font-bold text-slate-700 bg-slate-100/50 rounded">{normalizeCity(r.city || r.city_name)}</td>
-                            <td className="px-6 py-4 font-sans text-xs font-semibold text-text">{r.person_number}</td>
-                            <td className="px-6 py-4">
+                            <td className="px-4 py-3 font-bold text-slate-700">{normalizeCity(r.city || r.city_name)}</td>
+                            <td className="px-4 py-3 font-semibold text-slate-800">{r.person_number || 'N/A'}</td>
+                            <td className="px-4 py-3">
                               <span className="inline-block rounded-md px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-700">{r.visitor_type}</span>
                             </td>
-                            <td className="px-6 py-4">
-                              <div className="font-sans text-xs font-semibold text-text">{r.executive_name}</div>
-                              <div className="font-mono text-[10px] text-text-dim">ID: {r.executive_id}</div>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-900">{r.executive_name}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.executive_id}</div>
                             </td>
-                            <td className="px-6 py-4"><span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${statusColor}`}>{displayStatus}</span></td>
-                            <td className="px-6 py-4 text-center">
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-800">{createdDate}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">{createdTime}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-800">{updatedDate}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">{updatedTime}</div>
+                            </td>
+                            <td className="px-4 py-3 font-bold text-slate-800">
+                              {r.updated_by_name || r.executive_name || '—'}
+                            </td>
+                            <td className="px-4 py-3"><span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${statusColor}`}>{displayStatus}</span></td>
+                            <td className="px-4 py-3 text-center">
                               {/* RBAC: Hide Action buttons if user is read-only */}
                               {!isReadOnly ? (
                                 <div className="inline-flex gap-2">
-                                  <button type="button" onClick={() => fetchRecordDetailsForEdit(r.id)} className="rounded-lg p-1.5 border border-border bg-white text-text-muted hover:text-primary hover:bg-slate-50 transition-all cursor-pointer"><Edit className="h-3.5 w-3.5" /></button>
-                                  <button type="button" onClick={() => { if (window.confirm('Delete this record?')) handleDeleteRecord(r.id); }} className="rounded-lg p-1.5 border border-border bg-white text-text-muted hover:text-rose-500 hover:bg-rose-50 border-rose-200 transition-all cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button>
+                                  <button type="button" onClick={() => fetchRecordDetailsForEdit(r.id)} className="rounded-lg p-1 border border-border bg-white text-text-muted hover:text-primary hover:bg-slate-50 transition-all cursor-pointer"><Edit className="h-3.5 w-3.5" /></button>
+                                  <button type="button" onClick={() => { if (window.confirm('Delete this record?')) handleDeleteRecord(r.id); }} className="rounded-lg p-1 border border-border bg-white text-text-muted hover:text-rose-500 hover:bg-rose-50 border-rose-200 transition-all cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button>
                                 </div>
                               ) : (
                                 <span className="text-[10px] text-slate-400 italic font-semibold">View Only</span>
