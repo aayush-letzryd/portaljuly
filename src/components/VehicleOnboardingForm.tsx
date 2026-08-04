@@ -34,7 +34,7 @@ function SearchableApproverSelect({
   useEffect(() => {
     if (selectedId) {
       const match = approvers.find(a => a.id === selectedId);
-      if (match) setSearch(`${match.name} (${match.role} — ${match.city})`);
+      if (match) setSearch(`${match.name} (${match.role})`);
     } else {
       setSearch("");
     }
@@ -51,15 +51,22 @@ function SearchableApproverSelect({
   }, []);
 
   const selectedMatch = selectedId ? approvers.find(a => a.id === selectedId) : null;
-  const isExactSelectedDisplay = selectedMatch && search === `${selectedMatch.name} (${selectedMatch.role} — ${selectedMatch.city})`;
+  const isExactSelectedDisplay = selectedMatch && search === `${selectedMatch.name} (${selectedMatch.role})`;
 
-  const filtered = (search.trim() === "" || isExactSelectedDisplay)
+  const filtered = ((search.trim() === "" || isExactSelectedDisplay)
     ? approvers
     : approvers.filter(a =>
         a.name?.toLowerCase().includes(search.toLowerCase()) ||
         a.role?.toLowerCase().includes(search.toLowerCase()) ||
         a.city?.toLowerCase().includes(search.toLowerCase())
-      );
+      )
+  ).sort((a, b) => {
+    if (!search.trim() || isExactSelectedDisplay) return 0;
+    const s = search.toLowerCase();
+    const aStarts = a.name?.toLowerCase().startsWith(s) ? 0 : 1;
+    const bStarts = b.name?.toLowerCase().startsWith(s) ? 0 : 1;
+    return aStarts - bStarts;
+  });
 
   return (
     <div ref={containerRef} className="space-y-1.5 relative w-full text-left">
@@ -83,13 +90,13 @@ function SearchableApproverSelect({
                 key={a.id}
                 onClick={() => {
                   onSelect(a.id);
-                  setSearch(`${a.name} (${a.role} — ${a.city})`);
+                  setSearch(`${a.name} (${a.role})`);
                   setIsOpen(false);
                 }}
                 className={`p-3 hover:bg-emerald-50 transition-colors cursor-pointer text-xs ${a.id === selectedId ? "bg-emerald-50 font-bold text-emerald-700" : "text-slate-800"}`}
               >
                 <span className="font-bold block text-slate-900">{a.name}</span>
-                <span className="text-[11px] text-slate-500">{a.role} · <strong className="text-slate-600">{a.city}</strong></span>
+                <span className="text-[11px] text-slate-500">{a.role}</span>
               </div>
             ))}
             {filtered.length === 0 && (

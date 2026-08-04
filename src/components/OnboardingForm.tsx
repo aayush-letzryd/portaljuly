@@ -95,7 +95,7 @@ function SearchableApproverSelect({
 
   useEffect(() => {
     if (selectedApprover) {
-      setSearch(`${selectedApprover.name} (${selectedApprover.role} — ${selectedApprover.city})`);
+      setSearch(`${selectedApprover.name} (${selectedApprover.role})`);
     } else if (validApprovers.length > 0) {
       const preferred = validApprovers.find(a => 
         a.role?.toLowerCase().includes("city manager") || 
@@ -104,7 +104,7 @@ function SearchableApproverSelect({
         ["CM", "GM", "BH", "DM"].includes(a.role_code)
       ) || validApprovers[0];
       onSelect(preferred.id);
-      setSearch(`${preferred.name} (${preferred.role} — ${preferred.city})`);
+      setSearch(`${preferred.name} (${preferred.role})`);
     }
   }, [selectedId, validApprovers]);
 
@@ -118,15 +118,23 @@ function SearchableApproverSelect({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const isExactSelectedDisplay = selectedApprover && search === `${selectedApprover.name} (${selectedApprover.role} — ${selectedApprover.city})`;
+  const isExactSelectedDisplay = selectedApprover && search === `${selectedApprover.name} (${selectedApprover.role})`;
 
-  const filtered = validApprovers.filter(a =>
-    isExactSelectedDisplay ||
-    !search.trim() ||
-    a.name?.toLowerCase().includes(search.toLowerCase()) ||
-    a.role?.toLowerCase().includes(search.toLowerCase()) ||
-    a.city?.toLowerCase().includes(search.toLowerCase())
-  );
+  const filtered = validApprovers
+    .filter(a =>
+      isExactSelectedDisplay ||
+      !search.trim() ||
+      a.name?.toLowerCase().includes(search.toLowerCase()) ||
+      a.role?.toLowerCase().includes(search.toLowerCase()) ||
+      a.city?.toLowerCase().includes(search.toLowerCase())
+    )
+    .sort((a, b) => {
+      if (!search.trim() || isExactSelectedDisplay) return 0;
+      const s = search.toLowerCase();
+      const aNameStarts = a.name?.toLowerCase().startsWith(s) ? 0 : 1;
+      const bNameStarts = b.name?.toLowerCase().startsWith(s) ? 0 : 1;
+      return aNameStarts - bNameStarts;
+    });
 
   return (
     <div className="space-y-1.5 relative" ref={containerRef}>
@@ -150,13 +158,13 @@ function SearchableApproverSelect({
                 key={a.id}
                 onClick={() => {
                   onSelect(a.id);
-                  setSearch(`${a.name} (${a.role} — ${a.city})`);
+                  setSearch(`${a.name} (${a.role})`);
                   setIsOpen(false);
                 }}
                 className={`p-3 hover:bg-emerald-50 transition-colors cursor-pointer text-xs ${a.id === selectedId ? "bg-emerald-50 font-bold text-emerald-700" : "text-slate-800"}`}
               >
                 <span className="font-bold block text-slate-900">{a.name}</span>
-                <span className="text-[11px] text-slate-500">{a.role} · <strong className="text-slate-600">{a.city}</strong></span>
+                <span className="text-[11px] text-slate-500">{a.role}</span>
               </div>
             ))}
             {filtered.length === 0 && (

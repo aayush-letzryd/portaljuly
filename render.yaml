@@ -1,20 +1,39 @@
 services:
   - type: web
-    name: portal-letzryd
-    env: python
-    buildCommand: "npm install && npm run build && pip install -r requirements.txt"
-    startCommand: "uvicorn main:app --host 0.0.0.0 --port $PORT"
+    name: portal-web-app
+    env: docker
+    plan: free
+    region: singapore
+    dockerfilePath: ./Dockerfile
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.11.9
-      - key: NODE_VERSION
-        value: 20.11.0
-      - key: DATABASE_URL
+      - key: PORT
+        value: 8000
+      - key: DB_HOST
         fromDatabase:
-          name: portal-db
-          property: connectionString
+          name: portal-postgres-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: portal-postgres-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: portal-postgres-db
+          property: database
+      - key: DB_USER
+        fromDatabase:
+          name: portal-postgres-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: portal-postgres-db
+          property: password
+      - key: JWT_SECRET
+        generateValue: true
 
 databases:
-  - name: portal-db
-    databaseName: portal_letzryd
-    user: portal_admin
+  - name: portal-postgres-db
+    databaseName: portal_db
+    user: postgres
+    plan: free
+    region: singapore
