@@ -2435,10 +2435,14 @@ def get_all_walkins(
                 COALESCE(w.lead_channel, '') AS lead_channel,
                 COALESCE(w.lead_channel_details, '') AS lead_channel_details,
                 w.created_at,
-                COALESCE(w.submission_status, 'Submitted') AS submission_status
+                COALESCE(w.submission_status, 'Submitted') AS submission_status,
+                COALESCE(w.updated_at, w.created_at) AS updated_at,
+                COALESCE(e_up.first_name || ' ' || COALESCE(e_up.last_name, ''), e.first_name || ' ' || COALESCE(e.last_name, ''), 'Onboarding Executive 1') AS updated_by_name
             FROM july_walkins w
             LEFT JOIN july_portal_users pu ON pu.portal_user_id = COALESCE(w.created_by, w.executive_id)
             LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
+            LEFT JOIN july_portal_users pu_up ON pu_up.portal_user_id = w.updated_by
+            LEFT JOIN july_employees e_up ON e_up.employee_id = pu_up.employee_id
             WHERE 1=1
         """
         
@@ -2534,7 +2538,9 @@ def get_all_walkins(
                 "lead_channel": r[20],
                 "lead_channel_details": r[21],
                 "created_at": r[22].isoformat() if r[22] else None,
-                "submission_status": r[23]
+                "submission_status": r[23],
+                "updated_at": r[24].isoformat() if r[24] else (r[22].isoformat() if r[22] else None),
+                "updated_by_name": r[25]
             })
             
         return {

@@ -1039,47 +1039,56 @@ export default function WalkInForm({
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-border/60">
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Draft ID</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Candidate Name</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">City</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Contact</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Created By (Portal User)</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Date & Time Saved</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-center">Action</th>
+                      <th className="px-5 py-3.5 font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">Draft ID</th>
+                      <th className="px-5 py-3.5 font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">Candidate Name</th>
+                      <th className="px-5 py-3.5 font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">City</th>
+                      <th className="px-5 py-3.5 font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">Contact</th>
+                      <th className="px-5 py-3.5 font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">Created By</th>
+                      <th className="px-5 py-3.5 font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">Date & Time Created</th>
+                      <th className="px-5 py-3.5 font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">Last Edited</th>
+                      <th className="px-5 py-3.5 font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
                     {draftRecords.length === 0 ? (
-                      <tr><td colSpan={7} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">No drafts found.</td></tr>
+                      <tr><td colSpan={8} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">No drafts found.</td></tr>
                     ) : (
-                      draftRecords.map((r) => (
-                        <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
-                          <td className="px-6 py-4 font-mono text-xs font-bold text-slate-900">#{r.id}</td>
-                          <td className="px-6 py-4">
-                            <div className="font-sans text-sm font-bold text-gray-900">{r.first_name ? `${r.first_name} ${r.last_name}`.trim() : (r.person_name || 'N/A')}</div>
-                          </td>
-                          <td className="px-6 py-4 font-sans text-xs font-bold text-slate-700 bg-slate-100/50 rounded">{normalizeCity(r.city || r.city_name)}</td>
-                          <td className="px-6 py-4 font-sans text-xs font-semibold text-text">{r.person_number || 'N/A'}</td>
-                          <td className="px-6 py-4 font-sans text-xs">
-                            <div className="font-bold text-slate-900">{r.executive_name || 'Onboarding Executive 1'}</div>
-                            <div className="font-mono text-[10px] text-text-dim">ID: {r.executive_id || 26}</div>
-                          </td>
-                          <td className="px-6 py-4 font-sans text-xs">
-                            <div className="font-bold text-slate-800">
-                              {r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : (r.event_date || "—")}
-                            </div>
-                            <div className="font-mono text-[10px] text-text-dim">
-                              {r.created_at ? new Date(r.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : (r.enquiry_time || "—")}
-                            </div>
-                          </td>
-                          <td className="px-6 py-4 text-center">
-                            <div className="inline-flex gap-2 justify-center">
-                              <button type="button" onClick={() => fetchRecordDetailsForEdit(r.id)} className="rounded-lg px-2.5 py-1.5 border border-border bg-white text-text-muted hover:text-primary hover:bg-slate-50 transition-all cursor-pointer flex items-center gap-1 text-xs font-bold"><Edit className="h-3.5 w-3.5" /> Edit</button>
-                              <button type="button" onClick={() => { if (window.confirm('Delete this draft?')) handleDeleteRecord(r.id); }} className="rounded-lg p-1.5 border border-border bg-white text-text-muted hover:text-rose-500 hover:bg-rose-50 border-rose-200 transition-all cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))
+                      draftRecords.map((r) => {
+                        const createdDate = r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : (r.event_date || "—");
+                        const createdTime = r.created_at ? new Date(r.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : (r.enquiry_time || "—");
+                        
+                        const updatedDate = r.updated_at ? new Date(r.updated_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : createdDate;
+                        const updatedTime = r.updated_at ? new Date(r.updated_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : createdTime;
+
+                        return (
+                          <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
+                            <td className="px-5 py-4 font-mono text-xs font-bold text-slate-900">#{r.id}</td>
+                            <td className="px-5 py-4">
+                              <div className="font-sans text-sm font-bold text-gray-900">{r.first_name ? `${r.first_name} ${r.last_name}`.trim() : (r.person_name || 'N/A')}</div>
+                            </td>
+                            <td className="px-5 py-4 font-sans text-xs font-bold text-slate-700">{normalizeCity(r.city || r.city_name)}</td>
+                            <td className="px-5 py-4 font-sans text-xs font-semibold text-text">{r.person_number || 'N/A'}</td>
+                            <td className="px-5 py-4 font-sans text-xs">
+                              <div className="font-bold text-slate-900">{r.executive_name || 'Onboarding Executive 1'}</div>
+                              <div className="font-mono text-[10px] text-text-dim">ID: {r.executive_id || 26}</div>
+                            </td>
+                            <td className="px-5 py-4 font-sans text-xs">
+                              <div className="font-bold text-slate-800">{createdDate}</div>
+                              <div className="font-mono text-[10px] text-text-dim">{createdTime}</div>
+                            </td>
+                            <td className="px-5 py-4 font-sans text-xs">
+                              <div className="font-bold text-slate-800">{updatedDate}</div>
+                              <div className="font-mono text-[10px] text-text-dim">{updatedTime} {r.updated_by_name ? `(${r.updated_by_name})` : ''}</div>
+                            </td>
+                            <td className="px-5 py-4 text-center">
+                              <div className="inline-flex gap-2 justify-center">
+                                <button type="button" onClick={() => fetchRecordDetailsForEdit(r.id)} className="rounded-lg px-2.5 py-1.5 border border-border bg-white text-text-muted hover:text-primary hover:bg-slate-50 transition-all cursor-pointer flex items-center gap-1 text-xs font-bold"><Edit className="h-3.5 w-3.5" /> Edit</button>
+                                <button type="button" onClick={() => { if (window.confirm('Delete this draft?')) handleDeleteRecord(r.id); }} className="rounded-lg p-1.5 border border-border bg-white text-text-muted hover:text-rose-500 hover:bg-rose-50 border-rose-200 transition-all cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
                     )}
                   </tbody>
                 </table>
@@ -1199,19 +1208,21 @@ export default function WalkInForm({
                 <table className="w-full text-left border-collapse">
                   <thead>
                     <tr className="bg-slate-50 border-b border-border/60">
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Walk-in ID</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Name</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">City</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Contact</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Position</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Recorded By</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim">Outcome Status</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-dim text-center">Action</th>
+                      <th className="px-5 py-3.5 font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">Walk-in ID</th>
+                      <th className="px-5 py-3.5 font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">Candidate Name</th>
+                      <th className="px-5 py-3.5 font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">City</th>
+                      <th className="px-5 py-3.5 font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">Contact</th>
+                      <th className="px-5 py-3.5 font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">Position</th>
+                      <th className="px-5 py-3.5 font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">Recorded By</th>
+                      <th className="px-5 py-3.5 font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">Date & Time Created</th>
+                      <th className="px-5 py-3.5 font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">Last Edited</th>
+                      <th className="px-5 py-3.5 font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">Outcome Status</th>
+                      <th className="px-5 py-3.5 font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
                     {records.length === 0 ? (
-                      <tr><td colSpan={8} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">No records found.</td></tr>
+                      <tr><td colSpan={10} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">No records found.</td></tr>
                     ) : (
                       records.map((r) => {
                         const displayStatus = r.joined_status || "Onboarding Process Initiated";
@@ -1220,24 +1231,37 @@ export default function WalkInForm({
                         else if (displayStatus === "Follow Up Required" || displayStatus === "Pending") statusColor = "bg-amber-50 text-amber-700 border-amber-200";
                         else if (displayStatus === "No Follow Up Required / Closed" || displayStatus === "Not Interested") statusColor = "bg-red-50 border-red-100 text-red-600";
 
+                        const createdDate = r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : (r.event_date || "—");
+                        const createdTime = r.created_at ? new Date(r.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : (r.enquiry_time || "—");
+                        
+                        const updatedDate = r.updated_at ? new Date(r.updated_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : createdDate;
+                        const updatedTime = r.updated_at ? new Date(r.updated_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : createdTime;
+
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="px-6 py-4 font-mono text-xs font-bold text-slate-900">#{r.id}</td>
-                            <td className="px-6 py-4">
+                            <td className="px-5 py-4 font-mono text-xs font-bold text-slate-900">#{r.id}</td>
+                            <td className="px-5 py-4">
                               <div className="font-sans text-sm font-bold text-gray-900">{r.first_name ? `${r.first_name} ${r.last_name}`.trim() : (r.person_name || 'N/A')}</div>
-                              <div className="font-sans text-[10px] text-text-dim">{r.event_date}</div>
                             </td>
-                            <td className="px-6 py-4 font-sans text-xs font-bold text-slate-700 bg-slate-100/50 rounded">{normalizeCity(r.city || r.city_name)}</td>
-                            <td className="px-6 py-4 font-sans text-xs font-semibold text-text">{r.person_number}</td>
-                            <td className="px-6 py-4">
+                            <td className="px-5 py-4 font-sans text-xs font-bold text-slate-700">{normalizeCity(r.city || r.city_name)}</td>
+                            <td className="px-5 py-4 font-sans text-xs font-semibold text-text">{r.person_number || 'N/A'}</td>
+                            <td className="px-5 py-4">
                               <span className="inline-block rounded-md px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-700">{r.visitor_type}</span>
                             </td>
-                            <td className="px-6 py-4">
-                              <div className="font-sans text-xs font-semibold text-text">{r.executive_name}</div>
+                            <td className="px-5 py-4">
+                              <div className="font-sans text-xs font-bold text-slate-900">{r.executive_name}</div>
                               <div className="font-mono text-[10px] text-text-dim">ID: {r.executive_id}</div>
                             </td>
-                            <td className="px-6 py-4"><span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${statusColor}`}>{displayStatus}</span></td>
-                            <td className="px-6 py-4 text-center">
+                            <td className="px-5 py-4 font-sans text-xs">
+                              <div className="font-bold text-slate-800">{createdDate}</div>
+                              <div className="font-mono text-[10px] text-text-dim">{createdTime}</div>
+                            </td>
+                            <td className="px-5 py-4 font-sans text-xs">
+                              <div className="font-bold text-slate-800">{updatedDate}</div>
+                              <div className="font-mono text-[10px] text-text-dim">{updatedTime} {r.updated_by_name ? `(${r.updated_by_name})` : ''}</div>
+                            </td>
+                            <td className="px-5 py-4"><span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${statusColor}`}>{displayStatus}</span></td>
+                            <td className="px-5 py-4 text-center">
                               {/* RBAC: Hide Action buttons if user is read-only */}
                               {!isReadOnly ? (
                                 <div className="inline-flex gap-2">
