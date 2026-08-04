@@ -4296,11 +4296,9 @@ def update_allocation_record(id: int, data: AllocationData, authorization: Optio
         if not row:
             raise HTTPException(status_code=404, detail="Allocation record not found")
 
-        # Decide action label
         new_stat = data.status or "Submitted"
-        action = "STATUS_CHANGE" if old_status != new_stat else "UPDATE"
         _write_alloc_log(
-            cur, id, action,
+            cur, id, "UPDATE",
             old_status=old_status, new_status=new_stat,
             changed_fields=None, previous_data=prev_data,
             new_data={
