@@ -146,12 +146,7 @@ export default function VehicleOnboardingForm({
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (res.ok) {
-        const data = await res.json();
-        const validApprovers = data.filter((a: any) =>
-          a.role_code !== "SA" &&
-          !a.name?.toLowerCase().includes("super admin") &&
-          !a.role?.toLowerCase().includes("super admin")
-        );
+        const validApprovers = data.filter((a: any) => a.id !== (user.portal_user_id || user.id));
         setApproversList(validApprovers);
         
         // Auto-select preferred default approver based on role hierarchy

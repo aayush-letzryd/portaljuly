@@ -448,8 +448,18 @@ def startup_event():
                 performed_by    INTEGER,
                 performed_by_name VARCHAR(255),
                 performed_at    TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-            );
         """)
+
+        for col in [
+            "old_status VARCHAR(50)",
+            "new_status VARCHAR(50)",
+            "changed_fields TEXT",
+            "remarks TEXT",
+            "performed_by INTEGER",
+            "performed_by_name VARCHAR(255)",
+            "performed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()"
+        ]:
+            cur.execute(f"ALTER TABLE july_onboarding_logs ADD COLUMN IF NOT EXISTS {col};")
 
         # ── july_vehicle_logs (audit every change to vehicle onboarding) ─────
         cur.execute("""
@@ -2926,37 +2936,75 @@ def delete_walkin(walkin_id: int, authorization: Optional[str] = Header(None)):
 # Onboarding API
 # ─────────────────────────────────────────────────────────
 @app.get("/api/onboarding")
-def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None, status: Optional[str] = None, limit: Optional[int] = 10):
+def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None, status: Optional[str] = None, limit: Optional[int] = 100):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        base_query = "SELECT * FROM july_form_onboarding WHERE 1=1"
+        cur.execute("SET TIME ZONE 'Asia/Kolkata';")
+        
+        base_query = """
+            SELECT 
+                w.onboarding_id AS id,
+                w.onboarding_id,
+                w.driver_id,
+                w.driver_name,
+                w.phone_number,
+                w.city,
+                w.driver_plan,
+                w.father_name,
+                w.present_address,
+                w.emergency_name,
+                w.emergency_phone,
+                w.driving_license,
+                w.pan_number,
+                w.aadhaar_number,
+                w.approval_status,
+                w.created_by,
+                w.updated_by,
+                w.current_approver_id,
+                w.approved_by,
+                w.approval_remarks,
+                w.created_at,
+                w.updated_at,
+                w.security_deposit,
+                w.daily_rent,
+                COALESCE(w.vendor_type, w.candidate_role, 'Driver') AS vendor_type,
+                COALESCE(w.candidate_role, w.vendor_type, 'Driver') AS candidate_role,
+                COALESCE(NULLIF(TRIM(CONCAT(e1.first_name, ' ', e1.last_name)), ''), u1.username, 'Admin') AS executive_name,
+                COALESCE(NULLIF(TRIM(CONCAT(e2.first_name, ' ', e2.last_name)), ''), u2.username, NULLIF(TRIM(CONCAT(e1.first_name, ' ', e1.last_name)), ''), u1.username, '—') AS updated_by_name
+            FROM july_onboarding w
+            LEFT JOIN july_portal_users u1 ON u1.portal_user_id = w.created_by
+            LEFT JOIN july_employees e1 ON e1.employee_id = u1.employee_id
+            LEFT JOIN july_portal_users u2 ON u2.portal_user_id = w.updated_by
+            LEFT JOIN july_employees e2 ON e2.employee_id = u2.employee_id
+            WHERE 1=1
+        """
         params = []
         
         if status == "Draft":
-            base_query += " AND approval_status = 'Draft'"
+            base_query += " AND w.approval_status = 'Draft'"
         elif status and status != "all":
-            base_query += " AND approval_status = %s"
+            base_query += " AND w.approval_status = %s"
             params.append(status)
-        else:
-            base_query += " AND (approval_status IS NULL OR approval_status != 'Draft')"
+        elif not status:
+            base_query += " AND (w.approval_status IS NULL OR w.approval_status != 'Draft')"
 
         if search:
             base_query += """
                 AND (
-                    driver_name ILIKE %s OR phone_number ILIKE %s 
-                    OR dl_number ILIKE %s OR aadhaar_number ILIKE %s
+                    w.driver_name ILIKE %s OR w.phone_number ILIKE %s 
+                    OR w.driving_license ILIKE %s OR w.aadhaar_number ILIKE %s
+                    OR CAST(w.onboarding_id AS TEXT) ILIKE %s
                 )
             """
             search_pattern = f"%{search}%"
-            params.extend([search_pattern] * 4)
-            limit = max(limit, 50)
+            params.extend([search_pattern] * 5)
             
         if city and city != "all":
-            base_query += " AND city = %s"
+            base_query += " AND w.city = %s"
             params.append(city)
             
-        base_query += " ORDER BY id DESC LIMIT %s;"
+        base_query += " ORDER BY COALESCE(w.updated_at, w.created_at) DESC, w.onboarding_id DESC LIMIT %s;"
         params.append(limit)
         
         cur.execute(base_query, params)
@@ -3184,16 +3232,26 @@ def send_onboarding_for_approval(
                 detail=f"Cannot submit: record is already in '{old_status}' state"
             )
 
-        # ── Resolve approver: explicit override > city's default CM
+        # ── Resolve approver: explicit override > city's default CM (excluding submitter)
         approver_id = (body.approver_id if body and body.approver_id else None)
-        if not approver_id:
+        if not approver_id or approver_id == submitter_id:
             cur.execute("""
                 SELECT id FROM copy_users
-                WHERE city = %s AND role ILIKE '%%city manager%%'
+                WHERE city = %s AND role ILIKE '%%city manager%%' AND id != %s
                 ORDER BY id LIMIT 1;
-            """, (city,))
+            """, (city, submitter_id))
             cm_row = cur.fetchone()
-            approver_id = cm_row[0] if cm_row else 20   # fallback to id=20
+            if cm_row:
+                approver_id = cm_row[0]
+            else:
+                # Fallback to General Manager / Admin (id 3) if no other CM available
+                approver_id = 3 if submitter_id != 3 else 20
+
+        if approver_id == submitter_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid approver: you cannot send an approval request to yourself."
+            )
 
         # ── Update july_form_onboarding
         cur.execute("""
@@ -3620,27 +3678,23 @@ def get_onboarding_stats():
     try:
         cur = conn.cursor()
         
-        cur.execute("SELECT COUNT(*) FROM july_form_onboarding;")
-        total_onboarded = cur.fetchone()[0]
+        cur.execute("SELECT COUNT(*) FROM july_onboarding WHERE (vendor_type ILIKE '%%Driver%%' OR candidate_role ILIKE '%%Driver%%');")
+        driver_count = cur.fetchone()[0]
         
-        cur.execute("SELECT COUNT(DISTINCT vendor_id) FROM july_form_onboarding WHERE vendor_id IS NOT NULL AND vendor_id <> '';")
-        vendor_count = cur.fetchone()[0]
-        
-        cur.execute("SELECT MAX(created_at) FROM july_form_onboarding;")
-        latest_time = cur.fetchone()[0]
-        if latest_time:
-            latest_str = latest_time.strftime("%d-%m-%Y")
-        else:
-            latest_str = "-"
-            
-        cur.execute("SELECT COUNT(*) FROM july_form_onboarding WHERE created_at >= NOW() - INTERVAL '7 days';")
+        cur.execute("SELECT COUNT(*) FROM july_onboarding WHERE (vendor_type ILIKE '%%Operator%%' OR candidate_role ILIKE '%%Operator%%');")
+        operator_count = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM july_onboarding WHERE created_at >= NOW() - INTERVAL '7 days';")
         last_7_days_count = cur.fetchone()[0]
+
+        cur.execute("SELECT COUNT(*) FROM july_onboarding WHERE approval_status ILIKE '%%Pending%%';")
+        pending_approvals_count = cur.fetchone()[0]
             
         return {
-            "total_onboarded": total_onboarded,
-            "vendor_count": vendor_count,
-            "latest_onboarding": latest_str,
-            "last_7_days_count": last_7_days_count
+            "driver_count": driver_count,
+            "operator_count": operator_count,
+            "last_7_days_count": last_7_days_count,
+            "pending_approvals_count": pending_approvals_count
         }
     finally:
         postgreSQL_pool.putconn(conn)
@@ -5823,8 +5877,6 @@ def get_approvers(authorization: Optional[str] = Header(None)):
             JOIN july_roles r ON r.role_id = pu.role_id
             WHERE pu.account_status = 'Active'
               AND pu.portal_user_id != %s
-              AND r.role_code != 'SA'
-              AND NOT (r.role_name ILIKE '%%Super Admin%%')
             ORDER BY 
               CASE WHEN e.city = %s THEN 0 ELSE 1 END,
               r.role_id, e.first_name;
@@ -5876,7 +5928,7 @@ def get_pending_approvals(authorization: Optional[str] = Header(None)):
             LEFT JOIN july_portal_users app_u ON app_u.portal_user_id = o.current_approver_id
             LEFT JOIN july_employees app_e ON app_e.employee_id = app_u.employee_id
             LEFT JOIN july_roles app_r ON app_r.role_id = app_u.role_id
-            {where_cond};
+            {where_cond} ORDER BY o.created_at DESC;
         """)
         for r in cur.fetchall():
             mod = r[1]
@@ -5906,7 +5958,7 @@ def get_pending_approvals(authorization: Optional[str] = Header(None)):
             LEFT JOIN july_portal_users app_u ON app_u.portal_user_id = v.current_approver_id
             LEFT JOIN july_employees app_e ON app_e.employee_id = app_u.employee_id
             LEFT JOIN july_roles app_r ON app_r.role_id = app_u.role_id
-            {where_v_cond};
+            {where_v_cond} ORDER BY v.created_at DESC;
         """)
         for r in cur.fetchall():
             pending.append({"id": r[0], "module": r[1], "module_label": "Vehicle Onboarding",
@@ -5914,8 +5966,8 @@ def get_pending_approvals(authorization: Optional[str] = Header(None)):
                             "approval_status": r[5], "created_at": r[6].isoformat() if r[6] else None,
                             "submitted_by": r[7], "submitted_by_name": r[8].strip(),
                             "current_approver": r[9], "current_approver_name": r[10].strip(),
-                            "daily_rent": float(r[11]) if r[11] is not None else 950.0,
-                            "security_deposit": float(r[12]) if r[12] is not None else 12000.0})
+                            "daily_rent": 0.0,
+                            "security_deposit": 0.0})
 
         # Tickets pending escalation
         cur.execute(f"""
@@ -5933,7 +5985,7 @@ def get_pending_approvals(authorization: Optional[str] = Header(None)):
             LEFT JOIN july_portal_users app_u ON app_u.portal_user_id = t.current_approver_id
             LEFT JOIN july_employees app_e ON app_e.employee_id = app_u.employee_id
             LEFT JOIN july_roles app_r ON app_r.role_id = app_u.role_id
-            {where_t_cond};
+            {where_t_cond} ORDER BY t.created_at DESC;
         """)
         for r in cur.fetchall():
             pending.append({"id": r[0], "module": r[1], "module_label": "Tickets Desk",
@@ -6015,8 +6067,8 @@ def get_my_submissions(authorization: Optional[str] = Header(None)):
                                 "current_approver": r[8], "current_approver_name": r[9].strip() if r[9] else "City Manager 1 (City Manager — Hyderabad)",
                                 "approval_remarks": r[10],
                                 "submitted_by": r[11], "submitted_by_name": r[12].strip() if r[12] else "Onboarding Executive 1 (Onboarding Executive — Hyderabad)",
-                                "daily_rent": float(r[13]) if r[13] is not None else 950.0,
-                                "security_deposit": float(r[14]) if r[14] is not None else 12000.0})
+                                "daily_rent": 0.0,
+                                "security_deposit": 0.0})
 
         return submissions
     finally:

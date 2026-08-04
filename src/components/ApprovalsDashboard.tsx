@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import {
-  CheckCircle, XCircle, ArrowRight, ArrowDown, Clock, ChevronLeft,
+  CheckCircle, XCircle, ArrowRight, ArrowDown, Clock, ChevronLeft, ChevronRight,
   RefreshCw, User, Building2, Calendar, AlertTriangle,
   FileText, Send, RotateCcw, Eye, Filter, Inbox, ClipboardList,
   ChevronDown, X, Loader2, Search, UserCheck, Truck, TicketIcon,
@@ -59,6 +59,14 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
   const [mySubmissions, setMySubmissions] = useState<any[]>([]);
   const [approvers, setApprovers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  // Pagination state
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 10;
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [activeTab, selectedCategory, searchQuery]);
   const [selectedRecord, setSelectedRecord] = useState<any | null>(null);
   
   const [recordDetails, setRecordDetails] = useState<any | null>(null);
@@ -75,10 +83,23 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
 
   // Dedicated Return for Revision Modal state
   const [returnRevisionModalItem, setReturnRevisionModalItem] = useState<any | null>(null);
-  const [revisionType, setRevisionType] = useState<"rent" | "deposit" | "docs" | "other">("rent");
+  const [selectedRevisionTypes, setSelectedRevisionTypes] = useState<string[]>(["rent"]);
   const [suggestedRent, setSuggestedRent] = useState("");
   const [suggestedDeposit, setSuggestedDeposit] = useState("");
   const [revisionComment, setRevisionComment] = useState("");
+
+  // Dedicated Revision Instructions View Modal state
+  const [viewInstructionsModalText, setViewInstructionsModalText] = useState<{ title: string; subtitle: string; remarks: string } | null>(null);
+
+  const toggleRevisionType = (type: string) => {
+    if (selectedRevisionTypes.includes(type)) {
+      if (selectedRevisionTypes.length > 1) {
+        setSelectedRevisionTypes(selectedRevisionTypes.filter(t => t !== type));
+      }
+    } else {
+      setSelectedRevisionTypes([...selectedRevisionTypes, type]);
+    }
+  };
 
   // Dedicated Reject Modal state
   const [rejectModalItem, setRejectModalItem] = useState<any | null>(null);
@@ -195,11 +216,11 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
   // Execute Return for Revision from Return for Revision Modal
   const handleConfirmReturnRevision = async () => {
     if (!returnRevisionModalItem) return;
-    if (revisionType === "rent" && !suggestedRent.trim()) {
+    if (selectedRevisionTypes.includes("rent") && !suggestedRent.trim()) {
       showToast("Please enter a suggested rent amount", "error");
       return;
     }
-    if (revisionType === "deposit" && !suggestedDeposit.trim()) {
+    if (selectedRevisionTypes.includes("deposit") && !suggestedDeposit.trim()) {
       showToast("Please enter a suggested deposit amount", "error");
       return;
     }
@@ -211,9 +232,10 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
     setActionLoading(true);
     try {
       const parts = [];
-      if (revisionType === "rent" && suggestedRent) parts.push(`[Suggested Rent: ₹${suggestedRent}/day]`);
-      if (revisionType === "deposit" && suggestedDeposit) parts.push(`[Suggested Deposit: ₹${suggestedDeposit}]`);
-      if (revisionType === "docs") parts.push(`[Document Revision Required]`);
+      if (selectedRevisionTypes.includes("rent") && suggestedRent) parts.push(`[Suggested Rent: ₹${suggestedRent}/day]`);
+      if (selectedRevisionTypes.includes("deposit") && suggestedDeposit) parts.push(`[Suggested Deposit: ₹${suggestedDeposit}]`);
+      if (selectedRevisionTypes.includes("docs")) parts.push(`[Document Revision Required]`);
+      if (selectedRevisionTypes.includes("vehicle_details")) parts.push(`[Vehicle / RC Details Revision Required]`);
       parts.push(revisionComment.trim());
 
       const finalRemarks = parts.join(" ");
@@ -341,28 +363,30 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
     }
   };
 
-  const formatDateTime = (dateStr?: string) => {
-    if (!dateStr) return "—";
+  const formatDateTimeComponents = (dateStr?: string) => {
+    if (!dateStr) return { date: "—", time: "" };
     try {
       const d = new Date(dateStr);
-      return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" });
+      const date = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+      const time = d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }).toLowerCase();
+      return { date, time };
     } catch {
-      return dateStr;
+      return { date: dateStr, time: "" };
     }
   };
 
   const getStatusBadge = (statusStr: string) => {
     const s = (statusStr || "").toLowerCase();
     if (s.includes("approved") || s.includes("completed")) {
-      return <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Approved</span>;
+      return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">Approved</span>;
     }
     if (s.includes("reject")) {
-      return <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">Rejected</span>;
+      return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200/80">Rejected</span>;
     }
     if (s.includes("requested")) {
-      return <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-orange-50 text-orange-700 border border-orange-200">Revision Req.</span>;
+      return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-orange-50 text-orange-700 border border-orange-200/80">Revision Req.</span>;
     }
-    return <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Pending</span>;
+    return <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80">Pending</span>;
   };
 
   // Batch approve selection handler
@@ -427,6 +451,20 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
       item.current_approver_name?.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesCategory && matchesSearch;
   });
+
+  // Sort items by Submitted At / Created At in DESCENDING order (Newest First)
+  filteredList.sort((a, b) => {
+    const timeA = a.submitted_at || a.created_at ? new Date(a.submitted_at || a.created_at).getTime() : 0;
+    const timeB = b.submitted_at || b.created_at ? new Date(b.submitted_at || b.created_at).getTime() : 0;
+    return timeB - timeA;
+  });
+
+  // Pagination parameters
+  const totalItems = filteredList.length;
+  const totalPages = Math.ceil(totalItems / itemsPerPage) || 1;
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, totalItems);
+  const paginatedList = filteredList.slice(startIndex, endIndex);
 
   // Calculate counts per category
   const getCategoryCount = (modKey: string) => {
@@ -594,53 +632,105 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
         {/* WORKSPACE MAIN PANEL */}
         <main className="flex-1 flex flex-col gap-4 min-w-0">
           
-          {/* Top Control Bar */}
-          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col sm:flex-row items-center justify-between gap-4">
-            <div className="flex items-center gap-3 w-full sm:w-auto">
-              {activeTab === "pending" && filteredList.length > 0 && (
-                <button
-                  onClick={toggleSelectAll}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors shadow-xs"
-                >
-                  {selectedItemKeys.size === filteredList.length ? <CheckSquare className="w-4 h-4 text-emerald-600" /> : <Square className="w-4 h-4" />}
-                  {selectedItemKeys.size === filteredList.length ? "Deselect All" : "Select All"}
-                </button>
-              )}
+          {/* Top Control Bar with Category Tabs */}
+          <div className="bg-white border border-slate-200 rounded-2xl p-4 shadow-xs flex flex-col gap-3">
+            {/* Category Sub-Navigation Pills */}
+            <div className="flex items-center gap-2 overflow-x-auto pb-1 border-b border-slate-100 pb-3">
+              <button
+                type="button"
+                onClick={() => setSelectedCategory("all")}
+                className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+                  selectedCategory === "all" ? "bg-slate-900 text-white shadow-xs" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                <span>All Forms</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] ${selectedCategory === "all" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-800"}`}>
+                  {getCategoryCount("all")}
+                </span>
+              </button>
 
-              {selectedItemKeys.size > 0 && (
-                <button
-                  onClick={handleBatchApprove}
-                  disabled={batchLoading}
-                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all"
-                >
-                  {batchLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
-                  Approve Selected ({selectedItemKeys.size})
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setSelectedCategory("individual_onboarding")}
+                className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+                  selectedCategory === "individual_onboarding" ? "bg-emerald-600 text-white shadow-xs" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>Driver Onboarding</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] ${selectedCategory === "individual_onboarding" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-800"}`}>
+                  {getCategoryCount("individual_onboarding")}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedCategory("operator_onboarding")}
+                className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+                  selectedCategory === "operator_onboarding" ? "bg-emerald-600 text-white shadow-xs" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                <Building2 className="w-3.5 h-3.5" />
+                <span>Operator Onboarding</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] ${selectedCategory === "operator_onboarding" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-800"}`}>
+                  {getCategoryCount("operator_onboarding")}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedCategory("vehicle_onboarding")}
+                className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+                  selectedCategory === "vehicle_onboarding" ? "bg-emerald-600 text-white shadow-xs" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                <Truck className="w-3.5 h-3.5" />
+                <span>Vehicle Onboarding</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] ${selectedCategory === "vehicle_onboarding" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-800"}`}>
+                  {getCategoryCount("vehicle_onboarding")}
+                </span>
+              </button>
             </div>
 
-            <div className="relative w-full sm:w-80">
-              <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search driver, vehicle, city..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-emerald-600 focus:bg-white transition-all shadow-xs"
-              />
+            {/* Actions Bar & Search Input */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-1">
+              <div className="flex items-center gap-3 w-full sm:w-auto">
+                {activeTab === "pending" && filteredList.length > 0 && (
+                  <button
+                    onClick={toggleSelectAll}
+                    className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-slate-50 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-colors shadow-xs"
+                  >
+                    {selectedItemKeys.size === filteredList.length ? <CheckSquare className="w-4 h-4 text-emerald-600" /> : <Square className="w-4 h-4" />}
+                    {selectedItemKeys.size === filteredList.length ? "Deselect All" : "Select All"}
+                  </button>
+                )}
+
+                {selectedItemKeys.size > 0 && (
+                  <button
+                    onClick={handleBatchApprove}
+                    disabled={batchLoading}
+                    className="flex items-center gap-1.5 px-4 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-all"
+                  >
+                    {batchLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle className="w-3.5 h-3.5" />}
+                    Approve Selected ({selectedItemKeys.size})
+                  </button>
+                )}
+              </div>
+
+              <div className="relative w-full sm:w-80">
+                <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search driver, vehicle, city..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full pl-9 pr-4 py-1.5 bg-slate-50 border border-slate-200 rounded-xl text-xs outline-none focus:border-emerald-600 focus:bg-white transition-all shadow-xs"
+                />
+              </div>
             </div>
           </div>
 
-          {/* Revision Banner — shown only on revisions tab */}
-          {activeTab === "revisions" && (
-            <div className="bg-orange-50 border border-orange-200 rounded-2xl px-5 py-3.5 flex items-start gap-3 shadow-xs">
-              <AlertTriangle className="w-4 h-4 text-orange-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="text-xs font-bold text-orange-900">Action Required — Changes Requested</p>
-                <p className="text-[11px] text-orange-700 mt-0.5">The records below were returned to you for revision. Click <strong>Edit &amp; Resubmit</strong> to modify the form details and send it back for approval.</p>
-              </div>
-            </div>
-          )}
+
 
           {/* Clean Form Table */}
           {loading ? (
@@ -665,17 +755,31 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
                 <thead>
                   <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
                     {activeTab === "pending" && <th className="py-3.5 px-4 w-[4%] text-center">Select</th>}
-                    <th className="py-3.5 px-4 w-[14%]">Form Type</th>
-                    <th className="py-3.5 px-4 w-[20%]">Subject / Details</th>
+                    {selectedCategory === "all" && <th className="py-3.5 px-4 w-[12%]">Form Type</th>}
+                    <th className="py-3.5 px-4 w-[20%]">
+                      {selectedCategory === "vehicle_onboarding"
+                        ? "Vehicle Reg. & Model"
+                        : selectedCategory === "individual_onboarding"
+                        ? "Driver & Plan"
+                        : selectedCategory === "operator_onboarding"
+                        ? "Operator & Details"
+                        : "Subject / Details"}
+                    </th>
+
+                    {/* DEDICATED REVISION INSTRUCTIONS COLUMN for Returned for Revision & My Submissions */}
+                    {(activeTab === "revisions" || activeTab === "my-submissions") && (
+                      <th className="py-3.5 px-4 w-[22%]">Revision Instructions</th>
+                    )}
+
                     <th className="py-3.5 px-4 w-[12%]">Submitted By</th>
-                    <th className="py-3.5 px-4 w-[13%]">Submitted At</th>
-                    <th className="py-3.5 px-4 w-[16%]">Pending With</th>
+                    <th className="py-3.5 px-4 w-[11%]">Submitted At</th>
+                    <th className="py-3.5 px-4 w-[14%]">Pending With</th>
                     <th className="py-3.5 px-4 w-[9%] text-center">Status</th>
-                    <th className="py-3.5 px-4 w-[16%] text-right">Actions</th>
+                    <th className="py-3.5 px-4 w-[12%] text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 text-xs">
-                  {filteredList.map(item => {
+                  {paginatedList.map(item => {
                     const conf = MODULE_CONFIG[item.module] || { label: item.module_label || "Form", textClass: "text-slate-600 font-semibold" };
                     const itemKey = `${item.module}:${item.id}`;
                     const isSelected = selectedItemKeys.has(itemKey);
@@ -701,162 +805,158 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
                           </td>
                         )}
 
-                        {/* Form Type */}
-                        <td className="py-4 px-4 whitespace-nowrap">
-                          <span className={`text-[11px] font-bold uppercase tracking-wider ${conf.textClass}`}>
-                            {conf.label}
-                          </span>
-                        </td>
+                        {/* Form Type (only when All Forms is selected) */}
+                        {selectedCategory === "all" && (
+                          <td className="py-3 px-4 whitespace-nowrap font-sans">
+                            <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 border border-slate-200/60">
+                              {conf.label}
+                            </span>
+                          </td>
+                        )}
 
                         {/* Subject / Details */}
-                        <td className="py-4 px-4">
+                        <td className="py-3 px-4 font-sans">
                           <p className="font-bold text-slate-900 text-xs tracking-tight">{item.title}</p>
                           <p className="text-[11px] text-slate-500 mt-0.5">{item.subtitle} · <span className="font-semibold text-slate-600">{item.city}</span></p>
 
-                          {/* EXPLICIT RENT & DEPOSIT DISPLAY */}
-                          {(item.daily_rent > 0 || item.security_deposit > 0) && (
-                            <div className="mt-1.5 inline-flex items-center gap-2 px-2.5 py-1 rounded-lg bg-emerald-50/70 border border-emerald-200/60 text-[11px]">
-                              <span className="font-extrabold text-emerald-700">₹{item.daily_rent?.toLocaleString('en-IN')}<span className="font-medium text-slate-500">/day (Rent)</span></span>
-                              <span className="text-emerald-300">|</span>
-                              <span className="font-extrabold text-slate-800">₹{item.security_deposit?.toLocaleString('en-IN')}<span className="font-medium text-slate-500"> (Deposit)</span></span>
-                            </div>
-                          )}
-
-                          {item.approval_remarks && (item.approval_status === "Changes Requested" || item.approval_status === "Revision Req." || activeTab === "revisions") && (
-                            <div className="mt-2 p-2 rounded-xl bg-orange-50 border border-orange-200 flex items-start gap-1.5 shadow-2xs">
-                              <MessageSquare className="w-3.5 h-3.5 text-orange-600 shrink-0 mt-0.5" />
-                              <div>
-                                <span className="text-[10px] font-bold text-orange-900 uppercase tracking-wider block leading-none mb-0.5">Manager's Revision Instructions:</span>
-                                <p className="text-[11px] font-semibold text-orange-800 leading-snug">{item.approval_remarks}</p>
-                              </div>
+                          {/* EXPLICIT RENT & DEPOSIT DISPLAY (Excluding Vehicle Onboarding) */}
+                          {item.module !== "vehicle_onboarding" && (item.daily_rent > 0 || item.security_deposit > 0) && (
+                            <div className="mt-1.5 inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-slate-100 border border-slate-200/60 text-[10px] font-bold text-slate-700">
+                              <span>₹{item.daily_rent?.toLocaleString('en-IN')}/day (Rent)</span>
+                              <span className="text-slate-300">·</span>
+                              <span>₹{item.security_deposit?.toLocaleString('en-IN')} (Deposit)</span>
                             </div>
                           )}
                         </td>
 
+                        {/* DEDICATED REVISION INSTRUCTIONS CELL (Compact 1-line & Clickable) */}
+                        {(activeTab === "revisions" || activeTab === "my-submissions") && (
+                          <td className="py-3 px-4 font-sans" onClick={(e) => e.stopPropagation()}>
+                            {item.approval_remarks ? (
+                              <button
+                                type="button"
+                                onClick={() => setViewInstructionsModalText({ title: item.title, subtitle: `${item.subtitle} · ${item.city}`, remarks: item.approval_remarks })}
+                                className="px-3 py-1.5 rounded-xl bg-amber-50 hover:bg-amber-100 border border-amber-200/80 text-amber-900 text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer max-w-[240px] shadow-2xs group"
+                                title="Click to view full instructions in detail"
+                              >
+                                <MessageSquare className="w-3.5 h-3.5 text-amber-600 shrink-0 group-hover:scale-110 transition-transform" />
+                                <span className="truncate text-[11px]">{item.approval_remarks}</span>
+                              </button>
+                            ) : (
+                              <span className="text-slate-300 font-medium">—</span>
+                            )}
+                          </td>
+                        )}
+
                         {/* Submitted By */}
-                        <td className="py-4 px-4 whitespace-nowrap">
+                        <td className="py-3 px-4 whitespace-nowrap font-sans">
                           {(() => {
                             const parsed = parseNameDetails(item.submitted_by_name || "Onboarding Executive 1 (Onboarding Executive — Hyderabad)");
                             return (
-                              <div className="flex flex-col">
-                                <span className="font-bold text-slate-800 text-xs">{parsed.name}</span>
-                                {parsed.details && <span className="text-[10px] font-medium text-slate-400 mt-0.5">{parsed.details}</span>}
+                              <div>
+                                <div className="font-bold text-slate-800 text-xs">{parsed.name}</div>
+                                <div className="text-slate-400 text-[10px] font-medium mt-0.5">{parsed.details || "Onboarding Executive"}</div>
                               </div>
                             );
                           })()}
                         </td>
 
                         {/* Submitted At */}
-                        <td className="py-4 px-4 whitespace-nowrap text-slate-500 font-medium text-[11px]">
-                          {formatDateTime(item.created_at)}
-                        </td>
-
-                        {/* Pending With / Sent To */}
-                        <td className="py-4 px-4 whitespace-nowrap">
+                        <td className="py-3 px-4 whitespace-nowrap font-sans">
                           {(() => {
-                            const parsed = parseNameDetails(item.current_approver_name || item.current_approver || "City Manager 1 (City Manager — Hyderabad)");
+                            const { date, time } = formatDateTimeComponents(item.created_at);
                             return (
-                              <div className="flex flex-col">
-                                <span className="font-semibold text-slate-800 text-xs px-2.5 py-0.5 rounded-md bg-slate-100 border border-slate-200/80 inline-block w-max">{parsed.name}</span>
-                                {parsed.details && <span className="text-[10px] font-medium text-slate-400 mt-1">{parsed.details}</span>}
+                              <div>
+                                <div className="font-bold text-slate-800 text-xs">{date}</div>
+                                <div className="text-slate-400 text-[10px] font-medium mt-0.5">{time}</div>
                               </div>
                             );
                           })()}
                         </td>
 
-                        {/* Status (Clean Badge, No Name!) */}
-                        <td className="py-4 px-4 whitespace-nowrap text-center">
+                        {/* Pending With / Sent To */}
+                        <td className="py-3 px-4 whitespace-nowrap font-sans">
+                          {(() => {
+                            const parsed = parseNameDetails(item.current_approver_name || item.current_approver || "City Manager 1 (City Manager — Hyderabad)");
+                            return (
+                              <div>
+                                <div className="font-bold text-slate-800 text-xs">{parsed.name}</div>
+                                <div className="text-slate-400 text-[10px] font-medium mt-0.5">{parsed.details || "City Manager"}</div>
+                              </div>
+                            );
+                          })()}
+                        </td>
+
+                        {/* Status */}
+                        <td className="py-3 px-4 whitespace-nowrap text-center font-sans">
                           {getStatusBadge(item.approval_status)}
                         </td>
 
-                        {/* Actions (Approve | Forward | View as Distinct Buttons) */}
+                        {/* Actions (Uniform Primary Button Per View) */}
                         <td className="py-4 px-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
-                          <div className="flex items-center justify-end gap-2 shrink-0">
+                          <div className="flex items-center justify-end gap-1.5 shrink-0">
                             {activeTab === "pending" && !item.isMySubmission && (
                               <>
                                 <button
+                                  type="button"
+                                  onClick={() => handleDirectApprove(item.module, item.id)}
+                                  className="h-8 w-8 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200/80 flex items-center justify-center transition-all shadow-2xs cursor-pointer"
+                                  title="Quick Approve Application"
+                                >
+                                  <CheckCircle className="w-4 h-4" />
+                                </button>
+                                <button
+                                  type="button"
                                   onClick={() => {
                                     setReturnRevisionModalItem(item);
-                                    setRevisionType("rent");
+                                    setSelectedRevisionTypes(item.module === "vehicle_onboarding" ? ["docs"] : ["rent"]);
                                     setSuggestedRent("");
                                     setSuggestedDeposit("");
                                     setRevisionComment("");
                                   }}
-                                  className="px-2.5 py-1.5 bg-orange-50 hover:bg-orange-600 text-orange-700 hover:text-white border border-orange-200 rounded-xl text-[11px] font-bold transition-all shadow-2xs flex items-center gap-1 shrink-0 cursor-pointer"
-                                  title="Return for revision with suggestions"
+                                  className="h-8 w-8 rounded-lg bg-amber-50 hover:bg-amber-600 text-amber-700 hover:text-white border border-amber-200/80 flex items-center justify-center transition-all shadow-2xs cursor-pointer"
+                                  title="Return for Revision"
                                 >
-                                  <RotateCcw className="w-3.5 h-3.5" /> Return for Revision
+                                  <RotateCcw className="w-4 h-4" />
                                 </button>
                                 <button
-                                  onClick={() => {
-                                    setForwardModalItem(item);
-                                    // Default approver selection based on role hierarchy
-                                    const uRole = (user?.role || "").toLowerCase();
-                                    let defaultApp = null;
-                                    if (uRole.includes("city manager") || uRole.includes("cm")) {
-                                      defaultApp = approvers.find(a => a.role?.toLowerCase().includes("general manager") || a.role_code === "GM") ||
-                                                   approvers.find(a => a.role?.toLowerCase().includes("business head") || a.role_code === "BH");
-                                    } else if (uRole.includes("general manager") || uRole.includes("gm")) {
-                                      defaultApp = approvers.find(a => a.role?.toLowerCase().includes("business head") || a.role_code === "BH");
-                                    } else {
-                                      defaultApp = approvers.find(a => a.role?.toLowerCase().includes("city manager") || a.role_code === "CM") || approvers[0];
-                                    }
-                                    if (defaultApp) {
-                                      setForwardToId(defaultApp.id);
-                                      setApproverSearch(`${defaultApp.name} (${defaultApp.role} — ${defaultApp.city})`);
-                                    } else {
-                                      setForwardToId(null);
-                                      setApproverSearch("");
-                                    }
-                                    setForwardComment("");
-                                    setIsApproverOpen(false);
-                                    loadLogs(item.module, item.id);
-                                  }}
-                                  className="px-2.5 py-1.5 bg-blue-50 hover:bg-blue-600 text-blue-700 hover:text-white border border-blue-200 rounded-xl text-[11px] font-bold transition-all shadow-2xs flex items-center gap-1 shrink-0 cursor-pointer"
-                                  title="Approve and forward application"
-                                >
-                                  <ArrowRight className="w-3.5 h-3.5" /> Approve &amp; Forward
-                                </button>
-                                <button
-                                  onClick={() => handleDirectApprove(item.module, item.id)}
-                                  className="px-2.5 py-1.5 bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200 rounded-xl text-[11px] font-bold transition-all shadow-2xs flex items-center gap-1 shrink-0 cursor-pointer"
-                                  title="Approve application directly"
-                                >
-                                  <CheckCircle className="w-3.5 h-3.5" /> Approve
-                                </button>
-                                <button
+                                  type="button"
                                   onClick={() => {
                                     setRejectModalItem(item);
                                     setRejectComment("");
                                   }}
-                                  className="px-2.5 py-1.5 bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200 rounded-xl text-[11px] font-bold transition-all shadow-2xs flex items-center gap-1 shrink-0 cursor-pointer"
-                                  title="Reject application"
+                                  className="h-8 w-8 rounded-lg bg-rose-50 hover:bg-rose-600 text-rose-700 hover:text-white border border-rose-200/80 flex items-center justify-center transition-all shadow-2xs cursor-pointer"
+                                  title="Reject Application"
                                 >
-                                  <XCircle className="w-3.5 h-3.5" /> Reject
+                                  <XCircle className="w-4 h-4" />
                                 </button>
                               </>
                             )}
-                            {activeTab === "revisions" && onEditRecord && (
+
+                            {activeTab === "revisions" ? (
                               <button
-                                onClick={() => onEditRecord(item.module, item.id, false, activeTab)}
-                                className="px-2.5 py-1.5 bg-orange-50 hover:bg-orange-600 text-orange-700 hover:text-white border border-orange-200 rounded-xl text-[11px] font-bold transition-all shadow-2xs flex items-center gap-1 shrink-0"
+                                type="button"
+                                onClick={() => onEditRecord ? onEditRecord(item.module, item.id, false, activeTab) : openRecord(item)}
+                                className="h-8 px-3.5 rounded-lg bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold transition-all shadow-xs flex items-center gap-1.5 cursor-pointer"
                               >
                                 <Edit className="w-3.5 h-3.5" /> Edit &amp; Resubmit
                               </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (onEditRecord) {
+                                    onEditRecord(item.module, item.id, true, activeTab);
+                                  } else {
+                                    openRecord(item);
+                                  }
+                                }}
+                                className="h-8 px-3.5 rounded-lg bg-primary hover:bg-primary-hover text-white text-xs font-bold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+                              >
+                                <Eye className="w-3.5 h-3.5" /> View
+                              </button>
                             )}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (onEditRecord) {
-                                  onEditRecord(item.module, item.id, true, activeTab);
-                                } else {
-                                  openRecord(item);
-                                }
-                              }}
-                              className="px-2.5 py-1.5 bg-slate-100 hover:bg-slate-800 text-slate-700 hover:text-white border border-slate-200 rounded-xl text-[11px] font-bold transition-all shadow-2xs flex items-center gap-1 shrink-0"
-                            >
-                              <Eye className="w-3.5 h-3.5" /> View
-                            </button>
                           </div>
                         </td>
                       </tr>
@@ -864,10 +964,108 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
                   })}
                 </tbody>
               </table>
+
+              {/* Pagination Bar */}
+              {totalItems > 0 && (
+                <div className="bg-slate-50/80 border-t border-slate-200 px-6 py-3 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-sans text-slate-500">
+                  <div>
+                    Showing <span className="font-bold text-slate-800">{startIndex + 1}</span> to{" "}
+                    <span className="font-bold text-slate-800">{endIndex}</span> of{" "}
+                    <span className="font-bold text-slate-800">{totalItems}</span> applications
+                  </div>
+
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(1)}
+                      disabled={currentPage === 1}
+                      className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                    >
+                      First
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
+                      disabled={currentPage === 1}
+                      className="flex items-center gap-1 px-3 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" /> Previous
+                    </button>
+                    
+                    <span className="px-3 py-1 font-bold text-slate-700">
+                      Page {currentPage} of {totalPages}
+                    </span>
+
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
+                      disabled={currentPage === totalPages}
+                      className="flex items-center gap-1 px-3 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                    >
+                      Next <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage(totalPages)}
+                      disabled={currentPage === totalPages}
+                      className="px-2.5 py-1 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-700 font-bold disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors"
+                    >
+                      Last
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </main>
       </div>
+
+      {/* DEDICATED FULL REVISION INSTRUCTIONS MODAL */}
+      {viewInstructionsModalText && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200" onClick={() => setViewInstructionsModalText(null)}>
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150" onClick={(e) => e.stopPropagation()}>
+            {/* Header */}
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-amber-50/60">
+              <div className="flex items-center gap-2">
+                <MessageSquare className="w-5 h-5 text-amber-600" />
+                <h3 className="text-sm font-extrabold text-slate-900">Revision Instructions</h3>
+              </div>
+              <button
+                onClick={() => setViewInstructionsModalText(null)}
+                className="p-1.5 rounded-full hover:bg-slate-200 text-slate-400 transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div className="p-6 space-y-4 text-xs font-sans">
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3.5 space-y-1">
+                <p className="font-bold text-slate-900 text-xs">{viewInstructionsModalText.title}</p>
+                <p className="text-[11px] text-slate-500">{viewInstructionsModalText.subtitle}</p>
+              </div>
+
+              <div className="space-y-1.5">
+                <label className="text-[11px] font-bold text-slate-700 uppercase tracking-wider block">Full Instructions</label>
+                <div className="p-4 bg-amber-50/50 border border-amber-200/80 rounded-xl text-amber-950 text-xs font-medium leading-relaxed whitespace-pre-wrap max-h-80 overflow-y-auto">
+                  {viewInstructionsModalText.remarks}
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex items-center justify-end px-6 py-3.5 border-t border-slate-100 bg-slate-50">
+              <button
+                type="button"
+                onClick={() => setViewInstructionsModalText(null)}
+                className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold rounded-xl text-xs transition-all shadow-xs cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* DEDICATED FORWARD POPUP MODAL */}
       {forwardModalItem && (
@@ -1109,82 +1307,144 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
                 <p className="text-[11px] text-slate-500">Submitted by: <strong className="text-slate-700">{returnRevisionModalItem.submitted_by_name || "Onboarding Executive 1 (Onboarding Executive — Hyderabad)"}</strong></p>
               </div>
 
-              {/* Revision Category Tabs */}
+              {/* Revision Category Tabs (Multi-Select, Tailored per module) */}
               <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-800">Select Suggestion / Reason Type *</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setRevisionType("rent")}
-                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-1.5 cursor-pointer ${
-                      revisionType === "rent" ? "bg-orange-600 text-white border-orange-600 shadow-xs" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    <IndianRupee className="w-3.5 h-3.5 shrink-0" /> Suggest Rent
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRevisionType("deposit")}
-                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-1.5 cursor-pointer ${
-                      revisionType === "deposit" ? "bg-orange-600 text-white border-orange-600 shadow-xs" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    <DollarSign className="w-3.5 h-3.5 shrink-0" /> Suggest Deposit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRevisionType("docs")}
-                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-1.5 cursor-pointer ${
-                      revisionType === "docs" ? "bg-orange-600 text-white border-orange-600 shadow-xs" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    <FileText className="w-3.5 h-3.5 shrink-0" /> Unclear Docs
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setRevisionType("other")}
-                    className={`px-3 py-2 rounded-xl text-xs font-bold border transition-all text-left flex items-center gap-1.5 cursor-pointer ${
-                      revisionType === "other" ? "bg-orange-600 text-white border-orange-600 shadow-xs" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-                    }`}
-                  >
-                    <MessageSquare className="w-3.5 h-3.5 shrink-0" /> Other Changes
-                  </button>
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-bold text-slate-800">Select Suggestion / Reason Types *</label>
+                  <span className="text-[10px] font-semibold text-slate-400">Select all that apply</span>
                 </div>
+                
+                {returnRevisionModalItem?.module === "vehicle_onboarding" ? (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleRevisionType("docs")}
+                      className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center justify-between cursor-pointer ${
+                        selectedRevisionTypes.includes("docs") ? "bg-orange-600 text-white border-orange-600 shadow-xs" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 shrink-0" /> Unclear Docs
+                      </div>
+                      {selectedRevisionTypes.includes("docs") && <CheckCircle className="w-3.5 h-3.5 shrink-0 text-white" />}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => toggleRevisionType("vehicle_details")}
+                      className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center justify-between cursor-pointer ${
+                        selectedRevisionTypes.includes("vehicle_details") ? "bg-orange-600 text-white border-orange-600 shadow-xs" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <Truck className="w-3.5 h-3.5 shrink-0" /> Incorrect Vehicle Details
+                      </div>
+                      {selectedRevisionTypes.includes("vehicle_details") && <CheckCircle className="w-3.5 h-3.5 shrink-0 text-white" />}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => toggleRevisionType("other")}
+                      className={`col-span-2 px-3 py-2.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center justify-between cursor-pointer ${
+                        selectedRevisionTypes.includes("other") ? "bg-orange-600 text-white border-orange-600 shadow-xs" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <MessageSquare className="w-3.5 h-3.5 shrink-0" /> Other Changes
+                      </div>
+                      {selectedRevisionTypes.includes("other") && <CheckCircle className="w-3.5 h-3.5 shrink-0 text-white" />}
+                    </button>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleRevisionType("rent")}
+                      className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center justify-between cursor-pointer ${
+                        selectedRevisionTypes.includes("rent") ? "bg-orange-600 text-white border-orange-600 shadow-xs" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <IndianRupee className="w-3.5 h-3.5 shrink-0" /> Suggest Rent
+                      </div>
+                      {selectedRevisionTypes.includes("rent") && <CheckCircle className="w-3.5 h-3.5 shrink-0 text-white" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleRevisionType("deposit")}
+                      className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center justify-between cursor-pointer ${
+                        selectedRevisionTypes.includes("deposit") ? "bg-orange-600 text-white border-orange-600 shadow-xs" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <DollarSign className="w-3.5 h-3.5 shrink-0" /> Suggest Deposit
+                      </div>
+                      {selectedRevisionTypes.includes("deposit") && <CheckCircle className="w-3.5 h-3.5 shrink-0 text-white" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleRevisionType("docs")}
+                      className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center justify-between cursor-pointer ${
+                        selectedRevisionTypes.includes("docs") ? "bg-orange-600 text-white border-orange-600 shadow-xs" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <FileText className="w-3.5 h-3.5 shrink-0" /> Unclear Docs
+                      </div>
+                      {selectedRevisionTypes.includes("docs") && <CheckCircle className="w-3.5 h-3.5 shrink-0 text-white" />}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => toggleRevisionType("other")}
+                      className={`px-3 py-2.5 rounded-xl text-xs font-bold border transition-all text-left flex items-center justify-between cursor-pointer ${
+                        selectedRevisionTypes.includes("other") ? "bg-orange-600 text-white border-orange-600 shadow-xs" : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <MessageSquare className="w-3.5 h-3.5 shrink-0" /> Other Changes
+                      </div>
+                      {selectedRevisionTypes.includes("other") && <CheckCircle className="w-3.5 h-3.5 shrink-0 text-white" />}
+                    </button>
+                  </div>
+                )}
               </div>
 
-              {/* Rent Numeric Input */}
-              {revisionType === "rent" && (
-                <div className="space-y-1.5 animate-in fade-in duration-150">
-                  <label className="text-xs font-bold text-slate-800">Suggested Daily Rent (₹/day) *</label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold">₹</span>
-                    <input
-                      type="number"
-                      value={suggestedRent}
-                      onChange={(e) => setSuggestedRent(e.target.value)}
-                      placeholder="e.g. 750"
-                      className="w-full h-10 pl-8 pr-4 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-orange-500"
-                    />
+              {/* Dynamic Numeric Inputs Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Rent Input */}
+                {selectedRevisionTypes.includes("rent") && (
+                  <div className="space-y-1.5 animate-in fade-in duration-150">
+                    <label className="text-xs font-bold text-slate-800">Suggested Daily Rent (₹/day) *</label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold">₹</span>
+                      <input
+                        type="number"
+                        value={suggestedRent}
+                        onChange={(e) => setSuggestedRent(e.target.value)}
+                        placeholder="e.g. 750"
+                        className="w-full h-10 pl-8 pr-4 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-orange-500"
+                      />
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
-              {/* Deposit Numeric Input */}
-              {revisionType === "deposit" && (
-                <div className="space-y-1.5 animate-in fade-in duration-150">
-                  <label className="text-xs font-bold text-slate-800">Suggested Security Deposit (₹) *</label>
-                  <div className="relative">
-                    <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold">₹</span>
-                    <input
-                      type="number"
-                      value={suggestedDeposit}
-                      onChange={(e) => setSuggestedDeposit(e.target.value)}
-                      placeholder="e.g. 5000"
-                      className="w-full h-10 pl-8 pr-4 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-orange-500"
-                    />
+                {/* Deposit Input */}
+                {selectedRevisionTypes.includes("deposit") && (
+                  <div className="space-y-1.5 animate-in fade-in duration-150">
+                    <label className="text-xs font-bold text-slate-800">Suggested Security Deposit (₹) *</label>
+                    <div className="relative">
+                      <span className="absolute left-3.5 top-2.5 text-slate-400 font-bold">₹</span>
+                      <input
+                        type="number"
+                        value={suggestedDeposit}
+                        onChange={(e) => setSuggestedDeposit(e.target.value)}
+                        placeholder="e.g. 5000"
+                        className="w-full h-10 pl-8 pr-4 bg-white border border-slate-200 rounded-xl text-xs font-semibold outline-none focus:border-orange-500"
+                      />
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Revision Instructions Textarea */}
               <div className="space-y-1.5">

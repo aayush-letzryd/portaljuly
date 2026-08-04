@@ -235,12 +235,7 @@ export default function AllocationForm({
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (res.ok) {
-        const data = await res.json();
-        const validApprovers = data.filter((a: any) =>
-          a.role_code !== "SA" &&
-          !a.name?.toLowerCase().includes("super admin") &&
-          !a.role?.toLowerCase().includes("super admin")
-        );
+        const validApprovers = data.filter((a: any) => a.id !== (user.portal_user_id || user.id));
         setApproversList(validApprovers);
         
         // Auto-select preferred default approver based on role hierarchy
@@ -805,7 +800,7 @@ export default function AllocationForm({
                     <div className="flex items-start gap-3">
                       <AlertTriangle className="w-5 h-5 text-orange-600 shrink-0 mt-0.5" />
                       <div>
-                        <p className="text-xs font-extrabold text-orange-900 uppercase tracking-wider mb-1">Manager's Revision Instructions</p>
+                        <p className="text-xs font-extrabold text-orange-900 uppercase tracking-wider mb-1">Revision Instructions</p>
                         <p className="text-sm font-semibold text-orange-800">{approvalRemarks}</p>
                       </div>
                     </div>
