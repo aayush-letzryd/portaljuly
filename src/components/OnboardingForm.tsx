@@ -1908,7 +1908,7 @@ export default function OnboardingForm({
                             </div>
                           )}
                         </div>
-                      </div>              </div>
+                      </div>
                     </div>
 
                     <hr className="border-border/60" />
