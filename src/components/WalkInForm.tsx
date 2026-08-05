@@ -193,10 +193,11 @@ export default function WalkInForm({
           setIsDuplicate(false);
           setDuplicateMsg("");
         }
+      } else {
+        console.warn("Search API returned non-OK status", res.status);
       }
     } catch (e) {
       console.error("Fetch error", e);
-      alert("An error occurred while searching. Please try again.");
     }
   };
 
@@ -252,32 +253,23 @@ export default function WalkInForm({
           const res = await fetch(`/api/walkins/search?q=${cleanPhone}`, {
             headers: { "Authorization": `Bearer ${token}` }
           });
-          const data = await res.json();
-          
-          if (data && data.length > 0) {
-            const match = data[0]; 
-            if (!firstName && !lastName) {
-              setFirstName(match.first_name || match.person_name?.split(" ")[0] || "");
-              setLastName(match.last_name || match.person_name?.split(" ").slice(1).join(" ") || "");
+          if (res.ok) {
+            const data = await res.json();
+            if (data && data.length > 0) {
+              const match = data[0]; 
+              applyRecordAutoFill(match);
+              setCandidateHistory(data);
+              setFetchBannerMsg(`Candidate Matched: ${match.person_name || 'Driver'} (${data.length} prior visit${data.length > 1 ? 's' : ''} logged). Candidate details auto-filled for a NEW Walk-In Visit.`);
+              setIsDuplicate(false);
+              setDuplicateMsg("");
+            } else {
+              setIsDuplicate(false);
+              setDuplicateMsg("");
+              setCandidateHistory([]);
+              setFoundWalkinRecord(null);
+              setFetchBannerMsg("");
+              setAutoFillApplied(false);
             }
-            if (!dlNumber && match.dl_number) setDlNumber(match.dl_number);
-            if (!aadhaarNumber && match.aadhaar_number) setAadhaarNumber(match.aadhaar_number);
-            if (match.city) setCity(normalizeCity(match.city));
-            if (!aadhaarImage && match.aadhaar_image) setAadhaarImage(match.aadhaar_image);
-            if (!dlImage && match.dl_image) setDlImage(match.dl_image);
-
-            setCandidateHistory(data);
-            setFoundWalkinRecord(match);
-            setFetchBannerMsg(`Candidate Matched: ${match.person_name || 'Driver'} (${data.length} prior visit${data.length > 1 ? 's' : ''} logged). Candidate details auto-filled for a NEW Walk-In Visit.`);
-            setIsDuplicate(false);
-            setDuplicateMsg("");
-          } else {
-            setIsDuplicate(false);
-            setDuplicateMsg("");
-            setCandidateHistory([]);
-            setFoundWalkinRecord(null);
-            setFetchBannerMsg("");
-            setAutoFillApplied(false);
           }
         } catch (e) {
           console.error("Error checking candidate details", e);
