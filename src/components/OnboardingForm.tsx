@@ -2773,7 +2773,7 @@ export default function OnboardingForm({
                   <tbody className="divide-y divide-border/40">
                     {paginatedRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50 text-[11px]">
+                        <td colSpan={10} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50 text-[11px]">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <Search className="h-8 w-8 text-border-strong mb-2 opacity-50" />
                             <p className="font-semibold text-slate-700">No onboarding records found matching current criteria.</p>
@@ -2866,10 +2866,6 @@ export default function OnboardingForm({
                             <td className="px-4 py-3">
                               <div className="font-bold text-slate-800">{updatedDate}</div>
                               <div className="text-slate-400 text-[10px] font-medium">{updatedTime}</div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="font-bold text-slate-800">{r.updated_by ? (r.updated_by_name || r.executive_name || "Admin") : (r.executive_name || user.name || 'Admin')}</div>
-                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.updated_by ? r.updated_by : (r.created_by || user.executive_id || 3)}</div>
                             </td>
                             <td className="px-4 py-3 text-center">
                               <div className="inline-flex gap-1.5 justify-center">
