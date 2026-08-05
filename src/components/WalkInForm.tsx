@@ -901,117 +901,85 @@ export default function WalkInForm({
                     </div>
                   </div>
 
-                  {/* Right Column: Multi-Select Category Tags Dropdown */}
-                  <div className="flex flex-col gap-2.5 p-4 bg-white border border-border rounded-xl relative">
+                  {/* Right Column: Simple Category Tags Dropdown */}
+                  <div className="flex flex-col gap-2.5 p-4 bg-white border border-border rounded-xl">
                     <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
-                      <span>Category Tags (Multi-Select)</span>
+                      <span>Category Tags</span>
                       <span className="text-[10px] text-emerald-700 font-extrabold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                         {selectedTags.length} Selected
                       </span>
                     </label>
 
-                    {/* Dropdown Header Trigger */}
-                    <div className="relative">
-                      <button
-                        type="button"
-                        onClick={() => setIsTagsDropdownOpen(!isTagsDropdownOpen)}
-                        className="w-full min-h-[44px] rounded-lg border border-border bg-slate-50/60 px-3 py-2 text-xs flex items-center justify-between gap-2 hover:border-primary focus:outline-none transition-all cursor-pointer"
-                      >
-                        <span className="text-slate-700 font-medium truncate">
-                          {selectedTags.length > 0
-                            ? selectedTags.join(", ")
-                            : `Select ${partnerType} Category Tags...`}
-                        </span>
-                        <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${isTagsDropdownOpen ? "rotate-180" : ""}`} />
-                      </button>
+                    {/* Standard Select Dropdown */}
+                    <select
+                      value=""
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        if (val === "__OTHERS__") {
+                          setShowCustomTagInput(true);
+                        } else if (val && !selectedTags.includes(val)) {
+                          setSelectedTags([...selectedTags, val]);
+                        }
+                      }}
+                      className="h-11 rounded-lg border border-border px-3 text-xs bg-white outline-none focus:border-primary font-semibold text-slate-700 cursor-pointer"
+                    >
+                      <option value="" disabled>+ Add {partnerType} Category Tag...</option>
+                      {(PRESET_TAGS[partnerType] || PRESET_TAGS["Driver"]).map((tag) => (
+                        <option key={tag} value={tag} disabled={selectedTags.includes(tag)}>
+                          {selectedTags.includes(tag) ? `✓ ${tag} (Selected)` : tag}
+                        </option>
+                      ))}
+                      <option value="__OTHERS__">＋ Others (Enter Custom Tag...)</option>
+                    </select>
 
-                      {/* Dropdown Menu Panel */}
-                      {isTagsDropdownOpen && (
-                        <div className="absolute top-12 left-0 w-full bg-white rounded-xl shadow-xl border border-border z-50 p-2 flex flex-col gap-1 max-h-64 overflow-y-auto">
-                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">
-                            {partnerType} Preset Options
-                          </span>
+                    {/* Custom Tag Input Box */}
+                    {showCustomTagInput && (
+                      <div className="flex gap-2 p-2 bg-slate-50 rounded-lg border border-slate-200">
+                        <input
+                          type="text"
+                          placeholder="Type custom tag name..."
+                          value={customTagInput}
+                          onChange={(e) => setCustomTagInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddCustomTag();
+                            }
+                          }}
+                          className="h-9 flex-1 rounded-lg border border-border px-3 text-xs bg-white outline-none focus:border-primary"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddCustomTag}
+                          className="h-9 px-3 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-lg cursor-pointer transition-colors"
+                        >
+                          Add Tag
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setShowCustomTagInput(false)}
+                          className="h-9 px-2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                        >
+                          ✕
+                        </button>
+                      </div>
+                    )}
 
-                          {(PRESET_TAGS[partnerType] || PRESET_TAGS["Driver"]).map((tag) => {
-                            const isChecked = selectedTags.includes(tag);
-                            return (
-                              <label
-                                key={tag}
-                                className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
-                                  isChecked ? "bg-emerald-50 text-emerald-900 font-bold" : "hover:bg-slate-50 text-slate-700"
-                                }`}
-                              >
-                                <input
-                                  type="checkbox"
-                                  checked={isChecked}
-                                  onChange={() => {
-                                    if (isChecked) setSelectedTags(selectedTags.filter(t => t !== tag));
-                                    else setSelectedTags([...selectedTags, tag]);
-                                  }}
-                                  className="w-4 h-4 rounded text-primary focus:ring-primary accent-emerald-600 cursor-pointer"
-                                />
-                                <span className="flex-1">{tag}</span>
-                              </label>
-                            );
-                          })}
-
-                          <div className="border-t border-slate-100 my-1" />
-
-                          {/* Custom / Others Tag Entry Button */}
-                          {!showCustomTagInput ? (
-                            <button
-                              type="button"
-                              onClick={() => setShowCustomTagInput(true)}
-                              className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-bold text-primary hover:bg-slate-50 transition-colors text-left cursor-pointer"
-                            >
-                              <Plus className="w-3.5 h-3.5" /> + Others / Enter Custom Tag...
-                            </button>
-                          ) : (
-                            <div className="flex flex-col gap-2 p-2 bg-slate-50 rounded-lg border border-slate-200">
-                              <span className="text-[11px] font-bold text-slate-800">Add Custom Category Tag</span>
-                              <div className="flex gap-1.5">
-                                <input
-                                  type="text"
-                                  placeholder="Type custom tag name..."
-                                  value={customTagInput}
-                                  onChange={(e) => setCustomTagInput(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === "Enter") {
-                                      e.preventDefault();
-                                      handleAddCustomTag();
-                                    }
-                                  }}
-                                  className="h-8 flex-1 rounded border border-border px-2 text-xs bg-white outline-none focus:border-primary"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={handleAddCustomTag}
-                                  className="h-8 px-3 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded cursor-pointer"
-                                >
-                                  Add
-                                </button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Selected Tag Badges Pills */}
+                    {/* Selected Tags Display Pills */}
                     {selectedTags.length > 0 && (
                       <div className="flex flex-wrap gap-1.5 mt-1 max-h-28 overflow-y-auto">
                         {selectedTags.map((tag) => (
                           <span
                             key={tag}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs"
+                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs"
                           >
                             <span>{tag}</span>
                             <button
                               type="button"
                               onClick={() => setSelectedTags(selectedTags.filter(t => t !== tag))}
-                              className="hover:text-red-600 focus:outline-none cursor-pointer"
+                              className="hover:text-red-600 focus:outline-none cursor-pointer text-emerald-700"
                             >
-                              <X className="w-3 h-3" />
+                              <X className="w-3.5 h-3.5" />
                             </button>
                           </span>
                         ))}
