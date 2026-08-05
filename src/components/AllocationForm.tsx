@@ -832,6 +832,46 @@ export default function AllocationForm({
                           <option value="Salary Model">Salary Model</option>
                         </select>
                       </div>
+
+                      {/* OLA Negative Balance & Proof */}
+                      <div>
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">OLA Negative Balance (₹)</label>
+                        <input 
+                          type="number"
+                          placeholder="e.g. 1500 (if any)..."
+                          value={olaNegativeBalance}
+                          onChange={(e) => setOlaNegativeBalance(e.target.value)}
+                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs font-semibold"
+                        />
+                      </div>
+
+                      {/* OLA Balance Proof Photo */}
+                      <div>
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">OLA Balance Proof Photo</label>
+                        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
+                          {olaNegativeBalanceProof ? (
+                            <div className="relative flex items-center justify-center bg-white rounded-lg p-1">
+                              <img src={olaNegativeBalanceProof} alt="OLA Balance Proof" className="max-h-24 object-contain rounded" />
+                              <button type="button" onClick={() => setOlaNegativeBalanceProof(null)} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 cursor-pointer"><X className="h-3.5 w-3.5" /></button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <button type="button" onClick={() => setActiveCameraTarget("olaProof")} className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-primary text-white text-xs font-bold py-2 hover:bg-primary-dark cursor-pointer transition-colors"><Camera className="h-3.5 w-3.5" /> Capture</button>
+                              <label className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-xs font-bold py-2 hover:bg-slate-100 cursor-pointer transition-colors">
+                                <Upload className="h-3.5 w-3.5 text-primary" /> Upload
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const r = new FileReader();
+                                    r.onloadend = () => { if (typeof r.result === "string") setOlaNegativeBalanceProof(r.result); };
+                                    r.readAsDataURL(file);
+                                  }
+                                }} />
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
 
