@@ -1741,9 +1741,10 @@ export default function OnboardingForm({
                             <button
                               type="button"
                               onClick={() => setShowPan(!showPan)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer p-1"
+                              title={showPan ? "Mask PAN Number" : "Unmask PAN Number"}
                             >
-                              {showPan ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                              {showPan ? <EyeOff className="w-4 h-4 text-primary" /> : <Eye className="w-4 h-4 text-slate-500" />}
                             </button>
                           </div>
                         </div>
@@ -1765,9 +1766,10 @@ export default function OnboardingForm({
                             <button
                               type="button"
                               onClick={() => setShowAadhaar(!showAadhaar)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer p-1"
+                              title={showAadhaar ? "Mask Aadhaar Number" : "Unmask Aadhaar Number"}
                             >
-                              {showAadhaar ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                              {showAadhaar ? <EyeOff className="w-4 h-4 text-primary" /> : <Eye className="w-4 h-4 text-slate-500" />}
                             </button>
                           </div>
                         </div>

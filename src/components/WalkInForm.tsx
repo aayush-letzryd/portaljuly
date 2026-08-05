@@ -1614,11 +1614,18 @@ export default function WalkInForm({
 
                     {v.visit_tags && (
                       <div className="flex flex-wrap gap-1">
-                        {(typeof v.visit_tags === 'string' ? (v.visit_tags.startsWith('[') ? JSON.parse(v.visit_tags) : [v.visit_tags]) : v.visit_tags).map((tag: string) => (
-                          <span key={tag} className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                            {tag}
-                          </span>
-                        ))}
+                        {(() => {
+                          try {
+                            const parsed = typeof v.visit_tags === 'string' ? (v.visit_tags.startsWith('[') ? JSON.parse(v.visit_tags) : [v.visit_tags]) : (Array.isArray(v.visit_tags) ? v.visit_tags : [String(v.visit_tags)]);
+                            return (Array.isArray(parsed) ? parsed : [String(parsed)]).map((tag: string) => (
+                              <span key={tag} className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                                {tag}
+                              </span>
+                            ));
+                          } catch (e) {
+                            return <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700">{String(v.visit_tags)}</span>;
+                          }
+                        })()}
                       </div>
                     )}
 
