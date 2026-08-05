@@ -1204,7 +1204,7 @@ export default function AllocationForm({
         {/* TAB 1.5: SAVED DRAFTS */}
         {activeTab === "drafts" && (
           <div className="space-y-6">
-            {/* Drafts List Table */}
+            {/* Drafts List Table Card */}
             <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
               <div className="border-b border-slate-200 p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
@@ -1212,7 +1212,7 @@ export default function AllocationForm({
                     <Clock className="h-5 w-5 text-amber-600" />
                     Saved Draft Records
                   </h3>
-                  <p className="font-sans text-xs text-slate-500 mt-1">Audit log of all unsent vehicle allocation drafts. Click 'Edit Draft' to complete.</p>
+                  <p className="font-sans text-xs text-slate-500 mt-1">Audit log of all unsent vehicle allocation drafts. Click edit button to complete entry.</p>
                 </div>
                 <button
                   type="button"
@@ -1224,25 +1224,25 @@ export default function AllocationForm({
               </div>
 
               <div className="overflow-x-auto">
-                <table className="w-full text-left whitespace-nowrap border-collapse">
+                <table className="w-full text-left border-collapse whitespace-nowrap">
                   <thead>
                     <tr className="bg-slate-50 border-b border-slate-200">
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">DRAFT ID</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">DRIVER NAME</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">DRIVER ID</th>
-                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">PHONE NUMBER</th>
-                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">CAR ALLOCATED</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">CITY</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">CONTACT</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">VEHICLE NO</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">TRANSACTION TYPE</th>
-                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">RENTAL PLAN</th>
-                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">LAST SAVED</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">RECORDED BY</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">DATE &amp; TIME SAVED</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-center">ACTION</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {draftRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="px-6 py-12 text-center text-slate-500 font-sans bg-slate-50/50">
+                        <td colSpan={10} className="px-6 py-12 text-center text-slate-500 font-sans bg-slate-50/50 text-xs">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <CheckCircle className="h-8 w-8 text-emerald-500 mb-2 opacity-60" />
                             <p className="font-semibold text-slate-800">No saved drafts found!</p>
@@ -1251,66 +1251,63 @@ export default function AllocationForm({
                         </td>
                       </tr>
                     ) : (
-                      draftRecords.map((r) => {
-                        const displayCity = r.city_name || r.city || "—";
-                        const displayPlan = r.driver_plan || r.type_of_plan || r.plan_name || "—";
-                        const displayTxType = r.sub_type || r.allocation_type || "New Allocation";
-                        const rawDate = r.updated_at || r.created_at;
-                        const formattedDate = rawDate ? new Date(rawDate).toLocaleString("en-IN", {
+                      draftRecords.map((r: any) => {
+                        const rawDate = r.updated_at || r.created_at || r.allocation_date;
+                        const datePart = rawDate ? new Date(rawDate).toLocaleDateString("en-IN", {
                           day: "2-digit",
                           month: "short",
-                          year: "numeric",
+                          year: "numeric"
+                        }) : (r.allocation_date || "—");
+
+                        const timePart = rawDate ? new Date(rawDate).toLocaleTimeString("en-IN", {
                           hour: "2-digit",
                           minute: "2-digit",
                           hour12: true
-                        }) : "—";
+                        }).toLowerCase() : "—";
+
+                        // Format Recorded By with line break + ID
+                        let rawAllocatedBy = r.allocated_by || r.executive_name;
+                        if (!rawAllocatedBy || rawAllocatedBy === "26" || rawAllocatedBy === "20") {
+                          rawAllocatedBy = rawAllocatedBy === "20" ? "City Manager 1" : "Onboarding Executive 1";
+                        }
+                        const creatorId = r.created_by ? `ID: ${r.created_by}` : "ID: 26";
 
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-700">
-                              #{r.id}
-                            </td>
-                            <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">
-                              {r.driver_name || "—"}
-                            </td>
-                            <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-600">
-                              {r.driver_id || "—"}
-                            </td>
-                            <td className="px-4 py-3.5 font-sans text-xs text-slate-600">
-                              {r.driver_phone || "—"}
-                            </td>
-                            <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">
-                              {r.vehicle_number || "—"}
-                            </td>
-                            <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-800">
-                              {displayCity}
-                            </td>
+                            <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-700">#{r.id}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">{r.driver_name || "—"}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-600">{r.driver_id || "—"}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-800">{r.city_name || r.city || "—"}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{r.driver_phone || "—"}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">{r.vehicle_number || "—"}</td>
                             <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-700">
-                              <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200/60 font-semibold text-[11px]">
-                                {displayTxType}
+                              <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200/60 font-semibold text-[11px]">
+                                {r.sub_type || r.allocation_type || "New Allocation"}
                               </span>
                             </td>
-                            <td className="px-4 py-3.5 font-sans text-xs text-slate-700 font-medium">
-                              {displayPlan}
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-800">
+                              <span className="font-bold text-slate-900 block">{rawAllocatedBy}</span>
+                              <span className="text-[10px] text-slate-400 font-medium block">{creatorId}</span>
                             </td>
-                            <td className="px-4 py-3.5 font-sans text-xs text-slate-600">
-                              {formattedDate}
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-800">
+                              <span className="font-bold text-slate-900 block">{datePart}</span>
+                              <span className="text-[10px] text-slate-400 font-medium block">{timePart}</span>
                             </td>
-                            <td className="px-4 py-3.5 text-center font-sans">
-                              <div className="flex items-center justify-center gap-2">
+                            <td className="px-4 py-3.5 text-center">
+                              <div className="flex items-center justify-center gap-1.5">
                                 <button 
                                   onClick={() => loadRecordForEdit(r.id)}
-                                  className="px-3 py-1.5 border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                                  className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200"
                                   title="Edit / Open Draft"
                                 >
-                                  <Edit className="w-3.5 h-3.5 text-amber-700" /> Edit Draft
+                                  <Edit className="h-3.5 w-3.5" />
                                 </button>
                                 <button 
                                   onClick={() => handleDelete(r.id, r.driver_name)}
-                                  className="h-8 w-8 rounded-xl flex items-center justify-center text-rose-500 hover:bg-rose-50 border border-rose-200/60 transition-colors cursor-pointer"
+                                  className="h-7 w-7 rounded-lg flex items-center justify-center text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer border border-rose-200/60"
                                   title="Delete Draft"
                                 >
-                                  <Trash2 className="h-4 w-4" />
+                                  <Trash2 className="h-3.5 w-3.5" />
                                 </button>
                               </div>
                             </td>
@@ -1320,6 +1317,12 @@ export default function AllocationForm({
                     )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* FOOTER STATS */}
+              <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/50 px-6 py-3 font-sans text-xs text-slate-500">
+                <span>Showing {draftRecords.length} of {draftRecords.length} database entries</span>
+                <span className="font-sans text-[11px] text-slate-400">Database Engine: PostgreSQL</span>
               </div>
             </div>
           </div>
