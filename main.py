@@ -2786,12 +2786,27 @@ def get_all_walkins(
         legacy_params = []
 
         if city and city != "all":
-            new_query += " AND n.city ILIKE %s"
-            new_params.append(f"%{city}%")
-            existing_query += " AND ex.city ILIKE %s"
-            existing_params.append(f"%{city}%")
-            legacy_query += " AND w.city ILIKE %s"
-            legacy_params.append(f"%{city}%")
+            clean_c = city.strip().lower()
+            if clean_c in ["blr", "bangalore", "bengaluru"]:
+                new_query += " AND (n.city ILIKE '%bangalore%' OR n.city ILIKE '%bengaluru%' OR n.city ILIKE '%blr%')"
+                existing_query += " AND (ex.city ILIKE '%bangalore%' OR ex.city ILIKE '%bengaluru%' OR ex.city ILIKE '%blr%')"
+                legacy_query += " AND (w.city ILIKE '%bangalore%' OR w.city ILIKE '%bengaluru%' OR w.city ILIKE '%blr%')"
+            elif clean_c in ["hyd", "hyderabad"]:
+                new_query += " AND (n.city ILIKE '%hyderabad%' OR n.city ILIKE '%hyd%')"
+                existing_query += " AND (ex.city ILIKE '%hyderabad%' OR ex.city ILIKE '%hyd%')"
+                legacy_query += " AND (w.city ILIKE '%hyderabad%' OR w.city ILIKE '%hyd%')"
+            elif clean_c in ["mum", "mumbai"]:
+                new_query += " AND (n.city ILIKE '%mumbai%' OR n.city ILIKE '%mum%')"
+                existing_query += " AND (ex.city ILIKE '%mumbai%' OR ex.city ILIKE '%mum%')"
+                legacy_query += " AND (w.city ILIKE '%mumbai%' OR w.city ILIKE '%mum%')"
+            else:
+                sp_city = f"%{city}%"
+                new_query += " AND n.city ILIKE %s"
+                new_params.append(sp_city)
+                existing_query += " AND ex.city ILIKE %s"
+                existing_params.append(sp_city)
+                legacy_query += " AND w.city ILIKE %s"
+                legacy_params.append(sp_city)
 
         if search:
             sp = f"%{search}%"
