@@ -1368,11 +1368,12 @@ def get_current_user(authorization: Optional[str] = Header(None)):
             
         # 2. Fallback to july_app_users
         cur.execute("""
-            SELECT au.id, au.executive_id, u.name, COALESCE(ar.name, u.role, 'Executive'), au.username, au.role_id
+            SELECT au.id, au.executive_id, COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), u.username, 'Admin'), COALESCE(r.role_name, 'Executive'), au.username, au.role_id
             FROM july_app_sessions s
             JOIN july_app_users au ON au.id = s.user_id
-            LEFT JOIN july_portal_users u ON u.id = au.executive_id
-            LEFT JOIN app_roles ar ON ar.id = au.role_id
+            LEFT JOIN july_portal_users u ON u.portal_user_id = au.executive_id
+            LEFT JOIN july_employees e ON e.employee_id = u.employee_id
+            LEFT JOIN july_roles r ON r.role_id = au.role_id
             WHERE s.token = %s;
         """, (token,))
         row = cur.fetchone()
@@ -1860,10 +1861,11 @@ def login(req: LoginRequest, request: Request):
         
         # Fallback to july_app_users if not found in july_portal_users
         cur.execute("""
-            SELECT au.id, au.password_hash, au.executive_id, u.name, COALESCE(ar.name, u.role, 'Executive'), au.username, au.role_id
+            SELECT au.id, au.password_hash, au.executive_id, COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), u.username, 'Admin'), COALESCE(r.role_name, 'Executive'), au.username, au.role_id
             FROM july_app_users au
-            LEFT JOIN july_portal_users u ON u.id = au.executive_id
-            LEFT JOIN app_roles ar ON ar.id = au.role_id
+            LEFT JOIN july_portal_users u ON u.portal_user_id = au.executive_id
+            LEFT JOIN july_employees e ON e.employee_id = u.employee_id
+            LEFT JOIN july_roles r ON r.role_id = au.role_id
             WHERE au.username = %s;
         """, (uname,))
         row = cur.fetchone()
