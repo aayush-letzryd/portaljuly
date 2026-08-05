@@ -44,6 +44,34 @@ const normalizeCity = (cityVal: string): string => {
   return "Hyderabad"; // Fallback
 };
 
+const PRESET_TAGS: Record<string, string[]> = {
+  Driver: [
+    "Payment / Payout Dispute",
+    "Plan Inquiry (Drive to Rent/Own)",
+    "Vehicle Swap / Issue",
+    "App / Login Technical Issue",
+    "Fastag / Toll Balance Query",
+    "Penalty / Fine Waiver Request",
+    "Shift Timing Change",
+    "Document Resubmission"
+  ],
+  Operator: [
+    "Multi-Vehicle Remittance",
+    "Fleet Expansion / Adding Cars",
+    "Sub-Driver Assignment / Swap",
+    "Operator Commission Payout",
+    "Hisaab Settlement",
+    "Fleet Security / GPS Issue"
+  ],
+  Vendor: [
+    "Garage Repair Invoice Settlement",
+    "CNG Fuel Vendor Payout",
+    "Spare Parts Supply",
+    "Fastag Tag Installation",
+    "Insurance Claim Processing"
+  ]
+};
+
 export default function WalkInForm({ 
   user, 
   onBackToSelector, 
@@ -99,11 +127,21 @@ export default function WalkInForm({
   const [referredByName, setReferredByName] = useState("");
   const [referredByPhone, setReferredByPhone] = useState("");
   const [operatingPlace, setOperatingPlace] = useState("");
-  // Duplicate detection & Walk-in match lookup
+  // Partner & Visit Logger state
+  const [partnerType, setPartnerType] = useState<"Driver" | "Operator" | "Vendor">("Driver");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [visitNotes, setVisitNotes] = useState<string>("");
+  const [isExistingPartner, setIsExistingPartner] = useState<boolean>(false);
+  const [partnerCode, setPartnerCode] = useState<string>("");
+
+  // Candidate Visit History & Profile Auto-fill state
   const [isDuplicate, setIsDuplicate] = useState(false);
   const [duplicateMsg, setDuplicateMsg] = useState("");
   const [foundWalkinRecord, setFoundWalkinRecord] = useState<any | null>(null);
   const [autoFillApplied, setAutoFillApplied] = useState(false);
+  const [candidateHistory, setCandidateHistory] = useState<any[]>([]);
+  const [fetchBannerMsg, setFetchBannerMsg] = useState<string>("");
+  const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false);
 
   const applyRecordAutoFill = (match: any) => {
     setFirstName(match.first_name || match.person_name?.split(" ")[0] || "");
@@ -113,6 +151,13 @@ export default function WalkInForm({
     if (match.city) setCity(normalizeCity(match.city));
     if (match.aadhaar_image) setAadhaarImage(match.aadhaar_image);
     if (match.dl_image) setDlImage(match.dl_image);
+    if (match.visitor_type) setInterestedPosition(match.visitor_type);
+    
+    const isOnboardedOrExisting = match.joined_status === "Successfully Onboarded" || match.is_existing_partner || Boolean(match.dl_number);
+    setIsExistingPartner(isOnboardedOrExisting);
+    if (match.partner_type) setPartnerType(match.partner_type);
+    if (match.partner_code) setPartnerCode(match.partner_code);
+
     setFoundWalkinRecord(match);
     setAutoFillApplied(true);
   };
@@ -121,11 +166,11 @@ export default function WalkInForm({
     if (foundWalkinRecord) applyRecordAutoFill(foundWalkinRecord);
   };
 
-  // Fetch button handler — always calls API directly, no reliance on cached state
+  // Fetch button handler — fetches candidate profile & prior visits, auto-fills into NEW visit form
   const handleFetchByPhone = async () => {
     const cleanPhone = personNumber.replace(/\D/g, "");
     if (cleanPhone.length !== 10) {
-      alert("Please enter a 10-digit phone number first.");
+      alert("Please enter a valid 10-digit Indian phone number.");
       return;
     }
     try {
@@ -136,19 +181,17 @@ export default function WalkInForm({
       if (res.ok) {
         const data = await res.json();
         if (data && data.length > 0) {
-          const match = data[0];
-          if (match.joined_status === "Successfully Onboarded") {
-            setIsDuplicate(true);
-            setDuplicateMsg(`Already filled — ${match.person_name || 'This candidate'} is already onboarded in the system.`);
-            setFoundWalkinRecord(null);
-          } else {
-            setIsDuplicate(false);
-            setDuplicateMsg("");
-            applyRecordAutoFill(match);
-          }
+          const match = data[0]; // Most recent visit record
+          applyRecordAutoFill(match);
+          setCandidateHistory(data);
+          setFetchBannerMsg(`Found Candidate: ${match.person_name || 'Driver'} (${data.length} prior visit${data.length > 1 ? 's' : ''} recorded). Details auto-filled for creating a NEW Walk-In Visit.`);
+          setIsDuplicate(false);
+          setDuplicateMsg("");
         } else {
-          setFoundWalkinRecord(null);
-          alert(`No previous walk-in record found for ${cleanPhone}. You can fill in the form manually.`);
+          setCandidateHistory([]);
+          setFetchBannerMsg(`No previous walk-in history found for ${cleanPhone}. Fill in details below to register candidate's first visit.`);
+          setIsDuplicate(false);
+          setDuplicateMsg("");
         }
       }
     } catch (e) {
@@ -199,7 +242,7 @@ export default function WalkInForm({
     }
   }, [editingId, enquiryDate]);
 
-  // AUTO-FILL & DUPLICATE LOGIC
+  // AUTO-FILL & CANDIDATE LOOKUP LOGIC
   useEffect(() => {
     const checkExistingPhone = async () => {
       const cleanPhone = personNumber.replace(/\D/g, "");
@@ -213,20 +256,27 @@ export default function WalkInForm({
           
           if (data && data.length > 0) {
             const match = data[0]; 
-            
-            if (match.joined_status === "Successfully Onboarded") {
-              setIsDuplicate(true);
-              setDuplicateMsg(`Already filled — ${match.person_name || 'This candidate'} is already onboarded in the system.`);
-              setFoundWalkinRecord(null);
-            } else {
-              setIsDuplicate(false);
-              setDuplicateMsg("");
-              setFoundWalkinRecord(match);
+            if (!firstName && !lastName) {
+              setFirstName(match.first_name || match.person_name?.split(" ")[0] || "");
+              setLastName(match.last_name || match.person_name?.split(" ").slice(1).join(" ") || "");
             }
+            if (!dlNumber && match.dl_number) setDlNumber(match.dl_number);
+            if (!aadhaarNumber && match.aadhaar_number) setAadhaarNumber(match.aadhaar_number);
+            if (match.city) setCity(normalizeCity(match.city));
+            if (!aadhaarImage && match.aadhaar_image) setAadhaarImage(match.aadhaar_image);
+            if (!dlImage && match.dl_image) setDlImage(match.dl_image);
+
+            setCandidateHistory(data);
+            setFoundWalkinRecord(match);
+            setFetchBannerMsg(`Candidate Matched: ${match.person_name || 'Driver'} (${data.length} prior visit${data.length > 1 ? 's' : ''} logged). Candidate details auto-filled for a NEW Walk-In Visit.`);
+            setIsDuplicate(false);
+            setDuplicateMsg("");
           } else {
             setIsDuplicate(false);
             setDuplicateMsg("");
+            setCandidateHistory([]);
             setFoundWalkinRecord(null);
+            setFetchBannerMsg("");
             setAutoFillApplied(false);
           }
         } catch (e) {
@@ -235,7 +285,9 @@ export default function WalkInForm({
       } else if (personNumber.replace(/\D/g, "").length < 10) {
         setIsDuplicate(false);
         setDuplicateMsg("");
+        setCandidateHistory([]);
         setFoundWalkinRecord(null);
+        setFetchBannerMsg("");
         setAutoFillApplied(false);
       }
     };
@@ -348,12 +400,6 @@ export default function WalkInForm({
     if (e) e.preventDefault();
     if (isReadOnly) return;
 
-    // Block submission if duplicate detected
-    if (isDuplicate) {
-      alert("Already filled. This candidate is already onboarded in the system.");
-      return;
-    }
-
     let cleanPhone = personNumber ? personNumber.trim() : "";
     
     if (!isDraft) {
@@ -385,7 +431,7 @@ export default function WalkInForm({
     }
 
     const payload = {
-      visitor_type: interestedPosition,
+      visitor_type: partnerType || interestedPosition || 'Driver',
       event_date: enquiryDate,
       enquiry_time: enquiryTime,
       city: city,
@@ -393,19 +439,24 @@ export default function WalkInForm({
       last_name: lastName.trim(),
       person_name: `${firstName.trim()} ${lastName.trim()}`.trim(),
       person_number: cleanPhone || undefined,
-      dl_number: visitingReason === "Onboarding" ? dlNumber.trim().toUpperCase() : undefined,
-      aadhaar_number: visitingReason === "Onboarding" && cleanAadhaar ? cleanAadhaar.replace(/(\d{4})(\d{4})(\d{4})/, "$1 $2 $3") : undefined,
-      aadhaar_image: visitingReason === "Onboarding" ? (aadhaarImage || undefined) : undefined,
-      dl_image: visitingReason === "Onboarding" ? (dlImage || undefined) : undefined,
+      dl_number: dlNumber ? dlNumber.trim().toUpperCase() : undefined,
+      aadhaar_number: cleanAadhaar ? cleanAadhaar.replace(/(\d{4})(\d{4})(\d{4})/, "$1 $2 $3") : undefined,
+      aadhaar_image: aadhaarImage || undefined,
+      dl_image: dlImage || undefined,
       visiting_reason: visitingReason,
       operating_place: operatingPlace.trim() || undefined,
-      mode_of_enquiry: leadChannel,
-      lead_channel: leadChannel,
-      lead_channel_details: leadChannelDetails.trim() || (leadChannel === "Driver Referral" && referredByName.trim() ? `${referredByName.trim()} ${referredByPhone.trim() ? `(${referredByPhone.trim()})` : ''}`.trim() : undefined),
+      mode_of_enquiry: leadChannel || 'Direct Walk-in',
+      lead_channel: leadChannel || 'Direct Walk-in',
+      lead_channel_details: leadChannelDetails.trim() || undefined,
       referred_by_name: leadChannel === "Driver Referral" ? (referredByName.trim() || undefined) : undefined,
-      joined_status: joinedStatus,
+      joined_status: isExistingPartner ? "Successfully Onboarded" : joinedStatus,
       submission_status: isDraft ? "Draft" : "Submitted",
-      remarks: remarks.trim() || undefined
+      remarks: visitNotes.trim() || remarks.trim() || undefined,
+      is_existing_partner: isExistingPartner,
+      partner_type: partnerType,
+      partner_code: partnerCode,
+      visit_tags: selectedTags,
+      visit_notes: visitNotes.trim()
     };
 
     const url = editingId ? `/api/walkins/${editingId}` : "/api/walkins";
@@ -462,6 +513,13 @@ export default function WalkInForm({
     setRemarks("");
     setIsDuplicate(false);
     setDuplicateMsg("");
+    setCandidateHistory([]);
+    setFetchBannerMsg("");
+    setIsExistingPartner(false);
+    setPartnerType("Driver");
+    setPartnerCode("");
+    setSelectedTags([]);
+    setVisitNotes("");
   };
 
   const fetchRecordDetailsForEdit = async (id: number) => {
@@ -763,69 +821,172 @@ export default function WalkInForm({
                   </div>
                 </div>
 
-                {foundWalkinRecord && !autoFillApplied && !isDuplicate && (
-                  <div className="bg-emerald-50 border-2 border-emerald-300 rounded-xl p-3.5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs">
-                    <div>
-                      <span className="text-xs font-bold text-slate-900 block">Existing Candidate Found</span>
-                      <span className="text-[11px] text-slate-600">Walk-in #{foundWalkinRecord.id} — {foundWalkinRecord.person_name}</span>
+                {fetchBannerMsg && (
+                  <div className="bg-emerald-50/90 border border-emerald-300 rounded-xl p-4 flex flex-col gap-3 shadow-xs">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
+                        <span className="text-xs font-bold text-slate-900">{fetchBannerMsg}</span>
+                      </div>
+                      {candidateHistory.length > 0 && (
+                        <button
+                          type="button"
+                          onClick={() => setShowHistoryModal(!showHistoryModal)}
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                        >
+                          <Clock className="w-3.5 h-3.5" />
+                          {showHistoryModal ? "Hide Prior Visits" : `View ${candidateHistory.length} Prior Visit${candidateHistory.length > 1 ? 's' : ''}`}
+                        </button>
+                      )}
                     </div>
-                    <button
-                      type="button"
-                      onClick={applyWalkinAutoFill}
-                      className="bg-primary hover:bg-primary-dark text-white text-xs font-bold px-3 py-2 rounded-lg transition-all shadow-xs cursor-pointer flex items-center gap-1 shrink-0"
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                      Auto-Fill Info
-                    </button>
+
+                    {showHistoryModal && candidateHistory.length > 0 && (
+                      <div className="mt-2 border-t border-emerald-200 pt-3 flex flex-col gap-2">
+                        <span className="text-[11px] font-extrabold text-emerald-900 uppercase tracking-wider">Candidate Visit History Log</span>
+                        <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-1">
+                          {candidateHistory.map((v, idx) => (
+                            <div key={v.id || idx} className="bg-white p-3 rounded-lg border border-emerald-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                              <div className="flex flex-col gap-0.5">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-slate-900">Visit #{candidateHistory.length - idx} (ID: #{v.id})</span>
+                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">{v.visiting_reason || 'Enquiry'}</span>
+                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${v.joined_status === 'Successfully Onboarded' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{v.joined_status}</span>
+                                </div>
+                                <span className="text-[11px] text-slate-500">Date: {v.event_date || v.created_at?.slice(0, 10)} | City: {v.city} | Exec: {v.executive_name || 'Executive'}</span>
+                              </div>
+                              {v.remarks && <span className="text-[11px] text-slate-600 italic bg-slate-50 px-2 py-1 rounded max-w-xs truncate">"{v.remarks}"</span>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
 
-              {/* 2. Enquiry & Visit Details (Middle Section) */}
+              {/* 2. Enquiry & Visit Details Section */}
               <div className="flex flex-col gap-5 bg-slate-50/60 p-5 rounded-2xl border border-border">
-                <div className="flex items-center gap-2 border-b border-border pb-3">
-                  <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white font-bold text-xs">2</div>
-                  <h3 className="font-sans text-xs font-bold text-primary uppercase tracking-wider">Enquiry & Visit Details</h3>
+                <div className="flex items-center justify-between border-b border-border pb-3">
+                  <div className="flex items-center gap-2">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white font-bold text-xs">2</div>
+                    <h3 className="font-sans text-xs font-bold text-primary uppercase tracking-wider">
+                      {isExistingPartner ? "Registered Partner Visit Event Logger" : "Enquiry & Visit Details"}
+                    </h3>
+                  </div>
+                  {isExistingPartner && (
+                    <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-extrabold text-[10px] rounded-full uppercase tracking-wider">
+                      Active Partner Mode (KYC Suppressed)
+                    </span>
+                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  
-                  {/* Left Column: Visit Info */}
+                  {/* Left Column: Partner Type & Visit Reasons */}
                   <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="font-sans text-xs font-semibold text-text-muted">Visiting Reason *</label>
-                      <select required value={visitingReason} onChange={(e) => setVisitingReason(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-sm bg-white outline-none focus:border-primary">
-                        <option value="Onboarding">Onboarding</option>
-                        <option value="Enquiry">Enquiry</option>
-                        <option value="Complaints">Complaints</option>
-                        <option value="(Complaint) DM Meet">(Complaint) DM Meet</option>
-                        <option value="Driver Manager (DM) Meet">Driver Manager (DM) Meet</option>
-                        <option value="Maintenance Related Issue">Maintenance Related Issue</option>
-                        <option value="Others">Others</option>
-                      </select>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="font-sans text-xs font-semibold text-text-muted">Partner Category *</label>
+                        <select
+                          value={partnerType}
+                          onChange={(e) => setPartnerType(e.target.value as any)}
+                          className="h-11 rounded-lg border border-border px-3 text-sm bg-white outline-none focus:border-primary font-bold text-slate-800"
+                        >
+                          <option value="Driver">Individual Driver Partner</option>
+                          <option value="Operator">Fleet Operator Partner</option>
+                          <option value="Vendor">Vendor / Service Partner</option>
+                        </select>
+                      </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="font-sans text-xs font-semibold text-text-muted">Visiting Reason *</label>
+                        <select
+                          required
+                          value={visitingReason}
+                          onChange={(e) => setVisitingReason(e.target.value)}
+                          className="h-11 rounded-lg border border-border px-3 text-sm bg-white outline-none focus:border-primary font-semibold"
+                        >
+                          <option value="Onboarding Inquiry">Onboarding Inquiry</option>
+                          <option value="Complaint">Complaint</option>
+                          <option value="Driver Manager (DM) Meet">Driver Manager (DM) Meet</option>
+                          <option value="Maintenance Related Issue">Maintenance Issue</option>
+                          <option value="Others">Others</option>
+                        </select>
+                      </div>
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <label className="font-sans text-xs font-semibold text-text-muted">Enquiry Date *</label>
-                      <input type="date" required value={enquiryDate} onChange={(e) => setEnquiryDate(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-sm bg-white outline-none focus:border-primary" />
-                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="flex flex-col gap-1.5">
+                        <label className="font-sans text-xs font-semibold text-text-muted">Enquiry Date *</label>
+                        <input type="date" required value={enquiryDate} onChange={(e) => setEnquiryDate(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-sm bg-white outline-none focus:border-primary" />
+                      </div>
 
-                    <div className="flex flex-col gap-1.5">
-                      <label className="font-sans text-xs font-semibold text-text-muted">Enquiry Time *</label>
-                      <input type="time" required value={enquiryTime} onChange={(e) => setEnquiryTime(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-sm bg-white outline-none focus:border-primary" />
+                      <div className="flex flex-col gap-1.5">
+                        <label className="font-sans text-xs font-semibold text-text-muted">Enquiry Time *</label>
+                        <input type="time" required value={enquiryTime} onChange={(e) => setEnquiryTime(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-sm bg-white outline-none focus:border-primary" />
+                      </div>
                     </div>
                   </div>
 
-                  {/* Right Column: Upload Documents (Full Width Inputs & Stacked Actions - Optional for All Visits) */}
-                  <div className="flex flex-col gap-4 p-5 bg-white border border-border rounded-xl">
-                    <h4 className="text-xs font-bold text-primary flex items-center gap-2 border-b border-border/60 pb-2">
-                      <Upload className="w-4 h-4" /> Identity & Document Upload (Optional)
-                    </h4>
+                  {/* Right Column: Preset Category Tags */}
+                  <div className="flex flex-col gap-3 p-4 bg-white border border-border rounded-xl">
+                    <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                      <span>Preset Category Tags (Click to Select)</span>
+                      <span className="text-[10px] text-primary font-bold">{selectedTags.length} Selected</span>
+                    </label>
+                    <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
+                      {(PRESET_TAGS[partnerType] || PRESET_TAGS["Driver"]).map((tag) => {
+                        const isSelected = selectedTags.includes(tag);
+                        return (
+                          <button
+                            key={tag}
+                            type="button"
+                            onClick={() => {
+                              if (isSelected) setSelectedTags(selectedTags.filter(t => t !== tag));
+                              else setSelectedTags([...selectedTags, tag]);
+                            }}
+                            className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer border ${
+                              isSelected
+                                ? "bg-primary text-white border-primary shadow-xs"
+                                : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
+                            }`}
+                          >
+                            {isSelected ? "✓ " : "+ "}{tag}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
 
-                    {/* Aadhaar group (TOP) */}
-                    <div className="flex flex-col gap-2.5">
+                {/* Free-Text Context Notes (200-300 words max) */}
+                <div className="flex flex-col gap-1.5 mt-2">
+                  <label className="font-sans text-xs font-semibold text-text-muted flex justify-between">
+                    <span>Visit Notes & Executive Summary (Max ~300 words) *</span>
+                    <span className="text-[10px] text-slate-400">{visitNotes.length} / 1500 chars</span>
+                  </label>
+                  <textarea
+                    rows={3}
+                    maxLength={1500}
+                    placeholder="Record detailed notes of discussion, complaint description, or resolution provided during this visit..."
+                    value={visitNotes}
+                    onChange={(e) => setVisitNotes(e.target.value)}
+                    className="w-full rounded-xl border border-border p-3 text-xs bg-white outline-none focus:border-primary font-sans leading-relaxed"
+                  />
+                </div>
+              </div>
+
+              {/* 3. Identity & Document Uploads (ONLY rendered for NEW Candidates; Suppressed for Existing Partners) */}
+              {!isExistingPartner && (
+                <div className="flex flex-col gap-5 bg-slate-50/60 p-5 rounded-2xl border border-border">
+                  <div className="flex items-center gap-2 border-b border-border pb-3">
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white font-bold text-xs">3</div>
+                    <h3 className="font-sans text-xs font-bold text-primary uppercase tracking-wider">Identity & Document Uploads (New Candidate Onboarding)</h3>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Aadhaar group */}
+                    <div className="flex flex-col gap-2.5 p-4 bg-white border border-border rounded-xl">
                       <label className="font-sans text-xs font-bold text-slate-800">1. Aadhaar Card</label>
-                      
                       <div className="relative w-full">
                         <input
                           type={showAadhaar ? "text" : "password"}
@@ -858,12 +1019,9 @@ export default function WalkInForm({
                       )}
                     </div>
 
-                    <hr className="border-border/60" />
-
-                    {/* DL group (BOTTOM) */}
-                    <div className="flex flex-col gap-2.5">
+                    {/* DL group */}
+                    <div className="flex flex-col gap-2.5 p-4 bg-white border border-border rounded-xl">
                       <label className="font-sans text-xs font-bold text-slate-800">2. Driving License</label>
-                      
                       <div className="relative w-full">
                         <input
                           type={showDl ? "text" : "password"}
@@ -895,11 +1053,9 @@ export default function WalkInForm({
                         </div>
                       )}
                     </div>
-
                   </div>
-
                 </div>
-              </div>
+              )}
 
               {/* 3. Classifications & Outcome (Bottom Section) */}
               <div className="flex flex-col gap-5 bg-slate-50/60 p-5 rounded-2xl border border-border">
@@ -1019,10 +1175,9 @@ export default function WalkInForm({
                   </button>
                   <button 
                     type="submit" 
-                    disabled={isDuplicate}
-                    className="h-11 rounded-lg bg-primary hover:bg-primary-hover text-white px-6 font-sans text-sm font-semibold shadow-md cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="h-11 rounded-lg bg-primary hover:bg-primary-hover text-white px-6 font-sans text-sm font-semibold shadow-md cursor-pointer transition-colors"
                   >
-                    {isDuplicate ? "Already filled." : (editingId ? "Update Walk-In Entry" : "Save Walk-In Entry")}
+                    {editingId ? "Update Walk-In Entry" : (isExistingPartner ? "Register Partner Visit Event" : "Register New Candidate Visit")}
                   </button>
                 </div>
               </div>

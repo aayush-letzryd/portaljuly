@@ -252,7 +252,12 @@ def startup_event():
             "enquiry_time   VARCHAR(50)",
             "mode_of_enquiry VARCHAR(50)",
             "referred_by_name VARCHAR(255)",
-            "referred_by_phone VARCHAR(50)"
+            "referred_by_phone VARCHAR(50)",
+            "is_existing_partner BOOLEAN DEFAULT FALSE",
+            "partner_type VARCHAR(50) DEFAULT 'Driver'",
+            "partner_code VARCHAR(100)",
+            "visit_tags JSONB DEFAULT '[]'::jsonb",
+            "visit_notes TEXT"
         ]:
             cur.execute(f"ALTER TABLE july_walkins ADD COLUMN IF NOT EXISTS {col};")
 
@@ -2746,7 +2751,8 @@ def search_walkins(q: str):
         cur = conn.cursor()
         search_pattern = f"%{q}%"
         cur.execute("""
-            SELECT id, first_name, last_name, person_name, person_number, city, dl_number, aadhaar_number, joined_status, aadhaar_image, dl_image
+            SELECT id, first_name, last_name, person_name, person_number, city, dl_number, aadhaar_number, joined_status, aadhaar_image, dl_image,
+                   visitor_type, is_existing_partner, partner_type, partner_code, visit_tags, visit_notes, visiting_reason, event_date, remarks
             FROM july_walkins
             WHERE id::text = %s 
                OR person_number ILIKE %s 
@@ -2762,6 +2768,37 @@ def search_walkins(q: str):
         return result
     finally:
         postgreSQL_pool.putconn(conn)
+
+
+@app.get("/api/walkins/tags")
+def get_preset_visit_tags():
+    return {
+        "Driver": [
+            "Payment / Payout Dispute",
+            "Plan Inquiry (Drive to Rent/Own)",
+            "Vehicle Swap / Issue",
+            "App / Login Technical Issue",
+            "Fastag / Toll Balance Query",
+            "Penalty / Fine Waiver Request",
+            "Shift Timing Change",
+            "Document Resubmission"
+        ],
+        "Operator": [
+            "Multi-Vehicle Remittance",
+            "Fleet Expansion / Adding Cars",
+            "Sub-Driver Assignment / Swap",
+            "Operator Commission Payout",
+            "Hisaab Settlement",
+            "Fleet Security / GPS Issue"
+        ],
+        "Vendor": [
+            "Garage Repair Invoice Settlement",
+            "CNG Fuel Vendor Payout",
+            "Spare Parts Supply",
+            "Fastag Tag Installation",
+            "Insurance Claim Processing"
+        ]
+    }
 
 
 # ─────────────────────────────────────────────────────────
@@ -2803,6 +2840,35 @@ def get_walkin(walkin_id: int):
     finally:
         postgreSQL_pool.putconn(conn)
 
+class WalkinData(BaseModel):
+    visitor_type: Optional[str] = 'Driver'
+    event_date: Optional[str] = None
+    enquiry_time: Optional[str] = None
+    city: Optional[str] = 'Hyderabad'
+    operating_place: Optional[str] = 'Hitec City Hub'
+    first_name: Optional[str] = None
+    last_name: Optional[str] = None
+    person_name: Optional[str] = None
+    person_number: Optional[str] = None
+    aadhaar_number: Optional[str] = None
+    dl_number: Optional[str] = None
+    visiting_reason: Optional[str] = None
+    mode_of_enquiry: Optional[str] = None
+    lead_channel: Optional[str] = None
+    lead_channel_details: Optional[str] = None
+    referred_by_name: Optional[str] = None
+    referred_by_phone: Optional[str] = None
+    joined_status: Optional[str] = None
+    submission_status: Optional[str] = None
+    remarks: Optional[str] = None
+    aadhaar_image: Optional[str] = None
+    dl_image: Optional[str] = None
+    is_existing_partner: Optional[bool] = False
+    partner_type: Optional[str] = 'Driver'
+    partner_code: Optional[str] = None
+    visit_tags: Optional[Any] = None
+    visit_notes: Optional[str] = None
+
 # ─────────────────────────────────────────────────────────
 # Walk-ins — Create
 # ─────────────────────────────────────────────────────────
@@ -2824,12 +2890,21 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
                 (username,)
             )
             row = cur.fetchone()
-            user_p_id = row[0] if row else (user.get("user_id") or 3)
+            if row:
+                user_p_id = row[0]
+
+        # Verify user_p_id exists in july_portal_users for FK constraint
+        if user_p_id:
+            cur.execute("SELECT 1 FROM july_portal_users WHERE portal_user_id = %s;", (user_p_id,))
+            if not cur.fetchone():
+                user_p_id = None
 
         f_name = (data.first_name or "").strip()
         l_name = (data.last_name or "").strip()
         full_n = (data.person_name or f"{f_name} {l_name}").strip()
         sub_status = data.submission_status or ('Draft' if data.joined_status == 'Draft' else 'Submitted')
+
+        tags_json = json.dumps(data.visit_tags) if isinstance(data.visit_tags, list) else (data.visit_tags if isinstance(data.visit_tags, str) else '[]')
 
         cur.execute("""
             INSERT INTO july_walkins
@@ -2837,8 +2912,9 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
                first_name, last_name, person_name, person_number, aadhaar_number, dl_number,
                visiting_reason, mode_of_enquiry, lead_channel, lead_channel_details,
                referred_by_name, referred_by_phone, joined_status, submission_status, remarks,
-               aadhaar_image, dl_image, created_by, approval_status)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+               aadhaar_image, dl_image, created_by, approval_status,
+               is_existing_partner, partner_type, partner_code, visit_tags, visit_notes)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
             RETURNING id;
         """, (
             data.visitor_type or 'Driver',
@@ -2861,11 +2937,16 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
             data.referred_by_phone or '',
             data.joined_status or 'Onboarding Process Initiated',
             sub_status,
-            data.remarks or '',
+            data.remarks or (data.visit_notes or ''),
             data.aadhaar_image or None,
             data.dl_image or None,
             user_p_id,
-            'Submitted'
+            'Submitted',
+            data.is_existing_partner or False,
+            data.partner_type or 'Driver',
+            data.partner_code or '',
+            tags_json,
+            data.visit_notes or data.remarks or ''
         ))
         walkin_id = cur.fetchone()[0]
 
@@ -2909,7 +2990,15 @@ def update_walkin(walkin_id: int, data: WalkinData, authorization: Optional[str]
                 (username,)
             )
             row = cur.fetchone()
-            user_p_id = row[0] if row else (user.get("user_id") or 3)  # fallback to admin (3)
+            if row:
+                user_p_id = row[0]
+
+        # Verify user_p_id exists in july_portal_users for FK constraint
+        if user_p_id:
+            cur.execute("SELECT 1 FROM july_portal_users WHERE portal_user_id = %s;", (user_p_id,))
+            if not cur.fetchone():
+                user_p_id = None
+
 
         f_name = (data.first_name or "").strip()
         l_name = (data.last_name or "").strip()

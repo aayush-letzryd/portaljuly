@@ -12,7 +12,7 @@ const WRITE_ACCESS_ROLES = ["SA", "BH", "CM", "DM", "OB"];
 const ALL_ROLES = ["SA", "BH", "CM", "DM", "OB", "SP"];
 
 const CARDS = [
-  { key: "walkin",              label: "Lead Generation Form",   sub: "Log walk-in enquiries",               icon: ClipboardList, iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: ALL_ROLES, isCompleted: true },
+  { key: "walkin",              label: "Walk-In Form",          sub: "Log candidate walk-ins & candidate visit history", icon: ClipboardList, iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: ALL_ROLES, isCompleted: true },
   { key: "onboarding",          label: "Partner Onboarding",     sub: "Onboard driver and operator",         icon: UserCheck,     iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: WRITE_ACCESS_ROLES, isCompleted: true },
   { key: "vehicle_onboarding",  label: "Vehicle Onboarding",     sub: "Add new vehicles to fleet",           icon: Truck,         iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: WRITE_ACCESS_ROLES, isCompleted: true },
   { key: "allocation",          label: "Allocation Form",        sub: "Assign vehicle to partner",           icon: Key,           iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: ALL_ROLES, isCompleted: true },

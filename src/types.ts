@@ -28,6 +28,11 @@ export interface WalkInRecord {
   created_at?: string;
   updated_at?: string;
   updated_by_name?: string;
+  is_existing_partner?: boolean;
+  partner_type?: "Driver" | "Operator" | "Vendor" | string;
+  partner_code?: string;
+  visit_tags?: string[] | string;
+  visit_notes?: string;
 }
 
 export interface OnboardingRecord {
@@ -155,10 +160,13 @@ export interface ExpenseRecord {
 }
 
 export interface User {
+  id?: number;
+  portal_user_id?: number;
   username: string;
   name: string;
   role: string;
   executive_id: string;
+  city?: string;
   role_id?: number;
   role_code?: RoleCode; // RBAC integration
   permissions?: string[];
