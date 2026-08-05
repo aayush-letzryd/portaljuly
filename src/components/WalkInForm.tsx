@@ -168,8 +168,7 @@ export default function WalkInForm({
     
     const isOnboardedOrExisting = match.joined_status === "Successfully Onboarded" || match.is_existing_partner || Boolean(match.dl_number);
     setIsExistingPartner(isOnboardedOrExisting);
-    if (match.partner_type) setPartnerType(match.partner_type);
-    if (match.partner_code) setPartnerCode(match.partner_code);
+    if (match.partner_type || match.visitor_type) setPartnerType((match.partner_type || match.visitor_type).includes("Operator") ? "Operator" : "Driver");
 
     setFoundWalkinRecord(match);
     setAutoFillApplied(true);
@@ -840,7 +839,7 @@ export default function WalkInForm({
                 <div className="flex flex-col gap-5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
                     <div className="flex flex-col gap-1.5">
-                      <label className="font-sans text-xs font-semibold text-slate-700">Partner Category *</label>
+                      <label className="font-sans text-xs font-semibold text-slate-700">{isExistingPartner ? "Partner Category *" : "Interested Position *"}</label>
                       <select
                         value={partnerType}
                         onChange={(e) => setPartnerType(e.target.value as any)}
