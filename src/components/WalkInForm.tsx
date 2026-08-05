@@ -572,13 +572,48 @@ export default function WalkInForm({
     return timeStr;
   };
 
+  // Map legacy visiting_reason values (saved before rename) to current dropdown values
+  const normalizeLegacyVisitingReason = (reason: string, isExisting: boolean, pType: string): string => {
+    if (!reason || reason === "None" || reason === "null") {
+      return isExisting ? "Hisaab & Payout" : "Onboarding Inquiry";
+    }
+    // Legacy operator reasons → new simplified ones
+    const operatorMap: Record<string, string> = {
+      "Fleet Commission & Payout": "Hisaab & Payout",
+      "Adding New Vehicles to Fleet": "Adding New Vehicle to Fleet",
+      "Vehicle Offboarding / Return": "Vehicle Offboarding / Return",
+      "Sub-Driver Assignment & Change": "Driver Related Issue",
+      "GPS Tracker & Device Issue": "GPS & Device Issue",
+      "Scheduled Fleet Maintenance": "Maintenance Related Issue",
+      "Account & Contract Settlement": "Account & Contract Issue",
+      "Vehicle Related Issue": "Vehicle Related Issue",
+    };
+    // Legacy driver reasons → new ones
+    const driverMap: Record<string, string> = {
+      "Payout & Earnings Issue": "Payout & Earnings",
+      "Vehicle Breakdown / Repair": "Vehicle Issue & Repair",
+      "Vehicle Return / Exchange": "Vehicle Return / Swap",
+      "App Issue / Login": "App & Login Issue",
+      "Fastag / Toll Issue": "Fastag & Toll Issue",
+      "Challan / Fine": "Challan & Fine Issue",
+      "Document Update / Submission": "Document Update",
+      "Driver Manager (DM) Meet": "Others",
+      "Onboarding Inquiry": "Onboarding Inquiry",
+    };
+    const map = pType === "Operator" ? operatorMap : driverMap;
+    return map[reason] || reason;
+  };
+
   const loadRecordIntoForm = (record: any, id: number) => {
     setEditingId(id);
+    // Python booleans serialize as "True"/"False" strings, not JSON true/false
+    const rawFlag = record.is_existing_partner;
     const isExisting = Boolean(
-      record.is_existing_partner === true ||
-      record.is_existing_partner === "true" ||
+      rawFlag === true ||
+      rawFlag === "True" ||
+      rawFlag === "true" ||
       record.partner_code ||
-      (record.visit_notes && record.visit_notes.trim().length > 0)
+      (record.visit_notes && String(record.visit_notes).trim().length > 0 && record.visit_notes !== "None")
     );
     setIsExistingPartner(isExisting);
     
@@ -597,15 +632,19 @@ export default function WalkInForm({
     setAadhaarNumber(record.aadhaar_number || "");
     setAadhaarImage(record.aadhaar_image || null);
     setDlImage(record.dl_image || null);
-    setVisitingReason(record.visiting_reason || (isExisting ? "Hisaab & Payout" : "Onboarding Inquiry"));
-    setVisitNotes(record.visit_notes || record.remarks || "");
-    setLeadChannel(record.lead_channel || record.mode_of_enquiry || "Direct Walk-in");
-    setLeadChannelDetails(record.lead_channel_details || record.lead_source_details || "Ameerpet Hub Walk-In");
-    setLeadSource(record.lead_channel || record.mode_of_enquiry || "Direct Walk-in");
+    const rawReason = record.visiting_reason && record.visiting_reason !== "None" ? record.visiting_reason : "";
+    setVisitingReason(normalizeLegacyVisitingReason(rawReason, isExisting, pType));
+    const rawNotes = record.visit_notes && record.visit_notes !== "None" ? record.visit_notes : "";
+    setVisitNotes(rawNotes || record.remarks || "");
+    const rawLeadChannel = record.lead_channel && record.lead_channel !== "None" ? record.lead_channel : "Direct Walk-in";
+    setLeadChannel(rawLeadChannel);
+    const rawLeadDetails = record.lead_channel_details && record.lead_channel_details !== "None" ? record.lead_channel_details : "";
+    setLeadChannelDetails(rawLeadDetails);
+    setLeadSource(rawLeadChannel);
     setReferredByName(record.referred_by_name || "");
     setReferredByPhone(record.referred_by_phone || "");
     setJoinedStatus(record.joined_status || "Onboarding Process Initiated");
-    setRemarks(record.remarks || "");
+    setRemarks(record.remarks && record.remarks !== "None" ? record.remarks : "");
 
     setActiveTab("form");
   };
