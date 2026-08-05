@@ -978,7 +978,7 @@ export default function AllocationForm({
                   <div className="border-b border-border pb-3">
                     <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
                       <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">4</span>
-                      Car Condition Photos (At Handover) <span className="text-red-500">*</span>
+                      Car Condition Photos <span className="text-red-500">*</span>
                     </h3>
                     <p className="font-sans text-xs text-text-muted mt-1">Upload mandatory photos recording the vehicle's condition prior to handover.</p>
                   </div>
