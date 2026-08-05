@@ -1571,6 +1571,15 @@ class AllocationData(BaseModel):
     odometer_reading: Optional[Union[float, str]] = None
     odometer_photo: Optional[Any] = None
     battery_photo: Optional[Any] = None
+    insp_jack: Optional[str] = None
+    insp_jack_rod: Optional[str] = None
+    insp_spanner: Optional[str] = None
+    insp_parking_triangle: Optional[str] = None
+    insp_fire_extinguishers: Optional[str] = None
+    insp_seat_cover: Optional[str] = None
+    insp_floor_carpet: Optional[str] = None
+    insp_music_system: Optional[str] = None
+    insp_remarks: Optional[str] = None
 
 class DropOffData(BaseModel):
     dropoff_date: Optional[str] = None
@@ -4787,6 +4796,9 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
                 vehicle_number, gps_active,
                 ola_negative_balance, ola_negative_balance_proof,
                 photo_lh_side, photo_rh_side, photo_front_side, photo_back_side,
+                odometer_reading, odometer_photo, battery_photo,
+                insp_jack, insp_jack_rod, insp_spanner, insp_parking_triangle, insp_fire_extinguishers,
+                insp_seat_cover, insp_floor_carpet, insp_music_system, insp_remarks,
                 old_vehicle_number, dropoff_odometer, dropoff_remarks, dropoff_photo,
                 dropoff_location, duplicate_key_status,
                 fastag_balance_amount, fastag_balance_proof,
@@ -4794,6 +4806,8 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
             ) VALUES (
                 %s,%s,%s,%s, %s,%s,%s, %s,%s,%s, %s,%s,
                 %s,%s, %s,%s,%s,%s,
+                %s,%s,%s,
+                %s,%s,%s,%s,%s, %s,%s,%s,%s,
                 %s,%s,%s,%s, %s,%s, %s,%s,
                 %s, %s, %s, NOW()
             ) RETURNING id;
@@ -4805,6 +4819,12 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
             data.ola_negative_balance, extract_image(data.ola_negative_balance_proof),
             extract_image(data.photo_lh_side), extract_image(data.photo_rh_side),
             extract_image(data.photo_front_side), extract_image(data.photo_back_side),
+            float(data.odometer_reading) if data.odometer_reading is not None and str(data.odometer_reading).strip() != "" else None,
+            extract_image(data.odometer_photo), extract_image(data.battery_photo),
+            data.insp_jack or "Available", data.insp_jack_rod or "Available", data.insp_spanner or "Available",
+            data.insp_parking_triangle or "Available", data.insp_fire_extinguishers or "Available",
+            data.insp_seat_cover or "Available", data.insp_floor_carpet or "Available",
+            data.insp_music_system or "Available", data.insp_remarks,
             data.old_vehicle_number,
             float(data.dropoff_odometer) if data.dropoff_odometer else None,
             data.dropoff_remarks, extract_image(data.dropoff_photo),
@@ -4982,6 +5002,9 @@ def update_allocation_record(id: int, data: AllocationData, authorization: Optio
                 vehicle_number=%s, gps_active=%s,
                 ola_negative_balance=%s, ola_negative_balance_proof=%s,
                 photo_lh_side=%s, photo_rh_side=%s, photo_front_side=%s, photo_back_side=%s,
+                odometer_reading=%s, odometer_photo=%s, battery_photo=%s,
+                insp_jack=%s, insp_jack_rod=%s, insp_spanner=%s, insp_parking_triangle=%s, insp_fire_extinguishers=%s,
+                insp_seat_cover=%s, insp_floor_carpet=%s, insp_music_system=%s, insp_remarks=%s,
                 old_vehicle_number=%s, dropoff_odometer=%s, dropoff_remarks=%s, dropoff_photo=%s,
                 dropoff_location=%s, duplicate_key_status=%s,
                 fastag_balance_amount=%s, fastag_balance_proof=%s,
@@ -4995,6 +5018,12 @@ def update_allocation_record(id: int, data: AllocationData, authorization: Optio
             data.ola_negative_balance, extract_image(data.ola_negative_balance_proof),
             extract_image(data.photo_lh_side), extract_image(data.photo_rh_side),
             extract_image(data.photo_front_side), extract_image(data.photo_back_side),
+            float(data.odometer_reading) if data.odometer_reading is not None and str(data.odometer_reading).strip() != "" else None,
+            extract_image(data.odometer_photo), extract_image(data.battery_photo),
+            data.insp_jack or "Available", data.insp_jack_rod or "Available", data.insp_spanner or "Available",
+            data.insp_parking_triangle or "Available", data.insp_fire_extinguishers or "Available",
+            data.insp_seat_cover or "Available", data.insp_floor_carpet or "Available",
+            data.insp_music_system or "Available", data.insp_remarks,
             data.old_vehicle_number,
             float(data.dropoff_odometer) if data.dropoff_odometer else None,
             data.dropoff_remarks, extract_image(data.dropoff_photo),

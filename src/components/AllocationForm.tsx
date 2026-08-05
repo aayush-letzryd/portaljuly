@@ -305,6 +305,17 @@ export default function AllocationForm({
       setPhotoRhSide(data.photo_rh_side || null);
       setPhotoFrontSide(data.photo_front_side || null);
       setPhotoBackSide(data.photo_back_side || null);
+
+      // Populate Vehicle Inspection States from draft/allocation record
+      setJack(data.insp_jack || "Available");
+      setJackRod(data.insp_jack_rod || "Available");
+      setSpanner(data.insp_spanner || "Available");
+      setParkingTriangle(data.insp_parking_triangle || "Available");
+      setFireExtinguishers(data.insp_fire_extinguishers || "Available");
+      setSeatCover(data.insp_seat_cover || "Available");
+      setFloorCarpet(data.insp_floor_carpet || "Available");
+      setMusicSystem(data.insp_music_system || "Available");
+      setInspectionRemarks(data.insp_remarks || "");
       
       setActiveTab("form");
       setRetrieveIdInput("");
@@ -420,6 +431,15 @@ export default function AllocationForm({
         photo_rh_side: photoRhSide,
         photo_front_side: photoFrontSide,
         photo_back_side: photoBackSide,
+        insp_jack: jack,
+        insp_jack_rod: jackRod,
+        insp_spanner: spanner,
+        insp_parking_triangle: parkingTriangle,
+        insp_fire_extinguishers: fireExtinguishers,
+        insp_seat_cover: seatCover,
+        insp_floor_carpet: floorCarpet,
+        insp_music_system: musicSystem,
+        insp_remarks: inspectionRemarks,
         status: targetStatus
       };
 
