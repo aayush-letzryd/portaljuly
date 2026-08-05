@@ -2812,8 +2812,12 @@ def search_walkins(q: str):
             SELECT 'E-' || id::text AS id, 'existing' AS record_type, first_name, last_name, person_name, person_number, city, partner_type AS visitor_type, visiting_reason, event_date::text, true AS is_existing_partner
             FROM july_existing_walkins
             WHERE person_number ILIKE %s OR person_name ILIKE %s OR first_name ILIKE %s
+            UNION ALL
+            SELECT 'O-' || id::text AS id, 'existing' AS record_type, '' AS first_name, '' AS last_name, driver_name AS person_name, phone_number AS person_number, city, 'Driver' AS visitor_type, 'Partner Visit' AS visiting_reason, created_at::text AS event_date, true AS is_existing_partner
+            FROM july_driver_onboarding
+            WHERE phone_number ILIKE %s OR driver_name ILIKE %s
             LIMIT 10;
-        """, (sp, sp, sp, sp, sp, sp))
+        """, (sp, sp, sp, sp, sp, sp, sp, sp))
         
         cols = [d[0] for d in cur.description]
         return [dict(zip(cols, row)) for row in cur.fetchall()]
