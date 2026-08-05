@@ -44,6 +44,41 @@ const normalizeCity = (cityVal: string): string => {
   return "Hyderabad"; // Fallback
 };
 
+const ensureISOUTC = (dateStr?: string): string | undefined => {
+  if (!dateStr) return undefined;
+  let str = dateStr.trim();
+  if ((str.includes("T") || str.includes(" ")) && !str.endsWith("Z") && !/[+-]\d{2}:?\d{2}$/.test(str)) {
+    str = str.replace(" ", "T") + "Z";
+  }
+  return str;
+};
+
+const formatDisplayDate = (createdAt?: string, fallbackDate?: string): string => {
+  const isoStr = ensureISOUTC(createdAt);
+  if (isoStr) {
+    try {
+      const d = new Date(isoStr);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+      }
+    } catch (e) {}
+  }
+  return fallbackDate || "—";
+};
+
+const formatDisplayTime = (createdAt?: string, fallbackTime?: string): string => {
+  const isoStr = ensureISOUTC(createdAt);
+  if (isoStr) {
+    try {
+      const d = new Date(isoStr);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }).toLowerCase();
+      }
+    } catch (e) {}
+  }
+  return fallbackTime || "—";
+};
+
 const PRESET_TAGS: Record<string, string[]> = {
   Driver: [
     "Driver Manager (DM) Meet",
@@ -1454,11 +1489,11 @@ export default function WalkInForm({
                       <tr><td colSpan={10} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50 text-[11px]">No records found.</td></tr>
                     ) : (
                       records.map((r) => {
-                        const createdDate = r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : (r.event_date || "—");
-                        const createdTime = r.created_at ? new Date(r.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : (r.enquiry_time || "—");
+                        const createdDate = formatDisplayDate(r.created_at, r.event_date);
+                        const createdTime = formatDisplayTime(r.created_at, r.enquiry_time);
                         
-                        const updatedDate = r.updated_at ? new Date(r.updated_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : createdDate;
-                        const updatedTime = r.updated_at ? new Date(r.updated_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : createdTime;
+                        const updatedDate = formatDisplayDate(r.updated_at || r.created_at, createdDate);
+                        const updatedTime = formatDisplayTime(r.updated_at || r.created_at, createdTime);
 
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/50 transition-colors text-[11px] font-sans">
