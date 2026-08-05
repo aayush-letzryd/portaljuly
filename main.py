@@ -2726,8 +2726,8 @@ def get_all_walkins(
                 n.created_at,
                 COALESCE(n.submission_status, 'Submitted') AS submission_status,
                 COALESCE(n.updated_at, n.created_at) AS updated_at,
-                COALESCE(e.first_name || ' ' || COALESCE(e.last_name, ''), 'Executive') AS executive_name,
-                COALESCE(e_up.first_name || ' ' || COALESCE(e_up.last_name, ''), '') AS updated_by_name,
+                COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'Executive') AS executive_name,
+                COALESCE(NULLIF(TRIM(CONCAT(e_up.first_name, ' ', e_up.last_name)), ''), pu_up.username, NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'Executive') AS updated_by_name,
                 n.id::integer AS raw_id
             FROM july_new_walkins n
             LEFT JOIN july_portal_users pu ON pu.portal_user_id = COALESCE(n.created_by, n.executive_id)
@@ -2756,8 +2756,8 @@ def get_all_walkins(
                 ex.created_at,
                 COALESCE(ex.submission_status, 'Submitted') AS submission_status,
                 COALESCE(ex.updated_at, ex.created_at) AS updated_at,
-                COALESCE(e.first_name || ' ' || COALESCE(e.last_name, ''), 'Executive') AS executive_name,
-                COALESCE(e_up.first_name || ' ' || COALESCE(e_up.last_name, ''), '') AS updated_by_name,
+                COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'Executive') AS executive_name,
+                COALESCE(NULLIF(TRIM(CONCAT(e_up.first_name, ' ', e_up.last_name)), ''), pu_up.username, NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'Executive') AS updated_by_name,
                 ex.id::integer AS raw_id
             FROM july_existing_walkins ex
             LEFT JOIN july_portal_users pu ON pu.portal_user_id = COALESCE(ex.created_by, ex.executive_id)
@@ -2786,8 +2786,8 @@ def get_all_walkins(
                 w.created_at,
                 COALESCE(w.submission_status, 'Submitted') AS submission_status,
                 COALESCE(w.updated_at, w.created_at) AS updated_at,
-                COALESCE(e.first_name || ' ' || COALESCE(e.last_name, ''), 'Executive') AS executive_name,
-                COALESCE(e_up.first_name || ' ' || COALESCE(e_up.last_name, ''), '') AS updated_by_name,
+                COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'Executive') AS executive_name,
+                COALESCE(NULLIF(TRIM(CONCAT(e_up.first_name, ' ', e_up.last_name)), ''), pu_up.username, NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'Executive') AS updated_by_name,
                 w.id::integer AS raw_id
             FROM july_walkins w
             LEFT JOIN july_portal_users pu ON pu.portal_user_id = COALESCE(w.created_by, w.executive_id)
@@ -3215,10 +3215,11 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
 @app.put("/api/walkins/{walkin_id}")
 def update_walkin(walkin_id: str, data: WalkinData, authorization: Optional[str] = Header(None)):
     user = get_current_user(authorization)
-    user_p_id = user.get("portal_user_id")
+    user_p_id = user.get("portal_user_id") or user.get("user_id") or user.get("id") or 3
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
+        cur.execute("SET TIME ZONE 'Asia/Kolkata';")
         clean_id_str = str(walkin_id).upper()
         digits = re.sub(r'\D', '', clean_id_str)
         raw_id = int(digits) if digits else 0
