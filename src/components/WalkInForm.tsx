@@ -981,12 +981,30 @@ export default function WalkInForm({
 
                     <div className="flex flex-col gap-1.5 md:col-span-2">
                       <label className="font-sans text-xs font-semibold text-slate-700">Enquiry Date *</label>
-                      <input type="date" required value={enquiryDate} onChange={(e) => setEnquiryDate(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary" />
+                      <input 
+                        type="date" 
+                        required 
+                        readOnly
+                        value={enquiryDate} 
+                        className="h-11 rounded-lg border border-border px-3 text-xs bg-slate-100 text-slate-600 outline-none font-semibold cursor-not-allowed" 
+                      />
                     </div>
 
                     <div className="flex flex-col gap-1.5 md:col-span-2">
                       <label className="font-sans text-xs font-semibold text-slate-700">Enquiry Time *</label>
-                      <input type="time" required value={enquiryTime} onChange={(e) => setEnquiryTime(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary" />
+                      <input 
+                        type="time" 
+                        required 
+                        readOnly
+                        value={enquiryTime} 
+                        className="h-11 rounded-lg border border-border px-3 text-xs bg-slate-100 text-slate-600 outline-none font-semibold cursor-not-allowed" 
+                      />
+                    </div>
+
+                    <div className="md:col-span-12 -mt-2">
+                      <p className="font-sans text-[11px] font-medium text-slate-500 italic">
+                        This is the current date and time. The final submission timestamp will be recorded when you submit the form.
+                      </p>
                     </div>
                   </div>
 

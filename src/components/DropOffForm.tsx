@@ -135,7 +135,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
       }
     } catch (err) {
       setDriverLookupStatus("Lookup failed.");
-    } font-sans finally {
+    } finally {
       setIsDriverLookupLoading(false);
     }
   };

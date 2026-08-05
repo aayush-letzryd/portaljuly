@@ -3153,8 +3153,8 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
                 data.operating_place or '',
                 data.visitor_type or data.partner_type or 'Driver',
                 data.visiting_reason or 'Onboarding Inquiry',
-                data.event_date or datetime.now().strftime("%Y-%m-%d"),
-                data.enquiry_time or '10:30',
+                datetime.now().strftime("%Y-%m-%d"),
+                datetime.now().strftime("%H:%M"),
                 data.dl_number or '',
                 data.aadhaar_number or '',
                 data.aadhaar_image or None,
@@ -4650,6 +4650,106 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
     finally:
         postgreSQL_pool.putconn(conn)
 
+
+class DropOffData(BaseModel):
+    dropoff_date: str
+    dropoff_reason: str
+    city_name: str
+    driver_id: str
+    driver_name: str
+    driver_phone: str
+    vehicle_number: str
+    odometer_reading: float
+    odometer_photo: Optional[str] = None
+    battery_photo: Optional[str] = None
+    photo_lh_side: Optional[str] = None
+    photo_rh_side: Optional[str] = None
+    photo_front_side: Optional[str] = None
+    photo_back_side: Optional[str] = None
+    ola_negative_balance: Optional[str] = None
+    ola_negative_balance_proof: Optional[str] = None
+    pending_dues: Optional[float] = None
+    damage_penalty: Optional[float] = None
+    deposit_refund_status: Optional[str] = None
+    dropoff_notes: Optional[str] = None
+
+@app.get("/api/dropoffs")
+def get_dropoffs(authorization: Optional[str] = Header(None)):
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, allocation_date AS dropoff_date, sub_type AS dropoff_reason, city_name,
+                   driver_id, driver_name, driver_phone, vehicle_number,
+                   dropoff_odometer AS odometer_reading, dropoff_remarks AS dropoff_notes,
+                   fastag_balance_amount AS pending_dues, status AS deposit_refund_status,
+                   created_at
+            FROM july_allocation_form
+            WHERE allocation_type = 'Drop-Off' OR sub_type = 'Drop-Off' OR sub_type = 'Voluntary Return' OR sub_type = 'Contract Completion' OR sub_type = 'Non-payment / Default'
+            ORDER BY id DESC;
+        """)
+        rows = cur.fetchall()
+        cols = [d[0] for d in cur.description]
+        res = []
+        for r in rows:
+            rec = dict(zip(cols, r))
+            if rec.get("created_at") and hasattr(rec["created_at"], "isoformat"):
+                rec["created_at"] = rec["created_at"].isoformat()
+            res.append(rec)
+        return res
+    except Exception:
+        return []
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+@app.post("/api/dropoffs")
+def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None)):
+    user = None
+    if authorization:
+        try:
+            user = get_july_user(authorization)
+        except Exception:
+            pass
+    uid   = user["portal_user_id"] if user else None
+
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            INSERT INTO july_allocation_form (
+                allocation_date, allocation_type, sub_type, city_name,
+                driver_id, driver_name, driver_phone,
+                vehicle_number, dropoff_odometer, dropoff_remarks,
+                photo_lh_side, photo_rh_side, photo_front_side, photo_back_side,
+                dropoff_photo, ola_negative_balance, ola_negative_balance_proof,
+                fastag_balance_amount, status, created_by, created_at
+            ) VALUES (
+                %s, 'Drop-Off', %s, %s,
+                %s, %s, %s,
+                %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s,
+                %s, %s, %s, NOW()
+            ) RETURNING id;
+        """, (
+            data.dropoff_date, data.dropoff_reason, data.city_name,
+            data.driver_id, data.driver_name, data.driver_phone,
+            data.vehicle_number, data.odometer_reading, data.dropoff_notes,
+            extract_image(data.photo_lh_side), extract_image(data.photo_rh_side),
+            extract_image(data.photo_front_side), extract_image(data.photo_back_side),
+            extract_image(data.odometer_photo), data.ola_negative_balance,
+            extract_image(data.ola_negative_balance_proof),
+            data.pending_dues, data.deposit_refund_status or "Submitted",
+            uid
+        ))
+        new_id = cur.fetchone()[0]
+        conn.commit()
+        return {"success": True, "id": new_id}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        postgreSQL_pool.putconn(conn)
 
 @app.put("/api/allocation/{id}")
 def update_allocation_record(id: int, data: AllocationData, authorization: Optional[str] = Header(None)):
