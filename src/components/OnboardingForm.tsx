@@ -271,7 +271,7 @@ export default function OnboardingForm({
   const [entryMode, setEntryMode] = useState<"new" | "walkin" | "retrieve">("new");
   
   // RESTORED: Third Party Platforms
-  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["None"]);
+  const [thirdPartyPlatform, setThirdPartyPlatform] = useState<string>("None");
   const [platformDetails, setPlatformDetails] = useState<Record<string, {id: string, photo: string | null}>>({});
   
   const [documentsVerified, setDocumentsVerified] = useState(false);
@@ -306,21 +306,6 @@ export default function OnboardingForm({
   const [aadhaarCardBack, setAadhaarCardBack] = useState<string | null>(null);
   const [localAddressProofFiles, setLocalAddressProofFiles] = useState<string[]>([]);
   
-  const togglePlatform = (plat: string) => {
-    if (plat === "None") {
-      setSelectedPlatforms(["None"]);
-    } else {
-      let next = selectedPlatforms.filter(p => p !== "None");
-      if (next.includes(plat)) {
-        next = next.filter(p => p !== plat);
-      } else {
-        next.push(plat);
-      }
-      if (next.length === 0) next = ["None"];
-      setSelectedPlatforms(next);
-    }
-  };
-
   const removeLocalAddressFile = (index: number) => {
     setLocalAddressProofFiles(prev => prev.filter((_, idx) => idx !== index));
   };
@@ -802,10 +787,7 @@ export default function OnboardingForm({
       cheque2_photo: cheque2Photo || undefined,
       cheque3_photo: cheque3Photo || undefined,
       signature_photo: signaturePhoto || undefined,
-      platform_details: {
-        selected_platforms: selectedPlatforms,
-        details: platformDetails
-      },
+      platform_details: thirdPartyPlatform !== 'None' ? { [thirdPartyPlatform]: platformDetails[thirdPartyPlatform] || { id: "" } } : { None: { id: "" } },
       approval_status: targetStatus,
       approval_requested_to: targetStatus === "Pending Approval" ? approvalRequestedTo : undefined,
       approval_note: approvalSubmissionNote.trim() || undefined
@@ -958,7 +940,7 @@ export default function OnboardingForm({
     setCheque2Photo(null);
     setCheque3Photo(null);
     setSignaturePhoto(null);
-    setSelectedPlatforms(["None"]);
+    setThirdPartyPlatform("None");
     setPlatformDetails({});
     setEntryMode("new");
     setSameAsCandidateName(false);
@@ -1103,18 +1085,13 @@ export default function OnboardingForm({
       setApprovalStatus(data.approval_status || null);
       
       try {
-        let pObj = typeof data.platform_details === 'string' ? JSON.parse(data.platform_details) : (data.platform_details || {});
-        if (pObj.selected_platforms && Array.isArray(pObj.selected_platforms)) {
-          setSelectedPlatforms(pObj.selected_platforms);
-          setPlatformDetails(pObj.details || {});
-        } else {
-          const platforms = Object.keys(pObj).filter(k => k !== "None");
-          setSelectedPlatforms(platforms.length > 0 ? platforms : ["None"]);
-          setPlatformDetails(pObj);
-        }
+        const pDetails = typeof data.platform_details === 'string' ? JSON.parse(data.platform_details) : (data.platform_details || {});
+        setPlatformDetails(pDetails);
+        const platforms = Object.keys(pDetails).filter(k => k !== 'selected_platforms');
+        setThirdPartyPlatform(platforms.length > 0 ? platforms[0] : "None");
       } catch (e) {
-        setSelectedPlatforms(["None"]);
         setPlatformDetails({});
+        setThirdPartyPlatform("None");
       }
       
       setActiveTab("form");
@@ -2022,74 +1999,39 @@ export default function OnboardingForm({
                       )}
                     </div>
 
-                    {/* Section 3: Relocated Third-Party Platforms (Multi-Select: Uber, Ola, None) */}
+                    {/* Section 3: Relocated Third-Party Platform Dropdown (Uber, Ola, Rapido, None) */}
                     <div className="bg-slate-50 border border-border p-5 rounded-xl space-y-4">
-                      <div>
-                        <label className="text-xs font-bold text-slate-900 block mb-1">Third Party Platform Selection (Multi-Select) *</label>
-                        <p className="text-[11px] text-slate-500">Select platforms candidate will operate on (Uber, Ola, or None)</p>
-                      </div>
-
-                      <div className="flex flex-wrap gap-3">
-                        {["Uber", "Ola", "None"].map((plat) => {
-                          const isSelected = selectedPlatforms.includes(plat);
-                          return (
-                            <button
-                              key={plat}
-                              type="button"
-                              onClick={() => togglePlatform(plat)}
-                              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border shadow-2xs ${
-                                isSelected 
-                                  ? "bg-primary text-white border-primary ring-2 ring-primary/20" 
-                                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
-                              }`}
-                            >
-                              <div className={`w-4 h-4 rounded flex items-center justify-center border text-[10px] ${
-                                isSelected ? "bg-white text-primary border-white" : "border-slate-300"
-                              }`}>
-                                {isSelected && "✓"}
-                              </div>
-                              {plat}
-                            </button>
-                          );
-                        })}
-                      </div>
-
-                      {/* Dynamic Driver IDs per Selected Platform */}
-                      {selectedPlatforms.filter(p => p !== "None").length > 0 && (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
-                          {selectedPlatforms.includes("Uber") && (
-                            <div className="space-y-1.5 bg-white p-3.5 rounded-xl border border-slate-200">
-                              <label className="text-xs font-bold text-slate-800">Uber Driver ID <span className="text-slate-400 font-normal">(Optional if verified)</span></label>
-                              <input
-                                type="text"
-                                placeholder="e.g. UBER-12345"
-                                value={platformDetails["Uber"]?.id || ""}
-                                onChange={(e) => setPlatformDetails(prev => ({
-                                  ...prev,
-                                  Uber: { ...prev["Uber"], id: e.target.value }
-                                }))}
-                                className="w-full h-10 px-3 border border-border rounded-lg text-xs outline-none focus:border-primary font-mono"
-                              />
-                            </div>
-                          )}
-
-                          {selectedPlatforms.includes("Ola") && (
-                            <div className="space-y-1.5 bg-white p-3.5 rounded-xl border border-slate-200">
-                              <label className="text-xs font-bold text-slate-800">Ola Driver ID <span className="text-slate-400 font-normal">(Optional if verified)</span></label>
-                              <input
-                                type="text"
-                                placeholder="e.g. OLA-98765"
-                                value={platformDetails["Ola"]?.id || ""}
-                                onChange={(e) => setPlatformDetails(prev => ({
-                                  ...prev,
-                                  Ola: { ...prev["Ola"], id: e.target.value }
-                                }))}
-                                className="w-full h-10 px-3 border border-border rounded-lg text-xs outline-none focus:border-primary font-mono"
-                              />
-                            </div>
-                          )}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-xs font-bold text-slate-800">Third-Party Platform Selection</label>
+                          <select
+                            value={thirdPartyPlatform}
+                            onChange={(e) => setThirdPartyPlatform(e.target.value)}
+                            className="w-full h-11 px-4 bg-white border border-border rounded-xl text-sm outline-none focus:border-primary font-medium cursor-pointer"
+                          >
+                            <option value="None">None</option>
+                            <option value="Uber">Uber</option>
+                            <option value="Ola">Ola</option>
+                            <option value="Rapido">Rapido</option>
+                          </select>
                         </div>
-                      )}
+
+                        {thirdPartyPlatform !== "None" && (
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-slate-800">{thirdPartyPlatform} Driver ID <span className="text-slate-400 font-normal">(Optional if verified)</span></label>
+                            <input
+                              type="text"
+                              placeholder={`e.g. ${thirdPartyPlatform.toUpperCase()}-12345`}
+                              value={platformDetails[thirdPartyPlatform]?.id || ""}
+                              onChange={(e) => setPlatformDetails(prev => ({
+                                ...prev,
+                                [thirdPartyPlatform]: { ...prev[thirdPartyPlatform], id: e.target.value }
+                              }))}
+                              className="w-full h-11 px-4 bg-white border border-border rounded-xl text-sm outline-none focus:border-primary font-mono"
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {(rentalModel === "Drive to Own" || rentalModel === "LetzOwn") && (
