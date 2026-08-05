@@ -955,65 +955,36 @@ export default function AllocationForm({
                         </select>
                       </div>
 
-                      {/* Odometer & Battery Photo Upload Grid */}
-                      <div className="grid grid-cols-2 gap-3 pt-1">
-                        {/* Odometer Photo Card */}
-                        <div className="flex flex-col gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-2.5 shadow-2xs">
-                          <span className="font-sans text-[11px] font-bold text-slate-800 text-center">Odometer Photo *</span>
-                          {odometerPhoto ? (
-                            <div className="relative flex items-center justify-center bg-white rounded-lg p-1 border border-slate-200">
-                              <img src={odometerPhoto} alt="Odometer" className="max-h-20 object-contain rounded" />
-                              <button type="button" onClick={() => setOdometerPhoto(null)} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 cursor-pointer shadow-xs"><X className="h-3 w-3" /></button>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col gap-1">
-                              <button type="button" onClick={() => setActiveCameraTarget("odometer")} className="w-full flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-bold py-1.5 hover:bg-primary-dark cursor-pointer transition-colors"><Camera className="h-3 w-3" /> Capture</button>
-                              <label className="w-full flex items-center justify-center gap-1 rounded border border-slate-300 bg-white text-slate-700 text-[10px] font-bold py-1.5 hover:bg-slate-100 cursor-pointer transition-colors">
-                                <Upload className="h-3 w-3 text-primary" /> Upload
-                                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    const r = new FileReader();
-                                    r.onloadend = () => { if (typeof r.result === "string") setOdometerPhoto(r.result); };
-                                    r.readAsDataURL(file);
-                                  }
-                                }} />
-                              </label>
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Battery Photo Card */}
-                        <div className="flex flex-col gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-2.5 shadow-2xs">
-                          <span className="font-sans text-[11px] font-bold text-slate-800 text-center">Battery Photo *</span>
-                          {batteryPhoto ? (
-                            <div className="relative flex items-center justify-center bg-white rounded-lg p-1 border border-slate-200">
-                              <img src={batteryPhoto} alt="Battery" className="max-h-20 object-contain rounded" />
-                              <button type="button" onClick={() => setBatteryPhoto(null)} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 cursor-pointer shadow-xs"><X className="h-3 w-3" /></button>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col gap-1">
-                              <button type="button" onClick={() => setActiveCameraTarget("battery")} className="w-full flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-bold py-1.5 hover:bg-primary-dark cursor-pointer transition-colors"><Camera className="h-3 w-3" /> Capture</button>
-                              <label className="w-full flex items-center justify-center gap-1 rounded border border-slate-300 bg-white text-slate-700 text-[10px] font-bold py-1.5 hover:bg-slate-100 cursor-pointer transition-colors">
-                                <Upload className="h-3 w-3 text-primary" /> Upload
-                                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    const r = new FileReader();
-                                    r.onloadend = () => { if (typeof r.result === "string") setBatteryPhoto(r.result); };
-                                    r.readAsDataURL(file);
-                                  }
-                                }} />
-                              </label>
-                            </div>
-                          )}
-                        </div>
+                      {/* Odometer Photo Card */}
+                      <div className="flex flex-col gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 shadow-2xs mt-2">
+                        <span className="font-sans text-xs font-bold text-slate-800 text-center">Odometer Photo *</span>
+                        {odometerPhoto ? (
+                          <div className="relative flex items-center justify-center bg-white rounded-lg p-1 border border-slate-200">
+                            <img src={odometerPhoto} alt="Odometer" className="max-h-24 object-contain rounded" />
+                            <button type="button" onClick={() => setOdometerPhoto(null)} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 cursor-pointer shadow-xs"><X className="h-3.5 w-3.5" /></button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <button type="button" onClick={() => setActiveCameraTarget("odometer")} className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-primary text-white text-xs font-bold py-2 hover:bg-primary-dark cursor-pointer transition-colors shadow-xs"><Camera className="h-3.5 w-3.5" /> Capture</button>
+                            <label className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-xs font-bold py-2 hover:bg-slate-100 cursor-pointer transition-colors shadow-2xs">
+                              <Upload className="h-3.5 w-3.5 text-primary" /> Upload
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const r = new FileReader();
+                                  r.onloadend = () => { if (typeof r.result === "string") setOdometerPhoto(r.result); };
+                                  r.readAsDataURL(file);
+                                }
+                              }} />
+                            </label>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* 4. CAR CONDITION PHOTOS (At Allocation) */}
+                {/* 4. CAR CONDITION PHOTOS */}
                 <div className="border-t border-border pt-10 space-y-6">
                   <div className="border-b border-border pb-3">
                     <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
@@ -1023,12 +994,13 @@ export default function AllocationForm({
                     <p className="font-sans text-xs text-text-muted mt-1">Upload mandatory photos recording the vehicle's condition prior to handover.</p>
                   </div>
 
-                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-6">
                     {[
                       { label: "Left-Hand (LH) Side", state: photoLhSide, setState: setPhotoLhSide, target: "lhSide" },
                       { label: "Right-Hand (RH) Side", state: photoRhSide, setState: setPhotoRhSide, target: "rhSide" },
                       { label: "Front Side", state: photoFrontSide, setState: setPhotoFrontSide, target: "frontSide" },
-                      { label: "Back Side", state: photoBackSide, setState: setPhotoBackSide, target: "backSide" }
+                      { label: "Back Side", state: photoBackSide, setState: setPhotoBackSide, target: "backSide" },
+                      { label: "Battery Photo Upload", state: batteryPhoto, setState: setBatteryPhoto, target: "battery" }
                     ].map((ph) => (
                       <div key={ph.label} className="space-y-2">
                         <span className="block font-sans text-xs font-bold text-text-muted">{ph.label} <span className="text-red-500">*</span></span>
