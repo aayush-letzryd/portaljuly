@@ -753,22 +753,19 @@ export default function WalkInForm({
               <div className="flex flex-col gap-5 bg-slate-50/60 p-5 rounded-2xl border border-border">
                 <div className="flex items-center gap-2 border-b border-border pb-3">
                   <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white font-bold text-xs">1</div>
-                  <h3 className="font-sans text-xs font-bold text-primary uppercase tracking-wider">Candidate Information</h3>
+                  <h3 className="font-sans text-xs font-bold text-slate-800 uppercase tracking-wider">Candidate Information</h3>
                 </div>
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                   {/* Row 1: Phone Number & Operating City */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="font-sans text-xs font-semibold text-text-muted flex justify-between">
-                      <span>Phone Number *</span>
-                      <span className="text-[10px] text-primary italic font-bold">Search & Auto-fill</span>
-                    </label>
+                    <label className="font-sans text-xs font-semibold text-slate-700">Phone Number *</label>
                     <div className="relative flex items-center">
-                      <input type="tel" placeholder="Enter 10-digit number" required value={personNumber} onChange={(e) => setPersonNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} className="w-full h-11 rounded-lg border border-border pl-3 pr-24 text-sm bg-white outline-none focus:border-primary font-semibold" />
+                      <input type="tel" placeholder="Enter 10-digit number" required value={personNumber} onChange={(e) => setPersonNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} className="w-full h-11 rounded-lg border border-border pl-3 pr-24 text-xs bg-white outline-none focus:border-primary text-slate-800" />
                       <button
                         type="button"
                         onClick={handleFetchByPhone}
-                        className="absolute right-1.5 top-1.5 bottom-1.5 px-3 bg-primary hover:bg-primary-dark text-white text-xs font-bold rounded-md transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                        className="absolute right-1.5 top-1.5 bottom-1.5 px-3 bg-primary hover:bg-primary-dark text-white text-xs font-semibold rounded-md transition-all flex items-center gap-1 cursor-pointer shadow-xs"
                       >
                         <Search className="w-3.5 h-3.5" />
                         Fetch
@@ -777,21 +774,21 @@ export default function WalkInForm({
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="font-sans text-xs font-semibold text-text-muted">Operating City *</label>
-                    <select required value={city} onChange={(e) => setCity(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-sm bg-white outline-none focus:border-primary">
+                    <label className="font-sans text-xs font-semibold text-slate-700">Operating City *</label>
+                    <select required value={city} onChange={(e) => setCity(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary">
                       {CITIES.map((c) => <option key={c.value} value={c.value}>{c.text}</option>)}
                     </select>
                   </div>
 
                   {/* Row 2: First Name & Last Name */}
                   <div className="flex flex-col gap-1.5">
-                    <label className="font-sans text-xs font-semibold text-text-muted">First Name *</label>
-                    <input type="text" required value={firstName} onChange={(e) => setFirstName(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-sm bg-white outline-none focus:border-primary" />
+                    <label className="font-sans text-xs font-semibold text-slate-700">First Name *</label>
+                    <input type="text" required value={firstName} onChange={(e) => setFirstName(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary" />
                   </div>
 
                   <div className="flex flex-col gap-1.5">
-                    <label className="font-sans text-xs font-semibold text-text-muted">Last Name *</label>
-                    <input type="text" required value={lastName} onChange={(e) => setLastName(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-sm bg-white outline-none focus:border-primary" />
+                    <label className="font-sans text-xs font-semibold text-slate-700">Last Name *</label>
+                    <input type="text" required value={lastName} onChange={(e) => setLastName(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary" />
                   </div>
                 </div>
 
@@ -843,7 +840,7 @@ export default function WalkInForm({
                 <div className="flex items-center justify-between border-b border-border pb-3">
                   <div className="flex items-center gap-2">
                     <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white font-bold text-xs">2</div>
-                    <h3 className="font-sans text-xs font-bold text-primary uppercase tracking-wider">
+                    <h3 className="font-sans text-xs font-bold text-slate-800 uppercase tracking-wider">
                       {isExistingPartner ? "Registered Partner Visit Event Logger" : "Enquiry & Visit Details"}
                     </h3>
                   </div>
@@ -859,11 +856,11 @@ export default function WalkInForm({
                   <div className="flex flex-col gap-4">
                     <div className="grid grid-cols-2 gap-3">
                       <div className="flex flex-col gap-1.5">
-                        <label className="font-sans text-xs font-semibold text-text-muted">Partner Category *</label>
+                        <label className="font-sans text-xs font-semibold text-slate-700">Partner Category *</label>
                         <select
                           value={partnerType}
                           onChange={(e) => setPartnerType(e.target.value as any)}
-                          className="h-11 rounded-lg border border-border px-3 text-sm bg-white outline-none focus:border-primary font-bold text-slate-800"
+                          className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-medium cursor-pointer"
                         >
                           <option value="Driver">Individual Driver Partner</option>
                           <option value="Operator">Fleet Operator Partner</option>
@@ -872,12 +869,12 @@ export default function WalkInForm({
                       </div>
 
                       <div className="flex flex-col gap-1.5">
-                        <label className="font-sans text-xs font-semibold text-text-muted">Visiting Reason *</label>
+                        <label className="font-sans text-xs font-semibold text-slate-700">Visiting Reason *</label>
                         <select
                           required
                           value={visitingReason}
                           onChange={(e) => setVisitingReason(e.target.value)}
-                          className="h-11 rounded-lg border border-border px-3 text-sm bg-white outline-none focus:border-primary font-semibold"
+                          className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-medium cursor-pointer"
                         >
                           <option value="Onboarding Inquiry">Onboarding Inquiry</option>
                           <option value="Complaint">Complaint</option>
@@ -890,13 +887,13 @@ export default function WalkInForm({
 
                     <div className="grid grid-cols-2 gap-3">
                       <div className="flex flex-col gap-1.5">
-                        <label className="font-sans text-xs font-semibold text-text-muted">Enquiry Date *</label>
-                        <input type="date" required value={enquiryDate} onChange={(e) => setEnquiryDate(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-sm bg-white outline-none focus:border-primary" />
+                        <label className="font-sans text-xs font-semibold text-slate-700">Enquiry Date *</label>
+                        <input type="date" required value={enquiryDate} onChange={(e) => setEnquiryDate(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary" />
                       </div>
 
                       <div className="flex flex-col gap-1.5">
-                        <label className="font-sans text-xs font-semibold text-text-muted">Enquiry Time *</label>
-                        <input type="time" required value={enquiryTime} onChange={(e) => setEnquiryTime(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-sm bg-white outline-none focus:border-primary" />
+                        <label className="font-sans text-xs font-semibold text-slate-700">Enquiry Time *</label>
+                        <input type="time" required value={enquiryTime} onChange={(e) => setEnquiryTime(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary" />
                       </div>
                     </div>
                   </div>
