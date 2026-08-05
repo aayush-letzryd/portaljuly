@@ -1238,7 +1238,7 @@ export default function WalkInForm({
                 <select 
                   value={filterRecordType} 
                   onChange={(e) => {setFilterRecordType(e.target.value); setPage(1);}} 
-                  className="h-10 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer font-semibold"
+                  className="h-10 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer"
                 >
                   <option value="all">All Walk-Ins</option>
                   <option value="new">New Candidate Walk-Ins</option>
@@ -1509,7 +1509,8 @@ export default function WalkInForm({
                     </div>
                   )}
                 </div>
-              ))}
+              );
+            })}
             </div>
 
             <div className="px-6 py-3 border-t border-border bg-slate-50 flex justify-end">
