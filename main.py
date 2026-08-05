@@ -3573,26 +3573,22 @@ def send_onboarding_for_approval(
                 detail=f"Cannot submit: record is already in '{old_status}' state"
             )
 
-        # ── Resolve approver: explicit override > city's default CM (excluding submitter)
+        # ── Resolve approver: explicit override > city's default CM/DM/Admin (excluding submitter)
         approver_id = (body.approver_id if body and body.approver_id else None)
         if not approver_id or approver_id == submitter_id:
             cur.execute("""
                 SELECT id FROM copy_users
-                WHERE city = %s AND role ILIKE '%%city manager%%' AND id != %s
+                WHERE city = %s AND (role ILIKE '%%city manager%%' OR role ILIKE '%%driver manager%%' OR role ILIKE '%%general manager%%' OR role ILIKE '%%admin%%') AND id != %s
                 ORDER BY id LIMIT 1;
             """, (city, submitter_id))
             cm_row = cur.fetchone()
             if cm_row:
                 approver_id = cm_row[0]
             else:
-                # Fallback to General Manager / Admin (id 3) if no other CM available
-                approver_id = 3 if submitter_id != 3 else 20
+                approver_id = 3 if submitter_id != 3 else 24
 
         if approver_id == submitter_id:
-            raise HTTPException(
-                status_code=400,
-                detail="Invalid approver: you cannot send an approval request to yourself."
-            )
+            approver_id = 3 if submitter_id != 3 else 24
 
         # ── Update july_form_onboarding
         cur.execute("""

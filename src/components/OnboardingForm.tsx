@@ -818,7 +818,11 @@ export default function OnboardingForm({
       if (targetStatus === "Pending Approval") {
         await fetch(`/api/onboarding/send-for-approval/${savedRecordId}`, {
           method: "POST",
-          headers: { "Authorization": `Bearer ${token}` }
+          headers: { 
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}` 
+          },
+          body: JSON.stringify({ approver_id: approvalRequestedTo })
         });
         const selectedApprover = approversList.find(a => a.id === approvalRequestedTo);
         const approverName = selectedApprover ? selectedApprover.name : "the assigned manager";
@@ -2041,35 +2045,35 @@ export default function OnboardingForm({
                           <h4 className="font-sans text-xs font-bold text-amber-900 uppercase tracking-wider">LetzOwn Requirement: Driver Email & 3 Personal References</h4>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-1.5 md:col-span-2">
+                        <div className="space-y-4">
+                          <div className="space-y-1.5">
                             <label className="text-xs font-bold text-slate-800">Driver Email ID *</label>
-                            <input type="email" required={currentStep === 3} value={driverEmail} onChange={(e) => setDriverEmail(e.target.value)} className="w-full h-10 px-3 bg-white border border-border rounded-lg text-sm outline-none focus:border-primary" placeholder="driver@email.com" />
+                            <input type="email" required={currentStep === 3} value={driverEmail} onChange={(e) => setDriverEmail(e.target.value)} className="w-full h-10 px-3 bg-white border border-border rounded-lg text-sm outline-none focus:border-primary font-medium" placeholder="driver@email.com" />
                           </div>
 
-                          {/* Reference 1 */}
-                          <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-3">
-                            <span className="text-xs font-bold text-primary block border-b pb-1">Reference 1 *</span>
-                            <input type="text" required={currentStep === 3} value={ref1Name} onChange={(e) => setRef1Name(e.target.value)} placeholder="Full Name" className="w-full h-9 px-2.5 border border-border rounded text-xs outline-none focus:border-primary" />
-                            <input type="tel" required={currentStep === 3} value={ref1Phone} onChange={(e) => setRef1Phone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="10-digit Phone" className="w-full h-9 px-2.5 border border-border rounded text-xs outline-none focus:border-primary" maxLength={10} />
-                            <input type="text" required={currentStep === 3} value={ref1Address} onChange={(e) => setRef1Address(e.target.value)} placeholder="Local Address" className="w-full h-9 px-2.5 border border-border rounded text-xs outline-none focus:border-primary" />
-                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Reference 1 */}
+                            <div className="p-3.5 bg-white border border-slate-200 rounded-xl space-y-3 shadow-2xs">
+                              <span className="text-xs font-bold text-primary block border-b border-slate-100 pb-1.5">Reference 1 *</span>
+                              <input type="text" required={currentStep === 3} value={ref1Name} onChange={(e) => setRef1Name(e.target.value)} placeholder="Full Name" className="w-full h-9 px-2.5 bg-slate-50 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary transition-all font-medium" />
+                              <input type="tel" required={currentStep === 3} value={ref1Phone} onChange={(e) => setRef1Phone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="10-digit Phone" className="w-full h-9 px-2.5 bg-slate-50 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary transition-all font-medium" maxLength={10} />
+                              <input type="text" required={currentStep === 3} value={ref1Address} onChange={(e) => setRef1Address(e.target.value)} placeholder="Local Address" className="w-full h-9 px-2.5 bg-slate-50 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary transition-all font-medium" />
+                            </div>
 
-                          {/* Reference 2 */}
-                          <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-3">
-                            <span className="text-xs font-bold text-primary block border-b pb-1">Reference 2 *</span>
-                            <input type="text" required={currentStep === 3} value={ref2Name} onChange={(e) => setRef2Name(e.target.value)} placeholder="Full Name" className="w-full h-9 px-2.5 border border-border rounded text-xs outline-none focus:border-primary" />
-                            <input type="tel" required={currentStep === 3} value={ref2Phone} onChange={(e) => setRef2Phone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="10-digit Phone" className="w-full h-9 px-2.5 border border-border rounded text-xs outline-none focus:border-primary" maxLength={10} />
-                            <input type="text" required={currentStep === 3} value={ref2Address} onChange={(e) => setRef2Address(e.target.value)} placeholder="Local Address" className="w-full h-9 px-2.5 border border-border rounded text-xs outline-none focus:border-primary" />
-                          </div>
+                            {/* Reference 2 */}
+                            <div className="p-3.5 bg-white border border-slate-200 rounded-xl space-y-3 shadow-2xs">
+                              <span className="text-xs font-bold text-primary block border-b border-slate-100 pb-1.5">Reference 2 *</span>
+                              <input type="text" required={currentStep === 3} value={ref2Name} onChange={(e) => setRef2Name(e.target.value)} placeholder="Full Name" className="w-full h-9 px-2.5 bg-slate-50 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary transition-all font-medium" />
+                              <input type="tel" required={currentStep === 3} value={ref2Phone} onChange={(e) => setRef2Phone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="10-digit Phone" className="w-full h-9 px-2.5 bg-slate-50 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary transition-all font-medium" maxLength={10} />
+                              <input type="text" required={currentStep === 3} value={ref2Address} onChange={(e) => setRef2Address(e.target.value)} placeholder="Local Address" className="w-full h-9 px-2.5 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary transition-all font-medium" />
+                            </div>
 
-                          {/* Reference 3 */}
-                          <div className="p-3 bg-white border border-slate-200 rounded-xl space-y-3 md:col-span-2">
-                            <span className="text-xs font-bold text-primary block border-b pb-1">Reference 3 *</span>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                              <input type="text" required={currentStep === 3} value={ref3Name} onChange={(e) => setRef3Name(e.target.value)} placeholder="Full Name" className="w-full h-9 px-2.5 border border-border rounded text-xs outline-none focus:border-primary" />
-                              <input type="tel" required={currentStep === 3} value={ref3Phone} onChange={(e) => setRef3Phone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="10-digit Phone" className="w-full h-9 px-2.5 border border-border rounded text-xs outline-none focus:border-primary" maxLength={10} />
-                              <input type="text" required={currentStep === 3} value={ref3Address} onChange={(e) => setRef3Address(e.target.value)} placeholder="Local Address" className="w-full h-9 px-2.5 border border-border rounded text-xs outline-none focus:border-primary" />
+                            {/* Reference 3 */}
+                            <div className="p-3.5 bg-white border border-slate-200 rounded-xl space-y-3 shadow-2xs">
+                              <span className="text-xs font-bold text-primary block border-b border-slate-100 pb-1.5">Reference 3 *</span>
+                              <input type="text" required={currentStep === 3} value={ref3Name} onChange={(e) => setRef3Name(e.target.value)} placeholder="Full Name" className="w-full h-9 px-2.5 bg-slate-50 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary transition-all font-medium" />
+                              <input type="tel" required={currentStep === 3} value={ref3Phone} onChange={(e) => setRef3Phone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="10-digit Phone" className="w-full h-9 px-2.5 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary transition-all font-medium" maxLength={10} />
+                              <input type="text" required={currentStep === 3} value={ref3Address} onChange={(e) => setRef3Address(e.target.value)} placeholder="Local Address" className="w-full h-9 px-2.5 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary transition-all font-medium" />
                             </div>
                           </div>
                         </div>
