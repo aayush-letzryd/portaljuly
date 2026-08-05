@@ -110,19 +110,14 @@ export default function FormSelector({ user, onSelectForm, onLogout }: FormSelec
             const username = (user.username || "").toLowerCase();
             const name = (user.name || "").toLowerCase();
             const isAdmin = role.includes("admin") || role.includes("founder") || role.includes("ceo") || roleCode === "SA" || username === "admin" || name.includes("admin");
-            const isOnboardingExec = role.includes("onboarding") || roleCode === "OB";
-            
-            // Hide Vehicle Onboarding & Drop-Off Form from Onboarding Executives
-            if ((key === "vehicle_onboarding" || key === "dropoff") && (isOnboardingExec || role.includes("executive"))) {
-              if (!isAdmin && !role.includes("fleet") && !role.includes("manager")) {
-                return false;
-              }
+            const isOnboardingExec = roleCode === "OB" || roleCode === "OE" || role.includes("onboarding") || username.includes("onboarding");
+
+            // Onboarding Executives are strictly restricted to ONLY 3 core forms
+            if (isOnboardingExec && !isAdmin) {
+              return ["walkin", "onboarding", "allocation"].includes(key);
             }
-            
+
             if (!isAdmin) {
-              if (isOnboardingExec) {
-                return ["walkin", "onboarding", "allocation"].includes(key);
-              }
               return ["walkin", "onboarding", "vehicle_onboarding", "allocation", "dropoff"].includes(key);
             }
             return true;
