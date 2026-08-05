@@ -750,36 +750,6 @@ export default function WalkInForm({
 
             <form onSubmit={handleFormSubmit} className="rounded-2xl border border-border bg-white p-6 shadow-xs md:p-8 flex flex-col gap-8">
               
-              {/* Form Mode Selector: New Candidate vs Returning Partner */}
-              {!editingId && (
-                <div className="flex items-center gap-3 bg-slate-100/90 p-1.5 rounded-xl border border-slate-200">
-                  <button
-                    type="button"
-                    onClick={() => { setIsExistingPartner(false); resetForm(); }}
-                    className={`flex-1 py-2.5 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                      !isExistingPartner 
-                        ? "bg-white text-slate-900 shadow-xs border border-slate-200/80" 
-                        : "text-slate-500 hover:text-slate-800"
-                    }`}
-                  >
-                    <User className="w-4 h-4 text-primary" />
-                    New Candidate Onboarding
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => { setIsExistingPartner(true); }}
-                    className={`flex-1 py-2.5 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
-                      isExistingPartner 
-                        ? "bg-white text-slate-900 shadow-xs border border-slate-200/80" 
-                        : "text-slate-500 hover:text-slate-800"
-                    }`}
-                  >
-                    <RefreshCw className="w-4 h-4 text-emerald-600" />
-                    Returning Partner Visit Log
-                  </button>
-                </div>
-              )}
-
               {/* 1. Candidate Information (Top Section) */}
               <div className="flex flex-col gap-5 bg-slate-50/60 p-5 rounded-2xl border border-border">
                 <div className="flex items-center gap-2 border-b border-border pb-3">
@@ -867,167 +837,164 @@ export default function WalkInForm({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Left Column: Partner Type & Visit Reasons */}
-                  <div className="flex flex-col gap-4">
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="font-sans text-xs font-semibold text-slate-700">Partner Category *</label>
-                        <select
-                          value={partnerType}
-                          onChange={(e) => setPartnerType(e.target.value as any)}
-                          className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-medium cursor-pointer"
-                        >
-                          <option value="Driver">Individual Driver Partner</option>
-                          <option value="Operator">Fleet Operator Partner</option>
-                          <option value="Vendor">Vendor / Service Partner</option>
-                        </select>
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <label className="font-sans text-xs font-semibold text-slate-700">Visiting Reason *</label>
-                        <select
-                          required
-                          value={visitingReason}
-                          onChange={(e) => setVisitingReason(e.target.value)}
-                          className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-medium cursor-pointer"
-                        >
-                          <option value="Onboarding Inquiry">Onboarding Inquiry</option>
-                          <option value="Complaint">Complaint</option>
-                          <option value="Driver Manager (DM) Meet">Driver Manager (DM) Meet</option>
-                          <option value="Maintenance Related Issue">Maintenance Issue</option>
-                          <option value="Others">Others</option>
-                        </select>
-                      </div>
+                <div className="flex flex-col gap-5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                    <div className="flex flex-col gap-1.5">
+                      <label className="font-sans text-xs font-semibold text-slate-700">Partner Category *</label>
+                      <select
+                        value={partnerType}
+                        onChange={(e) => setPartnerType(e.target.value as any)}
+                        className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-medium cursor-pointer"
+                      >
+                        <option value="Driver">Individual Driver Partner</option>
+                        <option value="Operator">Fleet Operator Partner</option>
+                        <option value="Vendor">Vendor / Service Partner</option>
+                      </select>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-3">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="font-sans text-xs font-semibold text-slate-700">Enquiry Date *</label>
-                        <input type="date" required value={enquiryDate} onChange={(e) => setEnquiryDate(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary" />
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <label className="font-sans text-xs font-semibold text-slate-700">Enquiry Time *</label>
-                        <input type="time" required value={enquiryTime} onChange={(e) => setEnquiryTime(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary" />
-                      </div>
+                    <div className="flex flex-col gap-1.5">
+                      <label className="font-sans text-xs font-semibold text-slate-700">Visiting Reason *</label>
+                      <select
+                        required
+                        value={visitingReason}
+                        onChange={(e) => setVisitingReason(e.target.value)}
+                        className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-medium cursor-pointer"
+                      >
+                        <option value="Onboarding Inquiry">Onboarding Inquiry</option>
+                        <option value="Complaint">Complaint</option>
+                        <option value="Driver Manager (DM) Meet">Driver Manager (DM) Meet</option>
+                        <option value="Maintenance Related Issue">Maintenance Issue</option>
+                        <option value="Others">Others</option>
+                      </select>
                     </div>
 
-                    {isExistingPartner && (
-                      <div className="flex flex-col gap-1.5">
-                        <label className="font-sans text-xs font-semibold text-slate-700">Visit Outcome Status *</label>
-                        <select required value={joinedStatus} onChange={(e) => setJoinedStatus(e.target.value as OnboardingOutcome)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer">
-                            <option value="Onboarding Process Initiated">Onboarding Process Initiated</option>
-                            <option value="Successfully Onboarded">Successfully Onboarded</option>
-                            <option value="Follow Up Required">Follow Up Required</option>
-                            <option value="No Follow Up Required / Closed">No Follow Up Required / Closed</option>
-                            <option value="Others">Others</option>
-                        </select>
-                      </div>
-                    )}
+                    <div className="flex flex-col gap-1.5">
+                      <label className="font-sans text-xs font-semibold text-slate-700">Enquiry Date *</label>
+                      <input type="date" required value={enquiryDate} onChange={(e) => setEnquiryDate(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary" />
+                    </div>
+
+                    <div className="flex flex-col gap-1.5">
+                      <label className="font-sans text-xs font-semibold text-slate-700">Enquiry Time *</label>
+                      <input type="time" required value={enquiryTime} onChange={(e) => setEnquiryTime(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary" />
+                    </div>
                   </div>
 
-                  {/* Right Column: Simple Category Tags Dropdown */}
-                  <div className="flex flex-col gap-2.5 p-4 bg-white border border-border rounded-xl">
-                    <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
-                      <span>Category Tags</span>
-                      <span className="text-[10px] text-emerald-700 font-extrabold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                        {selectedTags.length} Selected
-                      </span>
-                    </label>
+                  {/* ONLY SHOW DETAILED VISIT LOGGING (Tags, Notes, Outcome) WHEN CANDIDATE IS FETCHED */}
+                  {isExistingPartner && (
+                    <div className="flex flex-col gap-5 pt-3 border-t border-slate-200">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="font-sans text-xs font-semibold text-slate-700">Visit Outcome Status *</label>
+                          <select required value={joinedStatus} onChange={(e) => setJoinedStatus(e.target.value as OnboardingOutcome)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer">
+                              <option value="Onboarding Process Initiated">Onboarding Process Initiated</option>
+                              <option value="Successfully Onboarded">Successfully Onboarded</option>
+                              <option value="Follow Up Required">Follow Up Required</option>
+                              <option value="No Follow Up Required / Closed">No Follow Up Required / Closed</option>
+                              <option value="Others">Others</option>
+                          </select>
+                        </div>
 
-                    {/* Standard Select Dropdown */}
-                    <select
-                      value=""
-                      onChange={(e) => {
-                        const val = e.target.value;
-                        if (val === "__OTHERS__") {
-                          setShowCustomTagInput(true);
-                        } else if (val && !selectedTags.includes(val)) {
-                          setSelectedTags([...selectedTags, val]);
-                        }
-                      }}
-                      className="h-11 rounded-lg border border-border px-3 text-xs bg-white outline-none focus:border-primary font-semibold text-slate-700 cursor-pointer"
-                    >
-                      <option value="" disabled>+ Add {partnerType} Category Tag...</option>
-                      {(PRESET_TAGS[partnerType] || PRESET_TAGS["Driver"]).map((tag) => (
-                        <option key={tag} value={tag} disabled={selectedTags.includes(tag)}>
-                          {selectedTags.includes(tag) ? `✓ ${tag} (Selected)` : tag}
-                        </option>
-                      ))}
-                      <option value="__OTHERS__">＋ Others (Enter Custom Tag...)</option>
-                    </select>
+                        {/* Category Tags Dropdown & Pills */}
+                        <div className="flex flex-col gap-2.5 p-4 bg-white border border-border rounded-xl">
+                          <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
+                            <span>Category Tags</span>
+                            <span className="text-[10px] text-emerald-700 font-extrabold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                              {selectedTags.length} Selected
+                            </span>
+                          </label>
 
-                    {/* Custom Tag Input Box */}
-                    {showCustomTagInput && (
-                      <div className="flex gap-2 p-2 bg-slate-50 rounded-lg border border-slate-200">
-                        <input
-                          type="text"
-                          placeholder="Type custom tag name..."
-                          value={customTagInput}
-                          onChange={(e) => setCustomTagInput(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") {
-                              e.preventDefault();
-                              handleAddCustomTag();
-                            }
-                          }}
-                          className="h-9 flex-1 rounded-lg border border-border px-3 text-xs bg-white outline-none focus:border-primary"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleAddCustomTag}
-                          className="h-9 px-3 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-lg cursor-pointer transition-colors"
-                        >
-                          Add Tag
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setShowCustomTagInput(false)}
-                          className="h-9 px-2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    )}
-
-                    {/* Selected Tags Display Pills */}
-                    {selectedTags.length > 0 && (
-                      <div className="flex flex-wrap gap-1.5 mt-1 max-h-28 overflow-y-auto">
-                        {selectedTags.map((tag) => (
-                          <span
-                            key={tag}
-                            className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs"
+                          <select
+                            value=""
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === "__OTHERS__") {
+                                setShowCustomTagInput(true);
+                              } else if (val && !selectedTags.includes(val)) {
+                                setSelectedTags([...selectedTags, val]);
+                              }
+                            }}
+                            className="h-11 rounded-lg border border-border px-3 text-xs bg-white outline-none focus:border-primary font-semibold text-slate-700 cursor-pointer"
                           >
-                            <span>{tag}</span>
-                            <button
-                              type="button"
-                              onClick={() => setSelectedTags(selectedTags.filter(t => t !== tag))}
-                              className="hover:text-red-600 focus:outline-none cursor-pointer text-emerald-700"
-                            >
-                              <X className="w-3.5 h-3.5" />
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </div>
+                            <option value="" disabled>+ Add {partnerType} Category Tag...</option>
+                            {(PRESET_TAGS[partnerType] || PRESET_TAGS["Driver"]).map((tag) => (
+                              <option key={tag} value={tag} disabled={selectedTags.includes(tag)}>
+                                {selectedTags.includes(tag) ? `✓ ${tag} (Selected)` : tag}
+                              </option>
+                            ))}
+                            <option value="__OTHERS__">＋ Others (Enter Custom Tag...)</option>
+                          </select>
 
-                {/* Free-Text Context Notes (200-300 words max) */}
-                <div className="flex flex-col gap-1.5 mt-2">
-                  <label className="font-sans text-xs font-semibold text-slate-700 flex justify-between">
-                    <span>Visit Notes & Executive Summary (Max ~300 words) *</span>
-                    <span className="text-[10px] text-slate-400">{visitNotes.length} / 1500 chars</span>
-                  </label>
-                  <textarea
-                    rows={3}
-                    maxLength={1500}
-                    placeholder="Record detailed notes of discussion, complaint description, or resolution provided during this visit..."
-                    value={visitNotes}
-                    onChange={(e) => setVisitNotes(e.target.value)}
-                    className="w-full rounded-xl border border-border p-3 text-xs bg-white outline-none focus:border-primary font-sans leading-relaxed"
-                  />
+                          {showCustomTagInput && (
+                            <div className="flex gap-2 p-2 bg-slate-50 rounded-lg border border-slate-200">
+                              <input
+                                type="text"
+                                placeholder="Type custom tag name..."
+                                value={customTagInput}
+                                onChange={(e) => setCustomTagInput(e.target.value)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    e.preventDefault();
+                                    handleAddCustomTag();
+                                  }
+                                }}
+                                className="h-9 flex-1 rounded-lg border border-border px-3 text-xs bg-white outline-none focus:border-primary"
+                              />
+                              <button
+                                type="button"
+                                onClick={handleAddCustomTag}
+                                className="h-9 px-3 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-lg cursor-pointer transition-colors"
+                              >
+                                Add Tag
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setShowCustomTagInput(false)}
+                                className="h-9 px-2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          )}
+
+                          {selectedTags.length > 0 && (
+                            <div className="flex flex-wrap gap-1.5 mt-1 max-h-28 overflow-y-auto">
+                              {selectedTags.map((tag) => (
+                                <span
+                                  key={tag}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs"
+                                >
+                                  <span>{tag}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setSelectedTags(selectedTags.filter(t => t !== tag))}
+                                    className="hover:text-red-600 focus:outline-none cursor-pointer text-emerald-700"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Visit Notes & Summary */}
+                      <div className="flex flex-col gap-1.5">
+                        <label className="font-sans text-xs font-semibold text-slate-700 flex justify-between">
+                          <span>Visit Notes & Executive Summary (Max ~300 words) *</span>
+                          <span className="text-[10px] text-slate-400">{visitNotes.length} / 1500 chars</span>
+                        </label>
+                        <textarea
+                          rows={3}
+                          maxLength={1500}
+                          placeholder="Record detailed notes of discussion, complaint description, or resolution provided during this visit..."
+                          value={visitNotes}
+                          onChange={(e) => setVisitNotes(e.target.value)}
+                          className="w-full rounded-xl border border-border p-3 text-xs bg-white outline-none focus:border-primary font-sans leading-relaxed"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 
