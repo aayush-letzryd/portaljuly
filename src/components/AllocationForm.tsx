@@ -127,16 +127,16 @@ export default function AllocationForm({
       });
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const d = data[0];
-          setDriverId(d.driver_id || "");
-          setDriverName(d.driver_name || "");
-          setDriverPhone(d.phone_number || "");
-          setCityName(d.city || "Hyderabad");
-          setDriverPlan(d.driver_plan || "Drive to Rent");
-          setTypeOfPlan(d.type_of_plan || "Subscription (Daily)");
-          setCarModel(d.car_model || "Tata Xpres-T EV");
-          setDriverLookupStatus(`Found: ${d.driver_name} (${d.driver_id})`);
+        const d = Array.isArray(data) ? data[0] : data;
+        if (d && (d.found || d.driver_id || d.driver_name)) {
+          if (d.driver_id) setDriverId(d.driver_id);
+          if (d.driver_name) setDriverName(d.driver_name);
+          if (d.driver_phone) setDriverPhone(d.driver_phone);
+          if (d.city_name || d.city) setCityName(d.city_name || d.city);
+          if (d.driver_plan) setDriverPlan(d.driver_plan);
+          if (d.type_of_plan) setTypeOfPlan(d.type_of_plan);
+          if (d.car_model) setCarModel(d.car_model);
+          setDriverLookupStatus(`Found: ${d.driver_name || "Driver"} (${d.driver_id || "ID"})`);
         } else {
           setDriverLookupStatus("No onboarded driver record found.");
         }

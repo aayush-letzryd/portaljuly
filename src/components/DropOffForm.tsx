@@ -118,13 +118,13 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
       });
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) {
-          const d = data[0];
-          setDriverId(d.driver_id || "");
-          setDriverName(d.driver_name || "");
-          setDriverPhone(d.phone_number || "");
-          setCityName(d.city || "Hyderabad");
-          setDriverLookupStatus(`Found driver: ${d.driver_name} (${d.driver_id})`);
+        const d = Array.isArray(data) ? data[0] : data;
+        if (d && (d.found || d.driver_id || d.driver_name)) {
+          if (d.driver_id) setDriverId(d.driver_id);
+          if (d.driver_name) setDriverName(d.driver_name);
+          if (d.driver_phone) setDriverPhone(d.driver_phone);
+          if (d.city_name || d.city) setCityName(d.city_name || d.city);
+          setDriverLookupStatus(`Found driver: ${d.driver_name || "Driver"} (${d.driver_id || "ID"})`);
         } else {
           setDriverLookupStatus("No matching onboarded driver found.");
         }
