@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect, useRef } from "react";
 import { 
   Calendar, MapPin, User, Phone, FileText, CheckCircle, 
   Clock, ArrowLeft, Download, Search, Trash2, Edit, Camera, 
-  Upload, X, RefreshCw, AlertTriangle, ShieldCheck, Filter, Plus, ChevronLeft, ChevronRight, Eye, EyeOff, Database
+  Upload, X, RefreshCw, AlertTriangle, ShieldCheck, Filter, Plus, ChevronLeft, ChevronRight, Eye, EyeOff, Database, ChevronDown
 } from "lucide-react";
 import { WalkInRecord, User as UserSession, CITIES, OnboardingOutcome } from "../types";
 import CameraCapture from "./CameraCapture";
@@ -133,6 +133,18 @@ export default function WalkInForm({
   const [visitNotes, setVisitNotes] = useState<string>("");
   const [isExistingPartner, setIsExistingPartner] = useState<boolean>(false);
   const [partnerCode, setPartnerCode] = useState<string>("");
+  const [isTagsDropdownOpen, setIsTagsDropdownOpen] = useState<boolean>(false);
+  const [customTagInput, setCustomTagInput] = useState<string>("");
+  const [showCustomTagInput, setShowCustomTagInput] = useState<boolean>(false);
+
+  const handleAddCustomTag = () => {
+    const tagToAdd = customTagInput.trim();
+    if (tagToAdd && !selectedTags.includes(tagToAdd)) {
+      setSelectedTags([...selectedTags, tagToAdd]);
+    }
+    setCustomTagInput("");
+    setShowCustomTagInput(false);
+  };
 
   // Candidate Visit History & Profile Auto-fill state
   const [isDuplicate, setIsDuplicate] = useState(false);
@@ -512,6 +524,9 @@ export default function WalkInForm({
     setPartnerCode("");
     setSelectedTags([]);
     setVisitNotes("");
+    setIsTagsDropdownOpen(false);
+    setCustomTagInput("");
+    setShowCustomTagInput(false);
   };
 
   const fetchRecordDetailsForEdit = async (id: number) => {
@@ -729,39 +744,6 @@ export default function WalkInForm({
                   </div>
                   <h1 className="font-sans text-2xl font-bold tracking-tight text-white">{editingId ? `Edit Walk-in #${editingId}` : "Walk-In Form"}</h1>
                 </div>
-
-                <div className="relative w-full max-w-sm">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/70" />
-                    <input
-                      type="text"
-                      placeholder="Search to edit... (Name, Phone, ID)"
-                      value={searchRetrieveQuery}
-                      onChange={(e) => setSearchRetrieveQuery(e.target.value)}
-                      onFocus={() => setIsRetrieveFocused(true)}
-                      onBlur={() => setTimeout(() => setIsRetrieveFocused(false), 200)}
-                      className="h-10 w-full rounded-lg bg-white/20 border border-white/35 pl-9 pr-4 text-sm font-semibold text-white placeholder:text-white/70 outline-none focus:bg-white focus:text-slate-900 focus:placeholder:text-slate-400 transition-all"
-                    />
-                  </div>
-                  {isRetrieveFocused && retrieveResults.length > 0 && (
-                    <div className="absolute top-12 left-0 w-full bg-white rounded-lg shadow-xl border border-border z-50 overflow-hidden flex flex-col max-h-64 overflow-y-auto">
-                      {retrieveResults.map((r) => (
-                        <button
-                          key={r.id}
-                          type="button"
-                          onMouseDown={() => fetchRecordDetailsForEdit(r.id)}
-                          className="flex flex-col items-start px-4 py-3 border-b border-border hover:bg-green-50 transition-colors text-left cursor-pointer"
-                        >
-                          <div className="flex justify-between w-full">
-                            <span className="font-bold text-sm text-slate-900">#{r.id} - {r.first_name} {r.last_name}</span>
-                            <span className="text-xs font-mono text-text-dim">{r.person_number}</span>
-                          </div>
-                          <span className="text-xs text-text-muted mt-1">{r.city}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
               </div>
             </div>
 
@@ -919,34 +901,122 @@ export default function WalkInForm({
                     </div>
                   </div>
 
-                  {/* Right Column: Preset Category Tags */}
-                  <div className="flex flex-col gap-3 p-4 bg-white border border-border rounded-xl">
+                  {/* Right Column: Multi-Select Category Tags Dropdown */}
+                  <div className="flex flex-col gap-2.5 p-4 bg-white border border-border rounded-xl relative">
                     <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
-                      <span>Preset Category Tags (Click to Select)</span>
-                      <span className="text-[10px] text-primary font-bold">{selectedTags.length} Selected</span>
+                      <span>Category Tags (Multi-Select)</span>
+                      <span className="text-[10px] text-emerald-700 font-extrabold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                        {selectedTags.length} Selected
+                      </span>
                     </label>
-                    <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto">
-                      {(PRESET_TAGS[partnerType] || PRESET_TAGS["Driver"]).map((tag) => {
-                        const isSelected = selectedTags.includes(tag);
-                        return (
-                          <button
-                            key={tag}
-                            type="button"
-                            onClick={() => {
-                              if (isSelected) setSelectedTags(selectedTags.filter(t => t !== tag));
-                              else setSelectedTags([...selectedTags, tag]);
-                            }}
-                            className={`px-2.5 py-1 rounded-full text-xs font-semibold transition-all cursor-pointer border ${
-                              isSelected
-                                ? "bg-primary text-white border-primary shadow-xs"
-                                : "bg-slate-50 text-slate-700 border-slate-200 hover:bg-slate-100"
-                            }`}
-                          >
-                            {isSelected ? "✓ " : "+ "}{tag}
-                          </button>
-                        );
-                      })}
+
+                    {/* Dropdown Header Trigger */}
+                    <div className="relative">
+                      <button
+                        type="button"
+                        onClick={() => setIsTagsDropdownOpen(!isTagsDropdownOpen)}
+                        className="w-full min-h-[44px] rounded-lg border border-border bg-slate-50/60 px-3 py-2 text-xs flex items-center justify-between gap-2 hover:border-primary focus:outline-none transition-all cursor-pointer"
+                      >
+                        <span className="text-slate-700 font-medium truncate">
+                          {selectedTags.length > 0
+                            ? selectedTags.join(", ")
+                            : `Select ${partnerType} Category Tags...`}
+                        </span>
+                        <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform ${isTagsDropdownOpen ? "rotate-180" : ""}`} />
+                      </button>
+
+                      {/* Dropdown Menu Panel */}
+                      {isTagsDropdownOpen && (
+                        <div className="absolute top-12 left-0 w-full bg-white rounded-xl shadow-xl border border-border z-50 p-2 flex flex-col gap-1 max-h-64 overflow-y-auto">
+                          <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">
+                            {partnerType} Preset Options
+                          </span>
+
+                          {(PRESET_TAGS[partnerType] || PRESET_TAGS["Driver"]).map((tag) => {
+                            const isChecked = selectedTags.includes(tag);
+                            return (
+                              <label
+                                key={tag}
+                                className={`flex items-center gap-2 px-2.5 py-2 rounded-lg text-xs font-semibold cursor-pointer transition-colors ${
+                                  isChecked ? "bg-emerald-50 text-emerald-900 font-bold" : "hover:bg-slate-50 text-slate-700"
+                                }`}
+                              >
+                                <input
+                                  type="checkbox"
+                                  checked={isChecked}
+                                  onChange={() => {
+                                    if (isChecked) setSelectedTags(selectedTags.filter(t => t !== tag));
+                                    else setSelectedTags([...selectedTags, tag]);
+                                  }}
+                                  className="w-4 h-4 rounded text-primary focus:ring-primary accent-emerald-600 cursor-pointer"
+                                />
+                                <span className="flex-1">{tag}</span>
+                              </label>
+                            );
+                          })}
+
+                          <div className="border-t border-slate-100 my-1" />
+
+                          {/* Custom / Others Tag Entry Button */}
+                          {!showCustomTagInput ? (
+                            <button
+                              type="button"
+                              onClick={() => setShowCustomTagInput(true)}
+                              className="flex items-center gap-1.5 px-2.5 py-2 rounded-lg text-xs font-bold text-primary hover:bg-slate-50 transition-colors text-left cursor-pointer"
+                            >
+                              <Plus className="w-3.5 h-3.5" /> + Others / Enter Custom Tag...
+                            </button>
+                          ) : (
+                            <div className="flex flex-col gap-2 p-2 bg-slate-50 rounded-lg border border-slate-200">
+                              <span className="text-[11px] font-bold text-slate-800">Add Custom Category Tag</span>
+                              <div className="flex gap-1.5">
+                                <input
+                                  type="text"
+                                  placeholder="Type custom tag name..."
+                                  value={customTagInput}
+                                  onChange={(e) => setCustomTagInput(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                      e.preventDefault();
+                                      handleAddCustomTag();
+                                    }
+                                  }}
+                                  className="h-8 flex-1 rounded border border-border px-2 text-xs bg-white outline-none focus:border-primary"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={handleAddCustomTag}
+                                  className="h-8 px-3 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded cursor-pointer"
+                                >
+                                  Add
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
+
+                    {/* Selected Tag Badges Pills */}
+                    {selectedTags.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 mt-1 max-h-28 overflow-y-auto">
+                        {selectedTags.map((tag) => (
+                          <span
+                            key={tag}
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs"
+                          >
+                            <span>{tag}</span>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedTags(selectedTags.filter(t => t !== tag))}
+                              className="hover:text-red-600 focus:outline-none cursor-pointer"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
 
