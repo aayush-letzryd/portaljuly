@@ -2763,16 +2763,17 @@ export default function OnboardingForm({
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Contact</th>
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Role & Status</th>
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Recorded By</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Submitted By</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Approver / Actioned By</th>
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Date & Time Created</th>
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Last Edited At</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Last Edited By</th>
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
                     {paginatedRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50 text-[11px]">
+                        <td colSpan={11} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50 text-[11px]">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <Search className="h-8 w-8 text-border-strong mb-2 opacity-50" />
                             <p className="font-semibold text-slate-700">No onboarding records found matching current criteria.</p>
@@ -2819,31 +2820,44 @@ export default function OnboardingForm({
                               <div className="flex flex-col gap-0.5">
                                 <span className="font-semibold text-slate-800">{role}</span>
                                 {statusBadge}
-                                {appStatus.includes("Pending") && (
-                                  <div className="text-[10px] text-amber-700 font-medium truncate mt-0.5">
-                                    Pending: {r.approver_name || 'Driver Manager 1'} <span className="text-slate-400 font-normal">(ID: {r.current_approver_id || r.approval_requested_to || 21})</span>
-                                  </div>
-                                )}
-                                {appStatus.includes("Approved") && (
-                                  <div className="text-[10px] text-emerald-700 font-medium truncate mt-0.5">
-                                    Approved by: {r.approved_by_name || r.updated_by_name || 'Admin'} <span className="text-slate-400 font-normal">(ID: {r.approved_by || r.updated_by || 3})</span>
-                                  </div>
-                                )}
-                                {(appStatus.includes("Requested") || appStatus.includes("Counter")) && (
-                                  <div className="text-[10px] text-blue-700 font-medium truncate mt-0.5">
-                                    Req. by: {r.approver_name || r.updated_by_name || 'City Manager 1'} <span className="text-slate-400 font-normal">(ID: {r.current_approver_id || r.updated_by || 20})</span>
-                                  </div>
-                                )}
-                                {appStatus.includes("Reject") && (
-                                  <div className="text-[10px] text-red-700 font-medium truncate mt-0.5">
-                                    Rejected by: {r.approved_by_name || r.updated_by_name || 'Manager'} <span className="text-slate-400 font-normal">(ID: {r.approved_by || r.updated_by || 3})</span>
-                                  </div>
-                                )}
                               </div>
                             </td>
                             <td className="px-4 py-3">
                               <div className="font-bold text-slate-900">{r.executive_name || user.name || "Admin"}</div>
                               <div className="text-slate-400 text-[10px] font-medium">ID: {r.created_by || user.executive_id || 3}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-900">{r.updated_by ? (r.updated_by_name || r.executive_name || "Admin") : (r.executive_name || user.name || 'Admin')}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.updated_by ? r.updated_by : (r.created_by || user.executive_id || 3)}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              {appStatus.includes("Pending") && (
+                                <div>
+                                  <div className="font-bold text-amber-900">{r.approver_name || 'Driver Manager 1'}</div>
+                                  <div className="text-amber-700/70 text-[10px] font-medium">Target ID: {r.current_approver_id || r.approval_requested_to || 21}</div>
+                                </div>
+                              )}
+                              {appStatus.includes("Approved") && (
+                                <div>
+                                  <div className="font-bold text-emerald-900">{r.approved_by_name || r.updated_by_name || 'Admin'}</div>
+                                  <div className="text-emerald-700/70 text-[10px] font-medium">Approved ID: {r.approved_by || r.updated_by || 3}</div>
+                                </div>
+                              )}
+                              {(appStatus.includes("Requested") || appStatus.includes("Counter")) && (
+                                <div>
+                                  <div className="font-bold text-blue-900">{r.approver_name || r.updated_by_name || 'City Manager 1'}</div>
+                                  <div className="text-blue-700/70 text-[10px] font-medium">Req. ID: {r.current_approver_id || r.updated_by || 20}</div>
+                                </div>
+                              )}
+                              {appStatus.includes("Reject") && (
+                                <div>
+                                  <div className="font-bold text-rose-900">{r.approved_by_name || r.updated_by_name || 'Manager'}</div>
+                                  <div className="text-rose-700/70 text-[10px] font-medium">Rejected ID: {r.approved_by || r.updated_by || 3}</div>
+                                </div>
+                              )}
+                              {appStatus === "Draft" && (
+                                <div className="text-slate-400 text-[11px] font-medium">—</div>
+                              )}
                             </td>
                             <td className="px-4 py-3">
                               <div className="font-bold text-slate-800">{createdDate}</div>
