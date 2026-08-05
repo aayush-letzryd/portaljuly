@@ -1308,10 +1308,51 @@ export default function AllocationForm({
 
         {activeTab === "registry" && (
           /* REGISTRY LOG */
-          <div className="space-y-10">
+          <div className="space-y-6">
             
+            {/* SEARCH & FILTER TOOLBAR - MOVED ABOVE KPI CARDS */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input 
+                  type="text" 
+                  placeholder="Search name, code, phone, vehicle..." 
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-slate-200 pl-9 pr-4 font-sans text-xs text-slate-900 bg-white outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20"
+                />
+              </div>
+
+              <div>
+                <select 
+                  value={filterCity}
+                  onChange={(e) => setFilterCity(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-slate-200 px-3 font-sans text-xs text-slate-800 bg-white outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 cursor-pointer"
+                >
+                  <option value="all">All Cities</option>
+                  <option value="Hyderabad">Hyderabad</option>
+                  <option value="Bengaluru">Bengaluru</option>
+                  <option value="Mumbai">Mumbai</option>
+                </select>
+              </div>
+
+              <div>
+                <select 
+                  value={filterType}
+                  onChange={(e) => setFilterType(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-slate-200 px-3 font-sans text-xs text-slate-800 bg-white outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 cursor-pointer"
+                >
+                  <option value="all">All Allocation Types</option>
+                  <option value="New Allocation">New Allocation</option>
+                  <option value="Reallocation">Reallocation</option>
+                  <option value="Swap">Swap</option>
+                  <option value="Rejoining">Rejoining</option>
+                </select>
+              </div>
+            </div>
+
             {/* 4 STATS CARDS */}
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
               
               {/* CARD 1: Total Allocations */}
               <div className="rounded-2xl border border-border bg-white p-6 shadow-sm flex items-center justify-between">
@@ -1362,19 +1403,19 @@ export default function AllocationForm({
               </div>
             </div>
 
-            {/* TABLE & FILTER CARD */}
-            <div className="rounded-2xl border border-border bg-white shadow-xs overflow-hidden">
+            {/* TABLE CARD */}
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
               
-              <div className="border-b border-border p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div className="border-b border-slate-200 p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
                   <h3 className="font-sans text-lg font-bold text-slate-900 tracking-tight">Allocation Registry</h3>
-                  <p className="font-sans text-xs text-text-muted mt-1">Audit log of all vehicle allocations, swaps, and returns</p>
+                  <p className="font-sans text-xs text-slate-500 mt-1">Audit log of all vehicle allocations, swaps, and returns</p>
                 </div>
 
                 <div className="flex gap-2">
                   <button 
                     onClick={handleExportCSV}
-                    className="flex h-10 items-center justify-center gap-1.5 rounded-lg border border-border bg-white hover:bg-slate-50 px-4 font-sans text-xs font-semibold text-text-muted transition-colors cursor-pointer shadow-2xs"
+                    className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 font-sans text-xs font-semibold text-slate-700 transition-colors cursor-pointer shadow-2xs"
                   >
                     <Download className="h-4 w-4" />
                     Export CSV
@@ -1384,7 +1425,7 @@ export default function AllocationForm({
                       resetForm();
                       setActiveTab("form");
                     }}
-                    className="flex h-10 items-center justify-center gap-1.5 rounded-lg bg-primary hover:bg-primary-hover px-4 font-sans text-xs font-semibold text-white transition-colors cursor-pointer shadow-xs"
+                    className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 font-sans text-xs font-semibold text-white transition-colors cursor-pointer shadow-xs"
                   >
                     <Plus className="h-4 w-4" />
                     Add Allocation
@@ -1392,98 +1433,65 @@ export default function AllocationForm({
                 </div>
               </div>
 
-              {/* FILTER TOOLBAR */}
-              <div className="bg-white border-b border-border p-4 grid grid-cols-1 gap-3 sm:grid-cols-3 items-center">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-dim" />
-                  <input 
-                    type="text" 
-                    placeholder="Search name, code, phone, vehicle..." 
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="h-10 w-full rounded-lg border border-border pl-9 pr-4 font-sans text-xs text-text bg-white outline-none focus:border-primary transition-colors"
-                  />
-                </div>
-
-                <div className="relative">
-                  <select 
-                    value={filterCity}
-                    onChange={(e) => setFilterCity(e.target.value)}
-                    className="h-10 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer"
-                  >
-                    <option value="all">All Cities</option>
-                    <option value="Hyderabad">Hyderabad</option>
-                    <option value="Bangalore">Bangalore</option>
-                    <option value="Mumbai">Mumbai</option>
-                    <option value="Chennai">Chennai</option>
-                    <option value="Delhi">Delhi</option>
-                  </select>
-                </div>
-
-                <div className="relative">
-                  <select 
-                    value={filterType}
-                    onChange={(e) => setFilterType(e.target.value)}
-                    className="h-10 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer"
-                  >
-                    <option value="all">All Types</option>
-                    <option value="New allocation">New allocation</option>
-                    <option value="Reallocation">Reallocation</option>
-                    <option value="Swap">Swap</option>
-                    <option value="Dropoff">Dropoff</option>
-                  </select>
-                </div>
-              </div>
-
               {/* TABLE CONTAINER */}
               <div className="overflow-x-auto">
                 <table className="w-full text-left border-collapse whitespace-nowrap">
                   <thead>
-                    <tr className="bg-slate-50 border-b border-border/60">
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">ID</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Driver Name</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Driver ID</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Phone Number</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">City</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Car Allocated</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Allocation Type</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Plan</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Date</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Time</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Allocated By</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Action</th>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">ID</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Driver Name</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Phone Number</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Driver ID</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Car Allocated</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">City</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Allocation Type</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Plan</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Date &amp; Time</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Allocated By</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-center">Action</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border/40">
+                  <tbody className="divide-y divide-slate-100">
                     {filteredRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={12} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50 text-[11px]">
+                        <td colSpan={11} className="px-6 py-12 text-center text-slate-500 font-sans bg-slate-50/50 text-xs">
                           No matching allocation records found in the database.
                         </td>
                       </tr>
                     ) : (
                       filteredRecords.map((r: any) => {
-                        const isoStr = (r.created_at && typeof r.created_at === 'string' && (r.created_at.includes("T") || r.created_at.includes(" ")) && !r.created_at.endsWith("Z") && !/[+-]\d{2}:?\d{2}$/.test(r.created_at)) ? r.created_at.replace(" ", "T") + "Z" : r.created_at;
-                        const formattedTime = isoStr 
-                          ? new Date(isoStr).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }).toLowerCase() 
-                          : "10:30 am";
-                        const allocatedBy = r.created_by || r.allocated_by || r.executive_name || user.name || user.username || "Admin";
+                        const rawDate = r.updated_at || r.created_at || r.allocation_date;
+                        const formattedDateTime = rawDate ? new Date(rawDate).toLocaleString("en-IN", {
+                          day: "2-digit",
+                          month: "short",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                          hour12: true
+                        }) : (r.allocation_date || "—");
+
+                        // Format Allocated By cleanly (Name + ID)
+                        let rawAllocatedBy = r.allocated_by || r.executive_name;
+                        if (!rawAllocatedBy || rawAllocatedBy === "26" || rawAllocatedBy === "20") {
+                          rawAllocatedBy = rawAllocatedBy === "20" ? "Super Admin" : "Onboarding Executive 1";
+                        }
+                        const creatorId = r.created_by ? ` (ID: ${r.created_by})` : "";
+                        const displayAllocatedBy = `${rawAllocatedBy}${creatorId}`;
                         
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
                             <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-700">#{r.id}</td>
-                            <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-900">{r.driver_name || "-"}</td>
-                            <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{r.driver_id || "-"}</td>
-                            <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{r.driver_phone || "-"}</td>
-                            <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-800">{r.city_name || "-"}</td>
-                            <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">{r.vehicle_number || "-"}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-900">{r.driver_name || "—"}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{r.driver_phone || "—"}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{r.driver_id || "—"}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">{r.vehicle_number || "—"}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-800">{r.city_name || r.city || "—"}</td>
                             <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-700">
-                              {r.allocation_type || "New Allocation"}
+                              {r.sub_type || r.allocation_type || "New Allocation"}
                             </td>
-                            <td className="px-4 py-3.5 font-sans text-xs text-slate-700">{r.driver_plan || r.type_of_plan || "-"}</td>
-                            <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{r.allocation_date || "-"}</td>
-                            <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{formattedTime}</td>
-                            <td className="px-4 py-3.5 font-sans text-xs text-slate-700 font-medium">{allocatedBy}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-700">{r.driver_plan || r.type_of_plan || "—"}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{formattedDateTime}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-700 font-medium">{displayAllocatedBy}</td>
                             <td className="px-4 py-3.5 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <button 
@@ -1511,9 +1519,9 @@ export default function AllocationForm({
               </div>
 
               {/* FOOTER STATS */}
-              <div className="flex items-center justify-between border-t border-border/60 bg-slate-50/50 px-6 py-3 font-sans text-xs text-slate-500">
+              <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/50 px-6 py-3 font-sans text-xs text-slate-500">
                 <span>Showing {filteredRecords.length} of {records.length} database entries</span>
-                <span className="font-mono text-[11px]">Database Engine: PostgreSQL</span>
+                <span className="font-sans text-[11px] text-slate-400">Database Engine: PostgreSQL</span>
               </div>
             </div>
           </div>

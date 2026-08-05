@@ -4465,30 +4465,35 @@ def get_allocations(
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        base_query = "SELECT * FROM july_allocation_form WHERE 1=1"
+        base_query = """
+            SELECT a.*, COALESCE(u.full_name, u.username, 'Onboarding Executive 1') AS executive_name
+            FROM july_allocation_form a
+            LEFT JOIN portal_users u ON a.created_by = u.id
+            WHERE 1=1
+        """
         params = []
 
         if query:
             base_query += """ AND (
-                LOWER(driver_name)        LIKE %s OR
-                LOWER(driver_id)          LIKE %s OR
-                driver_phone              LIKE %s OR
-                LOWER(vehicle_number)     LIKE %s OR
-                LOWER(old_vehicle_number) LIKE %s OR
-                CAST(id AS TEXT)          LIKE %s
+                LOWER(a.driver_name)        LIKE %s OR
+                LOWER(a.driver_id)          LIKE %s OR
+                a.driver_phone              LIKE %s OR
+                LOWER(a.vehicle_number)     LIKE %s OR
+                LOWER(a.old_vehicle_number) LIKE %s OR
+                CAST(a.id AS TEXT)          LIKE %s
             )"""
             q = f"%{query.lower()}%"
             params.extend([q, q, q, q, q, q])
 
         if city and city != "all":
-            base_query += " AND city_name = %s"
+            base_query += " AND a.city_name = %s"
             params.append(city)
 
         if alloc_type and alloc_type != "all":
-            base_query += " AND allocation_type = %s"
+            base_query += " AND a.allocation_type = %s"
             params.append(alloc_type)
 
-        base_query += " ORDER BY COALESCE(updated_at, created_at) DESC, id DESC"
+        base_query += " ORDER BY COALESCE(a.updated_at, a.created_at) DESC, a.id DESC"
         cur.execute(base_query, params)
         cols = [d[0] for d in cur.description]
         result = []
@@ -4498,6 +4503,7 @@ def get_allocations(
             for df in ["allocation_date", "created_at", "updated_at"]:
                 if rec.get(df) and hasattr(rec[df], "isoformat"):
                     rec[df] = rec[df].isoformat()
+            rec["allocated_by"] = rec.get("executive_name") or "Onboarding Executive 1"
             result.append(rec)
         return result
     finally:
