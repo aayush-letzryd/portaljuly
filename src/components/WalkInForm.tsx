@@ -741,20 +741,7 @@ export default function WalkInForm({
                 Walk-In Form
               </button>
             )}
-            {!isReadOnly && (
-              <button
-                onClick={() => setActiveTab("drafts")}
-                className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold tracking-wide transition-all cursor-pointer ${ activeTab === "drafts" ? "bg-amber-600 text-white shadow-sm shadow-amber-600/20" : "text-text-muted hover:bg-slate-100 hover:text-amber-600" }`}
-              >
-                <Clock className="h-4 w-4" />
-                Saved Drafts
-                {draftCount > 0 && (
-                  <span className="ml-1 px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded-full text-[10px] font-extrabold">
-                    {draftCount}
-                  </span>
-                )}
-              </button>
-            )}
+
             <button
               onClick={() => setActiveTab("registry")}
               className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold tracking-wide transition-all cursor-pointer ${ activeTab === "registry" ? "bg-primary text-white shadow-sm shadow-primary/20" : "text-text-muted hover:bg-slate-100 hover:text-primary" }`}
@@ -1176,14 +1163,7 @@ export default function WalkInForm({
                   ) : (
                     <>
                       {editingId && <button type="button" onClick={() => { resetForm(); setActiveTab("registry"); }} className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer">Cancel Edit</button>}
-                      <button
-                        type="button"
-                        disabled={isDuplicate}
-                        onClick={(e) => handleFormSubmit(e as any, true)}
-                        className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        Save as Draft
-                      </button>
+
                       <button 
                         type="submit" 
                         className="h-11 rounded-lg bg-primary hover:bg-primary-hover text-white px-6 font-sans text-sm font-semibold shadow-md cursor-pointer transition-colors"
@@ -1199,84 +1179,8 @@ export default function WalkInForm({
           </div>
         )}
 
-        {/* TAB 3: DRAFTS */}
-        {activeTab === "drafts" && !isReadOnly && (
-          <div className="flex flex-col gap-8">
-            <div className="rounded-2xl border border-border bg-white shadow-xs overflow-hidden">
-              <div className="border-b border-border p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <h3 className="font-sans text-lg font-bold text-slate-900 tracking-tight">Drafts</h3>
-                  <p className="font-sans text-xs text-text-muted mt-1">Incomplete walk-in entries saved as drafts</p>
-                </div>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
-                  <thead>
-                    <tr className="bg-slate-50 border-b border-border/60">
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Draft ID</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Candidate Name</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">City</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Contact</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Created By</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Date & Time Created</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Last Edited At</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Last Edited By</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-border/40">
-                    {draftRecords.length === 0 ? (
-                      <tr><td colSpan={9} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50 text-[11px]">No drafts found.</td></tr>
-                    ) : (
-                      draftRecords.map((r) => {
-                        const createdDate = r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : (r.event_date || "—");
-                        const createdTime = r.created_at ? new Date(r.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : (r.enquiry_time || "—");
-                        
-                        const updatedDate = r.updated_at ? new Date(r.updated_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : createdDate;
-                        const updatedTime = r.updated_at ? new Date(r.updated_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : createdTime;
-
-                        return (
-                          <tr key={r.id} className="hover:bg-slate-50/50 transition-colors text-[11px] font-sans">
-                            <td className="px-4 py-3 font-mono font-bold text-slate-900">#{r.id}</td>
-                            <td className="px-4 py-3 font-bold text-slate-900">
-                              {r.first_name ? `${r.first_name} ${r.last_name}`.trim() : (r.person_name || 'N/A')}
-                            </td>
-                            <td className="px-4 py-3 font-bold text-slate-700">{normalizeCity(r.city || r.city_name)}</td>
-                            <td className="px-4 py-3 font-semibold text-slate-800">{r.person_number || 'N/A'}</td>
-                            <td className="px-4 py-3">
-                              <div className="font-bold text-slate-900">{r.executive_name || 'Onboarding Executive 1'}</div>
-                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.executive_id || 26}</div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="font-bold text-slate-800">{createdDate}</div>
-                              <div className="text-slate-400 text-[10px] font-medium">{createdTime}</div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <div className="font-bold text-slate-800">{updatedDate}</div>
-                              <div className="text-slate-400 text-[10px] font-medium">{updatedTime}</div>
-                            </td>
-                            <td className="px-4 py-3 font-bold text-slate-800">
-                              {r.updated_by_name || r.executive_name || '—'}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <div className="inline-flex gap-1.5 justify-center">
-                                <button type="button" onClick={() => viewRecordInline(r)} className="rounded-lg p-1 border border-border bg-white text-slate-600 hover:text-primary hover:bg-slate-50 transition-all cursor-pointer" title="View Full Details"><Eye className="h-3.5 w-3.5" /></button>
-                                <button type="button" onClick={() => fetchRecordDetailsForEdit(r.id)} className="rounded-lg px-2 py-1 border border-border bg-white text-slate-700 hover:text-primary hover:bg-slate-50 transition-all cursor-pointer flex items-center gap-1 font-semibold text-[11px]"><Edit className="h-3.5 w-3.5" /> Edit</button>
-                                <button type="button" onClick={() => { if (window.confirm('Delete this draft?')) handleDeleteRecord(r.id); }} className="rounded-lg p-1 border border-border bg-white text-slate-600 hover:text-rose-500 hover:bg-rose-50 border-rose-200 transition-all cursor-pointer" title="Delete Draft"><Trash2 className="h-3.5 w-3.5" /></button>
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })
-                    )}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
         {/* TAB 2: REGISTRY */}
+
         {activeTab === "registry" && (
           <div className="flex flex-col gap-8">
 
@@ -1316,16 +1220,7 @@ export default function WalkInForm({
                 </select>
               </div>
 
-              <div className="relative">
-                <select value={filterStatus} onChange={(e) => {setFilterStatus(e.target.value); setPage(1);}} className="h-10 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer">
-                  <option value="all">All Statuses</option>
-                  <option value="Onboarding Process Initiated">Onboarding Process Initiated</option>
-                  <option value="Follow Up Required">Follow Up Required</option>
-                  <option value="Successfully Onboarded">Successfully Onboarded</option>
-                  <option value="No Follow Up Required / Closed">No Follow Up Required / Closed</option>
-                  <option value="Others">Others</option>
-                </select>
-              </div>
+
 
               {filterTimePeriod === "custom" && (
                 <div className="col-span-1 sm:col-span-5 grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2 border-t border-border/60">
@@ -1351,37 +1246,7 @@ export default function WalkInForm({
               )}
             </div>
 
-            {/* Bento Grid Metrics */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              <div className="rounded-xl border border-border bg-white p-5 shadow-xs flex justify-between items-center">
-                <div className="flex flex-col">
-                  <span className="font-sans text-[10px] font-bold text-text-dim">Total Walk-Ins</span>
-                  <span className="font-sans text-3xl font-extrabold text-slate-900 mt-1">{metrics.total}</span>
-                </div>
-                <div className="rounded-xl bg-slate-100 text-slate-600 p-3"><User className="h-6 w-6" /></div>
-              </div>
-              <div className="rounded-xl border border-border bg-white p-5 shadow-xs flex justify-between items-center">
-                <div className="flex flex-col">
-                  <span className="font-sans text-[10px] font-bold text-text-dim">Successful onboardings</span>
-                  <span className="font-sans text-3xl font-extrabold text-primary mt-1">{metrics.joined}</span>
-                </div>
-                <div className="rounded-xl bg-green-50 text-primary p-3"><CheckCircle className="h-6 w-6" /></div>
-              </div>
-              <div className="rounded-xl border border-border bg-white p-5 shadow-xs flex justify-between items-center">
-                <div className="flex-grow flex flex-col">
-                  <span className="font-sans text-[10px] font-bold text-text-dim">Conversion Rate</span>
-                  <span className="font-sans text-3xl font-extrabold text-slate-900 mt-1">{metrics.conversionRate}%</span>
-                </div>
-                <div className="rounded-xl bg-slate-100 text-slate-600 p-3"><ShieldCheck className="h-6 w-6" /></div>
-              </div>
-              <div className="rounded-xl border border-border bg-white p-5 shadow-xs flex justify-between items-center">
-                <div className="flex flex-col">
-                  <span className="font-sans text-[10px] font-bold text-text-dim">Pending Follow-Ups</span>
-                  <span className="font-sans text-3xl font-extrabold text-amber-500 mt-1">{metrics.pending}</span>
-                </div>
-                <div className="rounded-xl bg-amber-50 text-amber-500 p-3"><Clock className="h-6 w-6" /></div>
-              </div>
-            </div>
+
 
             {/* Records Card */}
             <div className="rounded-2xl border border-border bg-white shadow-xs overflow-hidden">
