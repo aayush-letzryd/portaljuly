@@ -1384,7 +1384,7 @@ export default function WalkInForm({
                             </td>
                             <td className="px-4 py-3">
                               <div className="font-bold text-slate-900">{r.executive_name}</div>
-                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.executive_id}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.executive_id || '—'}</div>
                             </td>
                             <td className="px-4 py-3">
                               <div className="font-bold text-slate-800">{createdDate}</div>
@@ -1394,8 +1394,9 @@ export default function WalkInForm({
                               <div className="font-bold text-slate-800">{updatedDate}</div>
                               <div className="text-slate-400 text-[10px] font-medium">{updatedTime}</div>
                             </td>
-                            <td className="px-4 py-3 font-bold text-slate-800">
-                              {r.updated_by_name || r.executive_name || '—'}
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-800">{r.updated_by_name || r.executive_name || '—'}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.updated_by || r.executive_id || '—'}</div>
                             </td>
                             <td className="px-4 py-3 text-center">
                               <div className="inline-flex gap-1.5 justify-center">

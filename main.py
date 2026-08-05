@@ -2734,6 +2734,8 @@ def get_all_walkins(
                 COALESCE(n.updated_at, n.created_at) AS updated_at,
                 COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'Executive') AS executive_name,
                 COALESCE(NULLIF(TRIM(CONCAT(e_up.first_name, ' ', e_up.last_name)), ''), pu_up.username, NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'Executive') AS updated_by_name,
+                COALESCE(pu.portal_user_id, n.created_by, n.executive_id) AS executive_id,
+                COALESCE(pu_up.portal_user_id, n.updated_by, pu.portal_user_id, n.created_by, n.executive_id) AS updated_by_id,
                 n.id::integer AS raw_id
             FROM july_new_walkins n
             LEFT JOIN july_portal_users pu ON pu.portal_user_id = COALESCE(n.created_by, n.executive_id)
@@ -2764,6 +2766,8 @@ def get_all_walkins(
                 COALESCE(ex.updated_at, ex.created_at) AS updated_at,
                 COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'Executive') AS executive_name,
                 COALESCE(NULLIF(TRIM(CONCAT(e_up.first_name, ' ', e_up.last_name)), ''), pu_up.username, NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'Executive') AS updated_by_name,
+                COALESCE(pu.portal_user_id, ex.created_by, ex.executive_id) AS executive_id,
+                COALESCE(pu_up.portal_user_id, ex.updated_by, pu.portal_user_id, ex.created_by, ex.executive_id) AS updated_by_id,
                 ex.id::integer AS raw_id
             FROM july_existing_walkins ex
             LEFT JOIN july_portal_users pu ON pu.portal_user_id = COALESCE(ex.created_by, ex.executive_id)
@@ -2794,6 +2798,8 @@ def get_all_walkins(
                 COALESCE(w.updated_at, w.created_at) AS updated_at,
                 COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'Executive') AS executive_name,
                 COALESCE(NULLIF(TRIM(CONCAT(e_up.first_name, ' ', e_up.last_name)), ''), pu_up.username, NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'Executive') AS updated_by_name,
+                COALESCE(pu.portal_user_id, w.created_by, w.executive_id) AS executive_id,
+                COALESCE(pu_up.portal_user_id, w.updated_by, pu.portal_user_id, w.created_by, w.executive_id) AS updated_by_id,
                 w.id::integer AS raw_id
             FROM july_walkins w
             LEFT JOIN july_portal_users pu ON pu.portal_user_id = COALESCE(w.created_by, w.executive_id)
@@ -2889,7 +2895,9 @@ def get_all_walkins(
                 "updated_at": r[16].isoformat() if r[16] else None,
                 "executive_name": r[17],
                 "updated_by_name": r[18],
-                "raw_id": r[19],
+                "executive_id": r[19],
+                "updated_by": r[20],
+                "raw_id": r[21],
             })
 
         return {"items": items, "total": total_count, "page": page, "limit": limit}
@@ -4147,7 +4155,7 @@ def get_adjustments(
             base_query += " AND status = %s"
             params.append(status)
             
-        base_query += " ORDER BY id DESC"
+        base_query += " ORDER BY COALESCE(updated_at, created_at) DESC, id DESC"
         cur.execute(base_query, params)
         cols = [d[0] for d in cur.description]
         return [dict(zip(cols, row)) for row in cur.fetchall()]
@@ -4383,7 +4391,7 @@ def get_allocations(
             base_query += " AND allocation_type = %s"
             params.append(alloc_type)
 
-        base_query += " ORDER BY id DESC"
+        base_query += " ORDER BY COALESCE(updated_at, created_at) DESC, id DESC"
         cur.execute(base_query, params)
         cols = [d[0] for d in cur.description]
         result = []
@@ -4976,7 +4984,7 @@ def get_expenses(
             base_query += " AND expenses_type = %s"
             params.append(exp_type)
             
-        base_query += " ORDER BY id DESC"
+        base_query += " ORDER BY COALESCE(updated_at, created_at) DESC, id DESC"
         cur.execute(base_query, params)
         cols = [d[0] for d in cur.description]
         return [dict(zip(cols, row)) for row in cur.fetchall()]
