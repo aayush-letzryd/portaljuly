@@ -942,7 +942,6 @@ export default function WalkInForm({
             </div>
 
             <form onSubmit={handleFormSubmit} className={`rounded-2xl border border-border bg-white p-6 shadow-xs md:p-8 flex flex-col gap-8 ${isFormReadOnly ? "opacity-90 bg-slate-50/40" : ""}`}>
-              <fieldset disabled={isFormReadOnly || isReadOnly} className="contents">
               
               {/* 1. Candidate Information (Top Section) */}
               <div className="flex flex-col gap-5 bg-slate-50/60 p-5 rounded-2xl border border-border">
@@ -1139,6 +1138,7 @@ export default function WalkInForm({
                       <div className="relative w-full">
                         <input
                           type={showAadhaar ? "text" : "password"}
+                          readOnly={isFormReadOnly || isReadOnly}
                           placeholder="Enter 12-digit Aadhaar Number"
                           value={aadhaarNumber}
                           onChange={(e) => setAadhaarNumber(e.target.value)}
@@ -1147,25 +1147,26 @@ export default function WalkInForm({
                         <button
                           type="button"
                           onClick={() => setShowAadhaar(!showAadhaar)}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer p-1"
+                          title={showAadhaar ? "Mask Number" : "Unmask Number"}
                         >
-                          {showAadhaar ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          {showAadhaar ? <EyeOff className="w-4 h-4 text-primary" /> : <Eye className="w-4 h-4 text-slate-500" />}
                         </button>
                       </div>
 
                       {aadhaarImage ? (
                         <div className="relative">
                           <img src={aadhaarImage} alt="Aadhaar" className="w-full h-16 object-cover rounded-lg border border-border" />
-                          <button type="button" onClick={() => setAadhaarImage(null)} className="absolute top-1 right-1 bg-white rounded-full p-0.5 shadow cursor-pointer text-red-500 hover:bg-red-50"><X className="w-3 h-3"/></button>
+                          {!isFormReadOnly && <button type="button" onClick={() => setAadhaarImage(null)} className="absolute top-1 right-1 bg-white rounded-full p-0.5 shadow cursor-pointer text-red-500 hover:bg-red-50"><X className="w-3 h-3"/></button>}
                         </div>
-                      ) : (
+                      ) : !isFormReadOnly ? (
                         <div className="flex gap-2">
                           <button type="button" onClick={() => setCameraActiveField("aadhaar")} className="flex-1 bg-slate-50 hover:bg-slate-100 text-xs py-2 rounded-lg text-center border border-border font-semibold text-slate-700 cursor-pointer transition-colors flex items-center justify-center gap-1.5"><Camera className="w-3.5 h-3.5 text-primary"/> Camera</button>
                           <label className="flex-1 bg-slate-50 hover:bg-slate-100 text-xs py-2 rounded-lg text-center border border-border font-semibold text-slate-700 cursor-pointer transition-colors flex items-center justify-center gap-1.5">
                             <Upload className="w-3.5 h-3.5 text-primary"/> File <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "aadhaar")} />
                           </label>
                         </div>
-                      )}
+                      ) : null}
                     </div>
 
                     {/* DL group */}
@@ -1174,6 +1175,7 @@ export default function WalkInForm({
                       <div className="relative w-full">
                         <input
                           type={showDl ? "text" : "password"}
+                          readOnly={isFormReadOnly || isReadOnly}
                           placeholder="Enter Driving License Number"
                           value={dlNumber}
                           onChange={(e) => setDlNumber(e.target.value)}
@@ -1182,9 +1184,10 @@ export default function WalkInForm({
                         <button
                           type="button"
                           onClick={() => setShowDl(!showDl)}
-                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                          className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer p-1"
+                          title={showDl ? "Mask Number" : "Unmask Number"}
                         >
-                          {showDl ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          {showDl ? <EyeOff className="w-4 h-4 text-primary" /> : <Eye className="w-4 h-4 text-slate-500" />}
                         </button>
                       </div>
 
@@ -1291,8 +1294,6 @@ export default function WalkInForm({
                   </div>
                </div>
               )}
-
-              </fieldset>
 
               {/* Actions */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-2 pt-6 border-t border-border">
