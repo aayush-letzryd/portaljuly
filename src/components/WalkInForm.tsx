@@ -1007,27 +1007,27 @@ export default function WalkInForm({
                 <div className="flex flex-col gap-5 bg-slate-50/60 p-5 rounded-2xl border border-border">
                   <div className="flex items-center gap-2 border-b border-border pb-3">
                     <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white font-bold text-xs">3</div>
-                    <h3 className="font-sans text-xs font-bold text-primary uppercase tracking-wider">Identity & Document Uploads (New Candidate Onboarding)</h3>
+                    <h3 className="font-sans text-xs font-bold text-slate-800 uppercase tracking-wider">Identity & Document Uploads (New Candidate Onboarding)</h3>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     {/* Aadhaar group */}
                     <div className="flex flex-col gap-2.5 p-4 bg-white border border-border rounded-xl">
-                      <label className="font-sans text-xs font-bold text-slate-800">1. Aadhaar Card</label>
+                      <label className="font-sans text-xs font-semibold text-slate-700">1. Aadhaar Card</label>
                       <div className="relative w-full">
                         <input
                           type={showAadhaar ? "text" : "password"}
                           placeholder="Enter 12-digit Aadhaar Number"
                           value={aadhaarNumber}
                           onChange={(e) => setAadhaarNumber(e.target.value)}
-                          className="h-10 w-full rounded-lg border border-border pl-3 pr-9 text-xs outline-none focus:border-primary font-mono bg-slate-50/50"
+                          className="h-11 w-full rounded-lg border border-border pl-3 pr-9 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal"
                         />
                         <button
                           type="button"
                           onClick={() => setShowAadhaar(!showAadhaar)}
                           className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
                         >
-                          {showAadhaar ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          {showAadhaar ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
 
@@ -1038,8 +1038,8 @@ export default function WalkInForm({
                         </div>
                       ) : (
                         <div className="flex gap-2">
-                          <button type="button" onClick={() => setCameraActiveField("aadhaar")} className="flex-1 bg-slate-50 hover:bg-slate-100 text-xs py-2 rounded-lg text-center border border-border font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5"><Camera className="w-3.5 h-3.5 text-primary"/> Camera</button>
-                          <label className="flex-1 bg-slate-50 hover:bg-slate-100 text-xs py-2 rounded-lg text-center border border-border font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5">
+                          <button type="button" onClick={() => setCameraActiveField("aadhaar")} className="flex-1 bg-slate-50 hover:bg-slate-100 text-xs py-2 rounded-lg text-center border border-border font-semibold text-slate-700 cursor-pointer transition-colors flex items-center justify-center gap-1.5"><Camera className="w-3.5 h-3.5 text-primary"/> Camera</button>
+                          <label className="flex-1 bg-slate-50 hover:bg-slate-100 text-xs py-2 rounded-lg text-center border border-border font-semibold text-slate-700 cursor-pointer transition-colors flex items-center justify-center gap-1.5">
                             <Upload className="w-3.5 h-3.5 text-primary"/> File <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "aadhaar")} />
                           </label>
                         </div>
@@ -1048,21 +1048,21 @@ export default function WalkInForm({
 
                     {/* DL group */}
                     <div className="flex flex-col gap-2.5 p-4 bg-white border border-border rounded-xl">
-                      <label className="font-sans text-xs font-bold text-slate-800">2. Driving License</label>
+                      <label className="font-sans text-xs font-semibold text-slate-700">2. Driving License</label>
                       <div className="relative w-full">
                         <input
                           type={showDl ? "text" : "password"}
                           placeholder="Enter Driving License Number"
                           value={dlNumber}
                           onChange={(e) => setDlNumber(e.target.value)}
-                          className="h-10 w-full rounded-lg border border-border pl-3 pr-9 text-xs outline-none focus:border-primary font-mono bg-slate-50/50"
+                          className="h-11 w-full rounded-lg border border-border pl-3 pr-9 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal"
                         />
                         <button
                           type="button"
                           onClick={() => setShowDl(!showDl)}
                           className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
                         >
-                          {showDl ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5" />}
+                          {showDl ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         </button>
                       </div>
 
@@ -1073,8 +1073,8 @@ export default function WalkInForm({
                         </div>
                       ) : (
                         <div className="flex gap-2">
-                          <button type="button" onClick={() => setCameraActiveField("dl")} className="flex-1 bg-slate-50 hover:bg-slate-100 text-xs py-2 rounded-lg text-center border border-border font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5"><Camera className="w-3.5 h-3.5 text-primary"/> Camera</button>
-                          <label className="flex-1 bg-slate-50 hover:bg-slate-100 text-xs py-2 rounded-lg text-center border border-border font-semibold cursor-pointer transition-colors flex items-center justify-center gap-1.5">
+                          <button type="button" onClick={() => setCameraActiveField("dl")} className="flex-1 bg-slate-50 hover:bg-slate-100 text-xs py-2 rounded-lg text-center border border-border font-semibold text-slate-700 cursor-pointer transition-colors flex items-center justify-center gap-1.5"><Camera className="w-3.5 h-3.5 text-primary"/> Camera</button>
+                          <label className="flex-1 bg-slate-50 hover:bg-slate-100 text-xs py-2 rounded-lg text-center border border-border font-semibold text-slate-700 cursor-pointer transition-colors flex items-center justify-center gap-1.5">
                             <Upload className="w-3.5 h-3.5 text-primary"/> File <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "dl")} />
                           </label>
                         </div>
@@ -1084,19 +1084,19 @@ export default function WalkInForm({
                 </div>
               )}
 
-              {/* 3. Classifications & Outcome (Bottom Section) */}
+              {/* 4. Classifications & Outcome (Bottom Section) */}
               <div className="flex flex-col gap-5 bg-slate-50/60 p-5 rounded-2xl border border-border">
                  <div className="flex items-center gap-2 border-b border-border pb-3">
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white font-bold text-xs">3</div>
-                    <h3 className="font-sans text-xs font-bold text-primary uppercase tracking-wider">Classifications & Outcome</h3>
+                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white font-bold text-xs">4</div>
+                    <h3 className="font-sans text-xs font-bold text-slate-800 uppercase tracking-wider">Classifications & Outcome</h3>
                  </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  
                  <div className="flex flex-col gap-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div className="flex flex-col gap-1.5">
-                        <label className="font-sans text-xs font-semibold text-text-muted">Interested Position</label>
-                        <select value={interestedPosition} onChange={(e) => setInterestedPosition(e.target.value)} className="h-10 rounded border border-border px-3 text-sm bg-white outline-none focus:border-primary">
+                        <label className="font-sans text-xs font-semibold text-slate-700">Interested Position</label>
+                        <select value={interestedPosition} onChange={(e) => setInterestedPosition(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer">
                           <option value="Driver">Driver</option>
                           <option value="Operator">Operator</option>
                           <option value="Enquiry">Enquiry</option>
@@ -1104,7 +1104,7 @@ export default function WalkInForm({
                       </div>
                       
                       <div className="flex flex-col gap-1.5">
-                        <label className="font-sans text-xs font-semibold text-text-muted">Lead Channel <span className="text-red-500">*</span></label>
+                        <label className="font-sans text-xs font-semibold text-slate-700">Lead Channel *</label>
                         <select
                           required
                           value={leadChannel}
@@ -1112,7 +1112,7 @@ export default function WalkInForm({
                             setLeadChannel(e.target.value);
                             setLeadSource(e.target.value);
                           }}
-                          className="h-10 rounded border border-border px-3 text-sm bg-white outline-none focus:border-primary"
+                          className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer"
                         >
                           <option value="Direct Walk-in">Direct Walk-in</option>
                           <option value="Telecaller">Telecaller</option>
@@ -1124,8 +1124,8 @@ export default function WalkInForm({
                     </div>
 
                     <div className="flex flex-col gap-1.5">
-                      <label className="font-sans text-xs font-semibold text-text-muted">
-                        Lead Channel Name / Details <span className="text-red-500">*</span>
+                      <label className="font-sans text-xs font-semibold text-slate-700">
+                        Lead Channel Name / Details *
                       </label>
                       <input
                         type="text"
@@ -1140,19 +1140,19 @@ export default function WalkInForm({
                           leadChannel === "Driver Referral" ? "Enter Referrer Driver Details (Name / ID / Phone)" :
                           "Enter Lead Channel Details"
                         }
-                        className="h-10 rounded border border-border px-3 text-sm bg-white outline-none focus:border-primary"
+                        className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal"
                       />
                     </div>
 
                     {leadChannel === "Driver Referral" && (
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col gap-1.5">
-                          <label className="font-sans text-xs font-semibold text-text-muted">Referred By (Name) *</label>
-                          <input type="text" required value={referredByName} onChange={(e) => setReferredByName(e.target.value)} className="h-10 rounded border border-border px-3 text-sm bg-white outline-none focus:border-primary" placeholder="Referrer Name" />
+                          <label className="font-sans text-xs font-semibold text-slate-700">Referred By (Name) *</label>
+                          <input type="text" required value={referredByName} onChange={(e) => setReferredByName(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal" placeholder="Referrer Name" />
                         </div>
                         <div className="flex flex-col gap-1.5">
-                          <label className="font-sans text-xs font-semibold text-text-muted">Referred By (Phone) *</label>
-                          <input type="tel" required value={referredByPhone} onChange={(e) => setReferredByPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} className="h-10 rounded border border-border px-3 text-sm bg-white outline-none focus:border-primary" placeholder="10-digit Phone" />
+                          <label className="font-sans text-xs font-semibold text-slate-700">Referred By (Phone) *</label>
+                          <input type="tel" required value={referredByPhone} onChange={(e) => setReferredByPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal" placeholder="10-digit Phone" />
                         </div>
                       </div>
                     )}
@@ -1160,8 +1160,8 @@ export default function WalkInForm({
 
                  <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1.5">
-                      <label className="font-sans text-xs font-semibold text-text-muted">Status *</label>
-                      <select required value={joinedStatus} onChange={(e) => setJoinedStatus(e.target.value as OnboardingOutcome)} className="h-10 rounded border border-border px-3 text-sm bg-white outline-none focus:border-primary">
+                      <label className="font-sans text-xs font-semibold text-slate-700">Status *</label>
+                      <select required value={joinedStatus} onChange={(e) => setJoinedStatus(e.target.value as OnboardingOutcome)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer">
                           <option value="Onboarding Process Initiated">Onboarding Process Initiated</option>
                           <option value="Successfully Onboarded">Successfully Onboarded</option>
                           <option value="Follow Up Required">Follow Up Required</option>
@@ -1170,8 +1170,8 @@ export default function WalkInForm({
                       </select>
                     </div>
                     <div className="flex flex-col gap-1.5">
-                      <label className="font-sans text-xs font-semibold text-text-muted">Remarks</label>
-                      <textarea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} className="rounded border border-border p-2 text-sm bg-white outline-none focus:border-primary resize-none" />
+                      <label className="font-sans text-xs font-semibold text-slate-700">Remarks</label>
+                      <textarea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} className="w-full rounded-lg border border-border p-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal resize-none" placeholder="Enter optional remarks..." />
                     </div>
                  </div>
 
