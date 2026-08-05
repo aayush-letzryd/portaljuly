@@ -3208,67 +3208,67 @@ def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None,
         
         base_query = """
             SELECT 
-                w.onboarding_id AS id,
-                w.onboarding_id,
-                w.driver_id,
-                w.driver_name,
-                w.phone_number,
-                w.city,
-                w.driver_plan,
-                w.father_name,
-                w.present_address,
-                w.emergency_name,
-                w.emergency_phone,
-                w.driving_license,
-                w.pan_number,
-                w.aadhaar_number,
-                w.approval_status,
-                w.created_by,
-                w.updated_by,
-                w.current_approver_id,
-                w.approved_by,
-                w.approval_remarks,
-                w.created_at,
-                w.updated_at,
-                w.security_deposit,
-                w.daily_rent,
-                COALESCE(w.vendor_type, w.candidate_role, 'Driver') AS vendor_type,
-                COALESCE(w.candidate_role, w.vendor_type, 'Driver') AS candidate_role,
+                f.id AS id,
+                f.id AS onboarding_id,
+                COALESCE(f.driver_id, f.vendor_id, 'DRV-' || f.id) AS driver_id,
+                COALESCE(f.driver_name, f.vendor_name, 'Partner') AS driver_name,
+                f.phone_number,
+                f.city,
+                f.rental_model AS driver_plan,
+                f.father_name,
+                f.present_address,
+                f.emergency_name,
+                f.emergency_phone,
+                f.dl_number AS driving_license,
+                f.pan_number,
+                f.aadhaar_number,
+                COALESCE(f.approval_status, 'Draft') AS approval_status,
+                f.created_by,
+                f.updated_by,
+                f.current_approver_id,
+                f.approved_by,
+                f.approval_remarks,
+                f.created_at,
+                f.updated_at,
+                f.security_deposit,
+                f.custom_rent_amount AS daily_rent,
+                COALESCE(f.vendor_type, f.candidate_role, 'Driver') AS vendor_type,
+                COALESCE(f.candidate_role, f.vendor_type, 'Driver') AS candidate_role,
                 COALESCE(NULLIF(TRIM(CONCAT(e1.first_name, ' ', e1.last_name)), ''), u1.username, 'Admin') AS executive_name,
                 COALESCE(NULLIF(TRIM(CONCAT(e2.first_name, ' ', e2.last_name)), ''), u2.username, NULLIF(TRIM(CONCAT(e1.first_name, ' ', e1.last_name)), ''), u1.username, '—') AS updated_by_name
-            FROM july_onboarding w
-            LEFT JOIN july_portal_users u1 ON u1.portal_user_id = w.created_by
+            FROM july_form_onboarding f
+            LEFT JOIN july_portal_users u1 ON u1.portal_user_id = f.created_by
             LEFT JOIN july_employees e1 ON e1.employee_id = u1.employee_id
-            LEFT JOIN july_portal_users u2 ON u2.portal_user_id = w.updated_by
+            LEFT JOIN july_portal_users u2 ON u2.portal_user_id = f.updated_by
             LEFT JOIN july_employees e2 ON e2.employee_id = u2.employee_id
             WHERE 1=1
         """
         params = []
         
         if status == "Draft":
-            base_query += " AND w.approval_status = 'Draft'"
+            base_query += " AND f.approval_status = 'Draft'"
         elif status and status != "all":
-            base_query += " AND w.approval_status = %s"
+            base_query += " AND f.approval_status = %s"
             params.append(status)
         elif not status:
-            base_query += " AND (w.approval_status IS NULL OR w.approval_status != 'Draft')"
+            base_query += " AND (f.approval_status IS NULL OR f.approval_status != 'Draft')"
 
         if search:
             base_query += """
                 AND (
-                    w.driver_name ILIKE %s OR w.phone_number ILIKE %s 
-                    OR w.driving_license ILIKE %s OR w.aadhaar_number ILIKE %s
-                    OR CAST(w.onboarding_id AS TEXT) ILIKE %s
+                    f.driver_name ILIKE %s OR f.phone_number ILIKE %s 
+                    OR f.dl_number ILIKE %s OR f.aadhaar_number ILIKE %s
+                    OR CAST(f.id AS TEXT) ILIKE %s
                 )
             """
             search_pattern = f"%{search}%"
             params.extend([search_pattern] * 5)
             
         if city and city != "all":
-            base_query += " AND w.city = %s"
+            base_query += " AND f.city = %s"
             params.append(city)
             
-        base_query += " ORDER BY COALESCE(w.updated_at, w.created_at) DESC, w.onboarding_id DESC LIMIT %s;"
+        base_query += " ORDER BY COALESCE(f.updated_at, f.created_at) DESC, f.id DESC LIMIT %s;"
         params.append(limit)
         
         cur.execute(base_query, params)
