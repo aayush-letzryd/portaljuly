@@ -147,7 +147,7 @@ export default function WalkInForm({
   const [candidateHistory, setCandidateHistory] = useState<any[]>([]);
   const [fetchBannerMsg, setFetchBannerMsg] = useState<string>("");
   const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false);
-  const [viewRecord, setViewRecord] = useState<any | null>(null);
+  const [isFormReadOnly, setIsFormReadOnly] = useState<boolean>(false);
 
   const applyRecordAutoFill = (match: any) => {
     setFirstName(match.first_name || match.person_name?.split(" ")[0] || "");
@@ -520,6 +520,7 @@ export default function WalkInForm({
     setIsTagsDropdownOpen(false);
     setCustomTagInput("");
     setShowCustomTagInput(false);
+    setIsFormReadOnly(false);
   };
 
   const fetchRecordDetailsForEdit = async (id: number) => {
@@ -529,6 +530,7 @@ export default function WalkInForm({
       const res = await fetch(`/api/walkins/${id}`, { headers: { "Authorization": `Bearer ${token}` }});
       if (!res.ok) throw new Error("Failed to load details");
       const data = await res.json();
+      setIsFormReadOnly(false);
       loadRecordIntoForm(data, id);
       setSearchRetrieveQuery("");
       setRetrieveResults([]);
@@ -536,6 +538,11 @@ export default function WalkInForm({
     } catch (e) {
       alert("Error loading record details");
     }
+  };
+
+  const viewRecordInline = (r: any) => {
+    setIsFormReadOnly(true);
+    loadRecordIntoForm(r, r.id);
   };
 
   const formatTimeForInput = (timeStr: string) => {
@@ -735,12 +742,29 @@ export default function WalkInForm({
                       LetzRyd Desk
                     </span>
                   </div>
-                  <h1 className="font-sans text-2xl font-bold tracking-tight text-white">{editingId ? `Edit Walk-in #${editingId}` : "Walk-In Form"}</h1>
+                  <h1 className="font-sans text-2xl font-bold tracking-tight text-white">{isFormReadOnly ? `View Walk-In Entry #${editingId}` : editingId ? `Edit Walk-in #${editingId}` : "Walk-In Form"}</h1>
                 </div>
               </div>
             </div>
 
+            {isFormReadOnly && (
+              <div className="flex items-center justify-between gap-3 px-5 py-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-semibold">
+                <div className="flex items-center gap-2">
+                  <Eye className="w-4 h-4 text-amber-700" />
+                  <span>Viewing Walk-In Entry #{editingId} in Read-Only Mode. Preserving original form layout.</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => { resetForm(); setActiveTab("registry"); }}
+                  className="px-3 py-1.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                >
+                  ← Back to Registry
+                </button>
+              </div>
+            )}
+
             <form onSubmit={handleFormSubmit} className="rounded-2xl border border-border bg-white p-6 shadow-xs md:p-8 flex flex-col gap-8">
+              <fieldset disabled={isFormReadOnly || isReadOnly} className="contents">
               
               {/* 1. Candidate Information (Top Section) */}
               <div className="flex flex-col gap-5 bg-slate-50/60 p-5 rounded-2xl border border-border">
@@ -1070,12 +1094,14 @@ export default function WalkInForm({
                </div>
               )}
 
+              </fieldset>
+
               {/* Actions */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-2 pt-6 border-t border-border">
                 <p className="text-[10px] font-bold text-red-500">* Mandatory Fields</p>
 
                 {/* Duplicate warning banner */}
-                {isDuplicate && (
+                {isDuplicate && !isFormReadOnly && (
                   <div className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-xs font-bold">
                     <AlertTriangle className="h-4 w-4 flex-shrink-0" />
                     <span>{duplicateMsg || "Already filled."}</span>
@@ -1083,21 +1109,33 @@ export default function WalkInForm({
                 )}
 
                 <div className="flex gap-3">
-                  {editingId && <button type="button" onClick={() => { resetForm(); setActiveTab("registry"); }} className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer">Cancel Edit</button>}
-                  <button
-                    type="button"
-                    disabled={isDuplicate}
-                    onClick={(e) => handleFormSubmit(e as any, true)}
-                    className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Save as Draft
-                  </button>
-                  <button 
-                    type="submit" 
-                    className="h-11 rounded-lg bg-primary hover:bg-primary-hover text-white px-6 font-sans text-sm font-semibold shadow-md cursor-pointer transition-colors"
-                  >
-                    {editingId ? "Update Entry" : "Submit Visit"}
-                  </button>
+                  {isFormReadOnly ? (
+                    <button
+                      type="button"
+                      onClick={() => { resetForm(); setActiveTab("registry"); }}
+                      className="h-11 rounded-lg border border-border bg-slate-900 text-white px-6 font-sans text-xs font-bold hover:bg-slate-800 cursor-pointer shadow-xs transition-colors"
+                    >
+                      ← Back to Registry
+                    </button>
+                  ) : (
+                    <>
+                      {editingId && <button type="button" onClick={() => { resetForm(); setActiveTab("registry"); }} className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer">Cancel Edit</button>}
+                      <button
+                        type="button"
+                        disabled={isDuplicate}
+                        onClick={(e) => handleFormSubmit(e as any, true)}
+                        className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        Save as Draft
+                      </button>
+                      <button 
+                        type="submit" 
+                        className="h-11 rounded-lg bg-primary hover:bg-primary-hover text-white px-6 font-sans text-sm font-semibold shadow-md cursor-pointer transition-colors"
+                      >
+                        {editingId ? "Update Entry" : "Submit Visit"}
+                      </button>
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -1166,7 +1204,7 @@ export default function WalkInForm({
                             </td>
                             <td className="px-4 py-3 text-center">
                               <div className="inline-flex gap-1.5 justify-center">
-                                <button type="button" onClick={() => setViewRecord(r)} className="rounded-lg p-1 border border-border bg-white text-slate-600 hover:text-primary hover:bg-slate-50 transition-all cursor-pointer" title="View Full Details"><Eye className="h-3.5 w-3.5" /></button>
+                                <button type="button" onClick={() => viewRecordInline(r)} className="rounded-lg p-1 border border-border bg-white text-slate-600 hover:text-primary hover:bg-slate-50 transition-all cursor-pointer" title="View Full Details"><Eye className="h-3.5 w-3.5" /></button>
                                 <button type="button" onClick={() => fetchRecordDetailsForEdit(r.id)} className="rounded-lg px-2 py-1 border border-border bg-white text-slate-700 hover:text-primary hover:bg-slate-50 transition-all cursor-pointer flex items-center gap-1 font-semibold text-[11px]"><Edit className="h-3.5 w-3.5" /> Edit</button>
                                 <button type="button" onClick={() => { if (window.confirm('Delete this draft?')) handleDeleteRecord(r.id); }} className="rounded-lg p-1 border border-border bg-white text-slate-600 hover:text-rose-500 hover:bg-rose-50 border-rose-200 transition-all cursor-pointer" title="Delete Draft"><Trash2 className="h-3.5 w-3.5" /></button>
                               </div>
@@ -1369,7 +1407,7 @@ export default function WalkInForm({
                             <td className="px-4 py-3"><span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${statusColor}`}>{displayStatus}</span></td>
                             <td className="px-4 py-3 text-center">
                               <div className="inline-flex gap-1.5 justify-center">
-                                <button type="button" onClick={() => setViewRecord(r)} className="rounded-lg p-1 border border-border bg-white text-slate-600 hover:text-primary hover:bg-slate-50 transition-all cursor-pointer" title="View Full Details"><Eye className="h-3.5 w-3.5" /></button>
+                                <button type="button" onClick={() => viewRecordInline(r)} className="rounded-lg p-1 border border-border bg-white text-slate-600 hover:text-primary hover:bg-slate-50 transition-all cursor-pointer" title="View Full Details"><Eye className="h-3.5 w-3.5" /></button>
                                 {!isReadOnly && (
                                   <>
                                     <button type="button" onClick={() => fetchRecordDetailsForEdit(r.id)} className="rounded-lg p-1 border border-border bg-white text-slate-600 hover:text-primary hover:bg-slate-50 transition-all cursor-pointer" title="Edit Entry"><Edit className="h-3.5 w-3.5" /></button>
@@ -1493,132 +1531,7 @@ export default function WalkInForm({
         </div>
       )}
 
-      {viewRecord && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl border border-border shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
-            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-slate-50">
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4 text-primary" />
-                <h3 className="font-sans text-xs font-bold text-slate-800 uppercase tracking-wider">
-                  Walk-In Entry #{viewRecord.id} Details
-                </h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setViewRecord(null)}
-                className="h-7 w-7 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
 
-            <div className="p-6 overflow-y-auto flex flex-col gap-5">
-              {/* Section 1: Candidate Info */}
-              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col gap-3">
-                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-200 pb-1.5">Candidate Details</span>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                  <div>
-                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">Full Name</span>
-                    <span className="font-semibold text-slate-900">{viewRecord.first_name ? `${viewRecord.first_name} ${viewRecord.last_name}`.trim() : (viewRecord.person_name || 'N/A')}</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">Contact Phone</span>
-                    <span className="font-semibold text-slate-900">{viewRecord.person_number || 'N/A'}</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">Operating City</span>
-                    <span className="font-semibold text-slate-900">{viewRecord.city || viewRecord.city_name || 'N/A'}</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Section 2: Visit & Enquiry Details */}
-              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col gap-3">
-                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-200 pb-1.5">Visit & Outcome Details</span>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                  <div>
-                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">Partner Category</span>
-                    <span className="font-semibold text-slate-900">{viewRecord.partner_type || viewRecord.visitor_type || 'Driver'}</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">Visiting Reason</span>
-                    <span className="font-semibold text-slate-900">{viewRecord.visiting_reason || 'Enquiry'}</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">Outcome Status</span>
-                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                      viewRecord.joined_status === 'Successfully Onboarded' ? 'bg-emerald-100 text-emerald-800' :
-                      viewRecord.joined_status === 'Follow Up Required' ? 'bg-amber-100 text-amber-800' :
-                      'bg-blue-100 text-blue-800'
-                    }`}>{viewRecord.joined_status || 'Initiated'}</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">Enquiry Date & Time</span>
-                    <span className="font-medium text-slate-800">{viewRecord.event_date || viewRecord.created_at?.slice(0, 10)} {viewRecord.enquiry_time || ''}</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">Recorded By</span>
-                    <span className="font-medium text-slate-800">{viewRecord.executive_name || 'Executive'}</span>
-                  </div>
-                  <div>
-                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">Last Updated By</span>
-                    <span className="font-medium text-slate-800">{viewRecord.updated_by_name || viewRecord.executive_name || '—'}</span>
-                  </div>
-                </div>
-
-                {viewRecord.visit_tags && (
-                  <div className="flex flex-wrap gap-1.5 mt-1">
-                    <span className="text-[10px] font-semibold text-slate-400 uppercase block w-full">Category Tags:</span>
-                    {(typeof viewRecord.visit_tags === 'string' ? (viewRecord.visit_tags.startsWith('[') ? JSON.parse(viewRecord.visit_tags) : [viewRecord.visit_tags]) : viewRecord.visit_tags).map((tag: string) => (
-                      <span key={tag} className="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {(viewRecord.visit_notes || viewRecord.remarks) && (
-                  <div className="p-3 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 leading-relaxed mt-1">
-                    <span className="font-semibold text-slate-900 block mb-0.5">Visit Notes & Executive Summary:</span>
-                    {viewRecord.visit_notes || viewRecord.remarks}
-                  </div>
-                )}
-              </div>
-
-              {/* Section 3: Identity & Documents (If Present) */}
-              {(viewRecord.aadhaar_number || viewRecord.dl_number) && (
-                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col gap-3">
-                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-200 pb-1.5">KYC & Document Records</span>
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    {viewRecord.aadhaar_number && (
-                      <div>
-                        <span className="block text-[10px] font-semibold text-slate-400 uppercase">Aadhaar Card</span>
-                        <span className="font-semibold text-slate-900">{viewRecord.aadhaar_number}</span>
-                      </div>
-                    )}
-                    {viewRecord.dl_number && (
-                      <div>
-                        <span className="block text-[10px] font-semibold text-slate-400 uppercase">Driving License</span>
-                        <span className="font-semibold text-slate-900">{viewRecord.dl_number}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="px-6 py-3 border-t border-border bg-slate-50 flex justify-end">
-              <button
-                type="button"
-                onClick={() => setViewRecord(null)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {cameraActiveField && (
         <CameraCapture
