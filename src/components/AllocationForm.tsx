@@ -2,7 +2,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { 
   Calendar, MapPin, User, Phone, FileText, CheckCircle, 
   Clock, ArrowLeft, Download, Search, Trash2, Edit, Camera, 
-  Upload, X, RefreshCw, Key, Plus, ChevronLeft, Settings, Database
+  Upload, X, RefreshCw, Key, Plus, ChevronLeft, ChevronRight, Settings, Database
 } from "lucide-react";
 import { AllocationRecord, User as UserSession, CITIES } from "../types";
 import CameraCapture from "./CameraCapture";
@@ -193,6 +193,9 @@ export default function AllocationForm({
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCity, setFilterCity] = useState("all");
   const [filterType, setFilterType] = useState("all");
+  const [filterTime, setFilterTime] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const PAGE_SIZE = 10;
   
   // Top header quick search
   const [retrieveIdInput, setRetrieveIdInput] = useState("");
@@ -488,11 +491,27 @@ export default function AllocationForm({
   };
 
   const filteredRecords = useMemo(() => {
+    const now = new Date();
     return records
       .filter((r) => {
-        if (filterCity !== "all" && r.city_name !== filterCity) return false;
-        if (filterType !== "all" && r.allocation_type !== filterType) return false;
-
+        // City filter (case-insensitive)
+        if (filterCity !== "all" && (r.city_name || "").toLowerCase() !== filterCity.toLowerCase()) return false;
+        // Type filter (case-insensitive)
+        if (filterType !== "all" && (r.allocation_type || "").toLowerCase() !== filterType.toLowerCase()) return false;
+        // Time filter
+        if (filterTime !== "all") {
+          const recDate = new Date(r.created_at || r.updated_at || 0);
+          if (filterTime === "today") {
+            if (recDate.toDateString() !== now.toDateString()) return false;
+          } else if (filterTime === "week") {
+            const weekAgo = new Date(now); weekAgo.setDate(now.getDate() - 7);
+            if (recDate < weekAgo) return false;
+          } else if (filterTime === "month") {
+            const monthAgo = new Date(now); monthAgo.setMonth(now.getMonth() - 1);
+            if (recDate < monthAgo) return false;
+          }
+        }
+        // Search query
         if (searchQuery.trim()) {
           const q = searchQuery.toLowerCase();
           return (
@@ -511,7 +530,10 @@ export default function AllocationForm({
         const dateB = new Date(b.created_at || b.updated_at || 0).getTime();
         return dateB - dateA;
       });
-  }, [records, searchQuery, filterCity, filterType]);
+  }, [records, searchQuery, filterCity, filterType, filterTime]);
+
+  const totalPages = Math.ceil(filteredRecords.length / PAGE_SIZE) || 1;
+  const paginatedRecords = filteredRecords.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const handleExportCSV = () => {
     if (filteredRecords.length === 0) return alert("No records to export");
@@ -1346,7 +1368,7 @@ export default function AllocationForm({
                   type="text" 
                   placeholder="Search candidate, phone, DL, ID..." 
                   value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
                   className="h-10 w-full rounded-xl border border-slate-200 pl-9 pr-4 font-sans text-xs text-slate-900 bg-white outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20"
                 />
               </div>
@@ -1354,7 +1376,7 @@ export default function AllocationForm({
               <div>
                 <select 
                   value={filterType}
-                  onChange={(e) => setFilterType(e.target.value)}
+                  onChange={(e) => { setFilterType(e.target.value); setCurrentPage(1); }}
                   className="h-10 w-full rounded-xl border border-slate-200 px-3 font-sans text-xs text-slate-800 bg-white outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 cursor-pointer"
                 >
                   <option value="all">All Allocation Types</option>
@@ -1367,7 +1389,8 @@ export default function AllocationForm({
 
               <div>
                 <select 
-                  defaultValue="all"
+                  value={filterTime}
+                  onChange={(e) => { setFilterTime(e.target.value); setCurrentPage(1); }}
                   className="h-10 w-full rounded-xl border border-slate-200 px-3 font-sans text-xs text-slate-800 bg-white outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 cursor-pointer"
                 >
                   <option value="all">All Time</option>
@@ -1380,7 +1403,7 @@ export default function AllocationForm({
               <div>
                 <select 
                   value={filterCity}
-                  onChange={(e) => setFilterCity(e.target.value)}
+                  onChange={(e) => { setFilterCity(e.target.value); setCurrentPage(1); }}
                   className="h-10 w-full rounded-xl border border-slate-200 px-3 font-sans text-xs text-slate-800 bg-white outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 cursor-pointer"
                 >
                   <option value="all">All Cities</option>
@@ -1446,7 +1469,7 @@ export default function AllocationForm({
                         </td>
                       </tr>
                     ) : (
-                      filteredRecords.map((r: any) => {
+                      paginatedRecords.map((r: any) => {
                         const rawDate = r.updated_at || r.created_at || r.allocation_date;
                         const datePart = rawDate ? new Date(rawDate).toLocaleDateString("en-IN", {
                           day: "2-digit",
@@ -1514,10 +1537,52 @@ export default function AllocationForm({
                 </table>
               </div>
 
-              {/* FOOTER STATS */}
-              <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/50 px-6 py-3 font-sans text-xs text-slate-500">
-                <span>Showing {filteredRecords.length} of {records.length} database entries</span>
-                <span className="font-sans text-[11px] text-slate-400">Database Engine: PostgreSQL</span>
+              {/* PAGINATION FOOTER */}
+              <div className="bg-slate-50 px-6 py-3 border-t border-slate-200 flex items-center justify-between font-sans text-xs text-slate-500">
+                <span>
+                  Showing {filteredRecords.length === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1}–{Math.min(currentPage * PAGE_SIZE, filteredRecords.length)} of {filteredRecords.length} records
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                    disabled={currentPage === 1}
+                    className="h-8 px-3 rounded-lg border border-slate-200 bg-white disabled:opacity-40 flex items-center gap-1 cursor-pointer hover:bg-slate-100 transition-colors text-slate-600"
+                  >
+                    <ChevronLeft className="w-3 h-3" /> Prev
+                  </button>
+                  {Array.from({ length: totalPages }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                    .reduce<(number | string)[]>((acc, p, idx, arr) => {
+                      if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("...");
+                      acc.push(p);
+                      return acc;
+                    }, [])
+                    .map((p, i) =>
+                      typeof p === "string" ? (
+                        <span key={`ellipsis-${i}`} className="px-1 text-slate-400">…</span>
+                      ) : (
+                        <button
+                          key={p}
+                          onClick={() => setCurrentPage(p)}
+                          className={`h-8 w-8 rounded-lg border text-xs font-semibold transition-colors cursor-pointer ${
+                            currentPage === p
+                              ? "border-emerald-600 bg-emerald-600 text-white"
+                              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      )
+                    )
+                  }
+                  <button
+                    onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                    disabled={currentPage === totalPages || filteredRecords.length === 0}
+                    className="h-8 px-3 rounded-lg border border-slate-200 bg-white disabled:opacity-40 flex items-center gap-1 cursor-pointer hover:bg-slate-100 transition-colors text-slate-600"
+                  >
+                    Next <ChevronRight className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
