@@ -57,7 +57,9 @@ const ensureISOIST = (dateStr?: string): string | undefined => {
 };
 
 const formatDisplayDate = (createdAt?: string, fallbackDate?: string): string => {
-  const isoStr = ensureISOIST(createdAt);
+  const targetStr = createdAt || fallbackDate;
+  if (!targetStr) return "—";
+  const isoStr = ensureISOIST(targetStr);
   if (isoStr) {
     try {
       const d = new Date(isoStr);
@@ -66,20 +68,44 @@ const formatDisplayDate = (createdAt?: string, fallbackDate?: string): string =>
       }
     } catch (e) {}
   }
-  return fallbackDate || "—";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(targetStr.trim())) {
+    try {
+      const parts = targetStr.trim().split("-");
+      const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+      return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    } catch (e) {}
+  }
+  return targetStr;
 };
 
 const formatDisplayTime = (createdAt?: string, fallbackTime?: string): string => {
-  const isoStr = ensureISOIST(createdAt);
-  if (isoStr) {
-    try {
-      const d = new Date(isoStr);
-      if (!isNaN(d.getTime())) {
-        return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }).toLowerCase();
-      }
-    } catch (e) {}
+  if (createdAt) {
+    const isoStr = ensureISOIST(createdAt);
+    if (isoStr) {
+      try {
+        const d = new Date(isoStr);
+        if (!isNaN(d.getTime())) {
+          return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }).toLowerCase();
+        }
+      } catch (e) {}
+    }
   }
-  return fallbackTime || "—";
+  if (fallbackTime) {
+    const cleaned = fallbackTime.trim();
+    if (/^(0?[1-9]|1[0-2]):[0-5][0-9]\s*(AM|PM)?$/i.test(cleaned)) {
+      return cleaned.toLowerCase();
+    }
+    const match = cleaned.match(/^(\d{1,2}):(\d{2})/);
+    if (match) {
+      let h = parseInt(match[1], 10);
+      const m = match[2];
+      const ampm = h >= 12 ? 'pm' : 'am';
+      h = h % 12 || 12;
+      return `${h.toString().padStart(2, '0')}:${m} ${ampm}`;
+    }
+    return cleaned;
+  }
+  return "—";
 };
 
 const PRESET_TAGS: Record<string, string[]> = {
