@@ -6537,13 +6537,23 @@ def get_pending_approvals(authorization: Optional[str] = Header(None)):
         uid = user["portal_user_id"]
         pending = []
 
-        # Strict personal filter + City check for non-global roles
+        # Flexible, role-aware pending approvals query:
         is_global = user.get("role_code") in ["SA", "BH", "FL", "FE", "AU"] or user.get("role") in ["Super Admin", "Admin", "Business Head"]
-        user_city = user.get("city")
+        is_city_manager = user.get("role_code") in ["CM"] or "City Manager" in (user.get("role") or "")
+        user_city = (user.get("city") or "Hyderabad").strip().lower()
 
-        where_cond = f"WHERE o.current_approver_id = {uid} AND o.approval_status LIKE 'Pending%%'"
-        where_v_cond = f"WHERE v.current_approver_id = {uid} AND v.approval_status LIKE 'Pending%%'"
-        where_t_cond = f"WHERE t.current_approver_id = {uid} AND t.approval_status LIKE 'Pending%%'"
+        if is_global:
+            where_cond = "WHERE (o.approval_status LIKE 'Pending%%' OR o.approval_status = 'Submitted')"
+            where_v_cond = "WHERE (v.approval_status LIKE 'Pending%%' OR v.approval_status = 'Submitted')"
+            where_t_cond = "WHERE (t.approval_status LIKE 'Pending%%' OR t.approval_status = 'Submitted')"
+        elif is_city_manager:
+            where_cond = f"WHERE (o.current_approver_id = {uid} OR o.current_approver_id IS NULL OR LOWER(COALESCE(o.city, '')) = '{user_city}') AND (o.approval_status LIKE 'Pending%%' OR o.approval_status = 'Submitted')"
+            where_v_cond = f"WHERE (v.current_approver_id = {uid} OR v.current_approver_id IS NULL OR LOWER(COALESCE(v.city, '')) = '{user_city}') AND (v.approval_status LIKE 'Pending%%' OR v.approval_status = 'Submitted')"
+            where_t_cond = f"WHERE (t.current_approver_id = {uid} OR t.current_approver_id IS NULL OR LOWER(COALESCE(t.city, '')) = '{user_city}') AND (t.approval_status LIKE 'Pending%%' OR t.approval_status = 'Submitted')"
+        else:
+            where_cond = f"WHERE (o.current_approver_id = {uid} OR (o.current_approver_id IS NULL AND LOWER(COALESCE(o.city, '')) = '{user_city}')) AND (o.approval_status LIKE 'Pending%%' OR o.approval_status = 'Submitted')"
+            where_v_cond = f"WHERE (v.current_approver_id = {uid} OR (v.current_approver_id IS NULL AND LOWER(COALESCE(v.city, '')) = '{user_city}')) AND (v.approval_status LIKE 'Pending%%' OR v.approval_status = 'Submitted')"
+            where_t_cond = f"WHERE (t.current_approver_id = {uid} OR (t.current_approver_id IS NULL AND LOWER(COALESCE(t.city, '')) = '{user_city}')) AND (t.approval_status LIKE 'Pending%%' OR t.approval_status = 'Submitted')"
 
 
 
@@ -6740,6 +6750,8 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
     try:
         cur = conn.cursor()
         uid = user["portal_user_id"]
+        is_admin_or_cm = (user.get("role_code") in ["SA", "BH", "CM", "FL", "FE", "AU"] or 
+                          any(r in (user.get("role") or "") for r in ["Super Admin", "Admin", "Business Head", "City Manager"]))
 
         if module not in MODULE_TABLE_MAP:
             raise HTTPException(status_code=400, detail=f"Unknown module: {module}")
@@ -6750,8 +6762,8 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
             cur.execute(f"""
                 UPDATE {table} SET approval_status = 'Approved',
                     current_approver_id = NULL, approved_by = %s, approval_remarks = %s
-                WHERE {pk} = %s AND current_approver_id = %s RETURNING {pk};
-            """, (uid, body.remarks, record_id, uid))
+                WHERE {pk} = %s AND (current_approver_id = %s OR current_approver_id IS NULL OR %s = True) RETURNING {pk};
+            """, (uid, body.remarks, record_id, uid, is_admin_or_cm))
             if not cur.fetchone():
                 raise HTTPException(status_code=403, detail="Not authorized or record not found")
             cur.execute("""
@@ -6763,8 +6775,8 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
             cur.execute(f"""
                 UPDATE {table} SET approval_status = 'Rejected',
                     current_approver_id = NULL, approved_by = %s, approval_remarks = %s
-                WHERE {pk} = %s AND current_approver_id = %s RETURNING {pk};
-            """, (uid, body.remarks, record_id, uid))
+                WHERE {pk} = %s AND (current_approver_id = %s OR current_approver_id IS NULL OR %s = True) RETURNING {pk};
+            """, (uid, body.remarks, record_id, uid, is_admin_or_cm))
             if not cur.fetchone():
                 raise HTTPException(status_code=403, detail="Not authorized or record not found")
             cur.execute("""
@@ -6777,8 +6789,8 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
                 raise HTTPException(status_code=400, detail="forward_to_user_id is required")
             cur.execute(f"""
                 UPDATE {table} SET current_approver_id = %s, approval_remarks = %s
-                WHERE {pk} = %s AND current_approver_id = %s RETURNING {pk};
-            """, (body.forward_to_user_id, body.remarks, record_id, uid))
+                WHERE {pk} = %s AND (current_approver_id = %s OR current_approver_id IS NULL OR %s = True) RETURNING {pk};
+            """, (body.forward_to_user_id, body.remarks, record_id, uid, is_admin_or_cm))
             if not cur.fetchone():
                 raise HTTPException(status_code=403, detail="Not authorized or record not found")
             cur.execute("""
@@ -6790,8 +6802,8 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
             cur.execute(f"""
                 UPDATE {table} SET approval_status = 'Changes Requested',
                     current_approver_id = created_by, approval_remarks = %s
-                WHERE {pk} = %s AND current_approver_id = %s RETURNING {pk};
-            """, (body.remarks, record_id, uid))
+                WHERE {pk} = %s AND (current_approver_id = %s OR current_approver_id IS NULL OR %s = True) RETURNING {pk};
+            """, (body.remarks, record_id, uid, is_admin_or_cm))
             if not cur.fetchone():
                 raise HTTPException(status_code=403, detail="Not authorized or record not found")
             cur.execute("""
