@@ -3107,6 +3107,7 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
+        cur.execute("SET TIME ZONE 'Asia/Kolkata';")
 
         if not user_p_id:
             username = user.get("username") or ""
@@ -3130,8 +3131,8 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
                 INSERT INTO july_existing_walkins
                   (first_name, last_name, person_name, person_number, city,
                    partner_type, visiting_reason, event_date, enquiry_time,
-                   visit_notes, submission_status, executive_id, created_by)
-                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                   visit_notes, submission_status, executive_id, created_by, created_at, updated_at, updated_by)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), NOW(), %s)
                 RETURNING id;
             """, (
                 f_name, l_name, full_n,
@@ -3140,10 +3141,10 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
                 data.partner_type or data.visitor_type or 'Driver',
                 data.visiting_reason or 'Visit',
                 data.event_date or datetime.now().strftime("%Y-%m-%d"),
-                data.enquiry_time or '10:30',
+                data.enquiry_time or datetime.now().strftime("%H:%M"),
                 data.visit_notes or data.remarks or '',
                 'Submitted',
-                user_p_id, user_p_id
+                user_p_id, user_p_id, user_p_id
             ))
             new_id = cur.fetchone()[0]
             conn.commit()
@@ -3168,7 +3169,7 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
                         data.operating_place or '', data.visitor_type or data.partner_type or 'Driver',
                         data.visiting_reason or 'Onboarding Inquiry',
                         data.event_date or datetime.now().strftime("%Y-%m-%d"),
-                        data.enquiry_time or '10:30', data.dl_number or '', data.aadhaar_number or '',
+                        data.enquiry_time or datetime.now().strftime("%H:%M"), data.dl_number or '', data.aadhaar_number or '',
                         data.lead_channel or 'Direct Walk-in', data.lead_channel_details or '',
                         data.joined_status or 'Onboarding Process Initiated', data.remarks or '',
                         user_p_id, existing_id
@@ -3182,8 +3183,8 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
                    interested_position, visiting_reason, event_date, enquiry_time,
                    dl_number, aadhaar_number, aadhaar_image, dl_image,
                    lead_channel, lead_channel_details, referred_by_name, referred_by_phone,
-                   joined_status, remarks, submission_status, executive_id, created_by)
-                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                   joined_status, remarks, submission_status, executive_id, created_by, created_at, updated_at, updated_by)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s, NOW(), NOW(), %s)
                 RETURNING id;
             """, (
                 f_name, l_name, full_n,
@@ -3192,8 +3193,8 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
                 data.operating_place or '',
                 data.visitor_type or data.partner_type or 'Driver',
                 data.visiting_reason or 'Onboarding Inquiry',
-                datetime.now().strftime("%Y-%m-%d"),
-                datetime.now().strftime("%H:%M"),
+                data.event_date or datetime.now().strftime("%Y-%m-%d"),
+                data.enquiry_time or datetime.now().strftime("%H:%M"),
                 data.dl_number or '',
                 data.aadhaar_number or '',
                 data.aadhaar_image or None,
@@ -3205,7 +3206,7 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
                 data.joined_status or 'Onboarding Process Initiated',
                 data.remarks or '',
                 'Submitted',
-                user_p_id, user_p_id
+                user_p_id, user_p_id, user_p_id
             ))
             new_id = cur.fetchone()[0]
             conn.commit()
