@@ -2719,33 +2719,31 @@ export default function OnboardingForm({
                 </div>
               </div>
 
-              {/* Table Layout */}
+              {/* Minimalist Table Layout */}
               <div className="overflow-x-auto">
                 <table className="w-full text-left whitespace-nowrap border-collapse">
                   <thead className="bg-slate-50 border-b border-border/60">
                     <tr>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">ID</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Candidate Name</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Role & Type</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Contact</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">City</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Date Created</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Recorded By</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Last Edited At</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Last Edited By</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Assigned Approver</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Approval Status</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center whitespace-nowrap">Action</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">ID</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Candidate Name</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">City</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Contact</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Role & Status</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Recorded By</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Date & Time Created</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Last Edited At</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Last Edited By</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
                     {paginatedRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={12} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">
+                        <td colSpan={10} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50 text-[11px]">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <Search className="h-8 w-8 text-border-strong mb-2 opacity-50" />
-                            <p className="font-semibold">No onboarding records found matching current criteria.</p>
-                            <p className="text-xs">Adjust your search or filters to see more results.</p>
+                            <p className="font-semibold text-slate-700">No onboarding records found matching current criteria.</p>
+                            <p className="text-xs text-slate-400">Adjust your search or filters to see more results.</p>
                           </div>
                         </td>
                       </tr>
@@ -2753,15 +2751,15 @@ export default function OnboardingForm({
                       paginatedRecords.map((r) => {
                         const role = r.vendor_type || r.candidate_role || "Driver";
                         const appStatus = r.approval_status || "Draft";
-                        let statusBadge = <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700 border border-slate-200">Draft</span>;
+                        let statusBadge = <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded w-max bg-slate-100 text-slate-700 border border-slate-200">Draft</span>;
                         if (appStatus.includes("Pending")) {
-                          statusBadge = <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">Pending Approval</span>;
+                          statusBadge = <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded w-max bg-amber-100 text-amber-800 border border-amber-200">Pending Approval</span>;
                         } else if (appStatus.includes("Approved")) {
-                          statusBadge = <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">Approved</span>;
+                          statusBadge = <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded w-max bg-emerald-100 text-emerald-800 border border-emerald-200">Approved</span>;
                         } else if (appStatus.includes("Requested") || appStatus.includes("Counter")) {
-                          statusBadge = <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-blue-50 text-blue-700 border border-blue-200">Changes Requested</span>;
+                          statusBadge = <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded w-max bg-blue-100 text-blue-800 border border-blue-200">Changes Requested</span>;
                         } else if (appStatus.includes("Reject")) {
-                          statusBadge = <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-50 text-rose-700 border border-rose-200">Rejected</span>;
+                          statusBadge = <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded w-max bg-rose-100 text-rose-800 border border-rose-200">Rejected</span>;
                         }
 
                         const createdDate = formatDisplayDate(r.created_at);
@@ -2774,64 +2772,47 @@ export default function OnboardingForm({
                             <td className="px-4 py-3 font-mono font-bold text-slate-900">
                               #{r.id}
                             </td>
-                            <td className="px-4 py-3 font-bold text-slate-900 truncate">
+                            <td className="px-4 py-3 font-bold text-slate-900">
                               {r.driver_name}
                             </td>
-                            <td className="px-4 py-3">
-                              <span className="font-sans text-[10px] font-bold text-primary bg-primary/10 px-2 py-0.5 rounded">
-                                {role}
-                              </span>
+                            <td className="px-4 py-3 font-bold text-slate-700">
+                              {r.city}
                             </td>
                             <td className="px-4 py-3 font-semibold text-slate-800">
                               {r.phone_number}
                             </td>
-                            <td className="px-4 py-3 font-bold text-slate-700">
-                              {r.city}
+                            <td className="px-4 py-3">
+                              <div className="flex flex-col gap-0.5">
+                                <span className="font-semibold text-slate-800">{role}</span>
+                                {statusBadge}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-900">{r.executive_name || user.name || "Admin"}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.created_by || user.executive_id || 3}</div>
                             </td>
                             <td className="px-4 py-3">
                               <div className="font-bold text-slate-800">{createdDate}</div>
                               <div className="text-slate-400 text-[10px] font-medium">{createdTime}</div>
                             </td>
                             <td className="px-4 py-3">
-                              <div className="font-bold text-slate-900 truncate">{r.executive_name || user.name || "Admin"}</div>
-                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.created_by || user.executive_id || 3}</div>
-                            </td>
-                            <td className="px-4 py-3">
                               <div className="font-bold text-slate-800">{updatedDate}</div>
                               <div className="text-slate-400 text-[10px] font-medium">{updatedTime}</div>
                             </td>
                             <td className="px-4 py-3">
-                              <div className="font-bold text-slate-900 truncate">{r.updated_by_name || r.executive_name || user.name || '—'}</div>
+                              <div className="font-bold text-slate-800">{r.updated_by_name || r.executive_name || user.name || '—'}</div>
                               <div className="text-slate-400 text-[10px] font-medium">ID: {r.updated_by || r.created_by || user.executive_id || 3}</div>
                             </td>
-                            <td className="px-4 py-3">
-                              <div className="font-bold text-slate-900 truncate">{r.approver_name || "City Manager"}</div>
-                              {r.current_approver_id && <div className="text-slate-400 text-[10px] font-medium">ID: {r.current_approver_id}</div>}
-                            </td>
-                            <td className="px-4 py-3">
-                              {statusBadge}
-                            </td>
                             <td className="px-4 py-3 text-center">
-                              {!isReadOnly ? (
-                                <div className="flex items-center justify-center gap-1.5">
-                                  <button 
-                                    onClick={() => loadRecordForEdit(r.id)}
-                                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-amber-50 hover:text-amber-600 transition-colors cursor-pointer"
-                                    title="Edit Record"
-                                  >
-                                    <Edit className="h-3.5 w-3.5" />
-                                  </button>
-                                  <button 
-                                    onClick={() => handleDeleteRecord(r.id)}
-                                    className="p-1.5 rounded-lg border border-slate-200 bg-white text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
-                                    title="Delete Record"
-                                  >
-                                    <Trash2 className="h-3.5 w-3.5" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <span className="text-[10px] text-slate-400 italic font-semibold">View Only</span>
-                              )}
+                              <div className="inline-flex gap-1.5 justify-center">
+                                <button type="button" onClick={() => loadRecordForEdit(r.id)} className="rounded-lg p-1 border border-border bg-white text-slate-600 hover:text-primary hover:bg-slate-50 transition-all cursor-pointer" title="View / Review Record"><Eye className="h-3.5 w-3.5" /></button>
+                                {!isReadOnly && (
+                                  <>
+                                    <button type="button" onClick={() => loadRecordForEdit(r.id)} className="rounded-lg p-1 border border-border bg-white text-slate-600 hover:text-primary hover:bg-slate-50 transition-all cursor-pointer" title="Edit Record"><Edit className="h-3.5 w-3.5" /></button>
+                                    <button type="button" onClick={() => handleDeleteRecord(r.id)} className="rounded-lg p-1 border border-border bg-white text-slate-600 hover:text-rose-500 hover:bg-rose-50 border-rose-200 transition-all cursor-pointer" title="Delete Record"><Trash2 className="h-3.5 w-3.5" /></button>
+                                  </>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
