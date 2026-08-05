@@ -1983,13 +1983,14 @@ export default function VehicleOnboardingForm({
                       <th className="py-3 px-4">Odometer</th>
                       <th className="py-3 px-4">Checklist Status</th>
                       <th className="py-3 px-4">Operation Status</th>
+                      <th className="py-3 px-4">Created At (IST)</th>
                       <th className="py-3 px-4 text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border font-sans text-xs">
                     {records.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="py-12 text-center text-text-muted font-medium">
+                        <td colSpan={10} className="py-12 text-center text-text-muted font-medium">
                           No vehicle records found matching the filters.
                         </td>
                       </tr>
@@ -1999,6 +2000,10 @@ export default function VehicleOnboardingForm({
                         if (record.received_allocated === "PDI Done") statusColor = "bg-green-50 text-green-700";
                         if (record.received_allocated === "Ready for Delivery") statusColor = "bg-emerald-100 text-emerald-900";
                         if (record.received_allocated === "In Process") statusColor = "bg-amber-50 text-amber-700";
+
+                        const isoStr = (record.created_at && typeof record.created_at === 'string' && (record.created_at.includes("T") || record.created_at.includes(" ")) && !record.created_at.endsWith("Z") && !/[+-]\d{2}:?\d{2}$/.test(record.created_at)) ? record.created_at.replace(" ", "T") + "Z" : record.created_at;
+                        const createdDate = isoStr ? new Date(isoStr).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }) : "—";
+                        const createdTime = isoStr ? new Date(isoStr).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }).toLowerCase() : "—";
                         
                         return (
                           <tr key={record.id} className="hover:bg-slate-50/50 transition-colors">
@@ -2026,6 +2031,10 @@ export default function VehicleOnboardingForm({
                               <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-extrabold ${statusColor}`}>
                                 {record.received_allocated}
                               </span>
+                            </td>
+                            <td className="py-4 px-4">
+                              <div className="font-bold text-slate-800">{createdDate}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">{createdTime}</div>
                             </td>
                             <td className="py-4 px-4">
                               <div className="flex items-center justify-center gap-1.5">

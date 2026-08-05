@@ -1472,9 +1472,10 @@ export default function AllocationForm({
                       </tr>
                     ) : (
                       filteredRecords.map((r: any) => {
-                        const formattedTime = r.created_at 
-                          ? new Date(r.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) 
-                          : "10:30 AM";
+                        const isoStr = (r.created_at && typeof r.created_at === 'string' && (r.created_at.includes("T") || r.created_at.includes(" ")) && !r.created_at.endsWith("Z") && !/[+-]\d{2}:?\d{2}$/.test(r.created_at)) ? r.created_at.replace(" ", "T") + "Z" : r.created_at;
+                        const formattedTime = isoStr 
+                          ? new Date(isoStr).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }).toLowerCase() 
+                          : "10:30 am";
                         const allocatedBy = r.created_by || r.allocated_by || r.executive_name || user.name || user.username || "Admin";
                         
                         return (
