@@ -3097,14 +3097,15 @@ def get_walkin(walkin_id: str):
                 SELECT w.visitor_type, w.event_date, w.city, w.operating_place, w.executive_id,
                        w.person_name, w.person_number, w.aadhaar_number, w.dl_number,
                        w.visiting_reason, w.joined_status, w.remarks,
-                       COALESCE(u.name, '') AS executive_name,
+                       COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), u.username, 'Executive') AS executive_name,
                        w.first_name, w.last_name, w.enquiry_time, w.mode_of_enquiry,
                        w.referred_by_name, w.referred_by_phone,
                        w.aadhaar_image, w.dl_image,
                        w.lead_channel, w.lead_channel_details,
                        w.is_existing_partner, w.partner_type, w.visit_notes
                 FROM july_walkins w
-                LEFT JOIN july_portal_users u ON u.id = w.executive_id
+                LEFT JOIN july_portal_users u ON u.portal_user_id = COALESCE(w.created_by, w.executive_id)
+                LEFT JOIN july_employees e ON e.employee_id = u.employee_id
                 WHERE w.id = %s;
             """, (raw_id,))
             r = cur.fetchone()
