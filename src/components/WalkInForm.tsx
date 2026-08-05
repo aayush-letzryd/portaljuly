@@ -846,9 +846,8 @@ export default function WalkInForm({
                         onChange={(e) => setPartnerType(e.target.value as any)}
                         className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-medium cursor-pointer"
                       >
-                        <option value="Driver">Individual Driver Partner</option>
-                        <option value="Operator">Fleet Operator Partner</option>
-                        <option value="Vendor">Vendor / Service Partner</option>
+                        <option value="Driver">Driver</option>
+                        <option value="Operator">Operator</option>
                       </select>
                     </div>
 
