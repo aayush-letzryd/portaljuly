@@ -3395,6 +3395,7 @@ def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None,
                 COALESCE(f.vendor_type, f.candidate_role, 'Driver') AS vendor_type,
                 COALESCE(f.candidate_role, f.vendor_type, 'Driver') AS candidate_role,
                 COALESCE(NULLIF(TRIM(CONCAT(e1.first_name, ' ', e1.last_name)), ''), u1.username, 'Admin') AS executive_name,
+                COALESCE(NULLIF(TRIM(CONCAT(e2.first_name, ' ', e2.last_name)), ''), u2.username, u1.username, 'Admin') AS updated_by_name,
                 COALESCE(NULLIF(TRIM(CONCAT(e3.first_name, ' ', e3.last_name)), ''), u3.username, 'City Manager 1') AS approver_name
             FROM july_form_onboarding f
             LEFT JOIN july_portal_users u1 ON u1.portal_user_id = f.created_by

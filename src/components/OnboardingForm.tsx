@@ -2801,8 +2801,8 @@ export default function OnboardingForm({
                               <div className="text-slate-400 text-[10px] font-medium">{updatedTime}</div>
                             </td>
                             <td className="px-4 py-3">
-                              <div className="font-bold text-slate-800">{r.updated_by_name || r.executive_name || user.name || '—'}</div>
-                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.updated_by || r.created_by || user.executive_id || 3}</div>
+                              <div className="font-bold text-slate-800">{r.updated_by ? (r.updated_by_name || r.executive_name || "Admin") : (r.executive_name || user.name || 'Admin')}</div>
+                              <div className="text-slate-400 text-[10px] font-medium">ID: {r.updated_by ? r.updated_by : (r.created_by || user.executive_id || 3)}</div>
                             </td>
                             <td className="px-4 py-3 text-center">
                               <div className="inline-flex gap-1.5 justify-center">
