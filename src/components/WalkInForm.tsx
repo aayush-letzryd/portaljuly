@@ -197,12 +197,12 @@ export default function WalkInForm({
           const match = data[0]; // Most recent visit record
           applyRecordAutoFill(match);
           setCandidateHistory(data);
-          setFetchBannerMsg(`Found Candidate: ${match.person_name || 'Driver'} (${data.length} prior visit${data.length > 1 ? 's' : ''} recorded). Details auto-filled for creating a NEW Walk-In Visit.`);
+          setFetchBannerMsg(`Found: ${match.person_name || 'Driver'} (${data.length} prior visit${data.length > 1 ? 's' : ''})`);
           setIsDuplicate(false);
           setDuplicateMsg("");
         } else {
           setCandidateHistory([]);
-          setFetchBannerMsg(`No previous walk-in history found for ${cleanPhone}. Fill in details below to register candidate's first visit.`);
+          setFetchBannerMsg(`No prior visits found for ${cleanPhone}`);
           setIsDuplicate(false);
           setDuplicateMsg("");
         }
@@ -272,7 +272,7 @@ export default function WalkInForm({
               const match = data[0]; 
               applyRecordAutoFill(match);
               setCandidateHistory(data);
-              setFetchBannerMsg(`Candidate Matched: ${match.person_name || 'Driver'} (${data.length} prior visit${data.length > 1 ? 's' : ''} logged). Candidate details auto-filled for a NEW Walk-In Visit.`);
+              setFetchBannerMsg(`Found: ${match.person_name || 'Driver'} (${data.length} prior visit${data.length > 1 ? 's' : ''})`);
               setIsDuplicate(false);
               setDuplicateMsg("");
             } else {
@@ -832,14 +832,9 @@ export default function WalkInForm({
                   <div className="flex items-center gap-2">
                     <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white font-bold text-xs">2</div>
                     <h3 className="font-sans text-xs font-bold text-slate-800 uppercase tracking-wider">
-                      {isExistingPartner ? "Registered Partner Visit Event Logger" : "Enquiry & Visit Details"}
+                      Visit Details
                     </h3>
                   </div>
-                  {isExistingPartner && (
-                    <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-semibold text-xs rounded-lg border border-emerald-200">
-                      Active Partner Mode (KYC Suppressed)
-                    </span>
-                  )}
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -1209,7 +1204,7 @@ export default function WalkInForm({
                     type="submit" 
                     className="h-11 rounded-lg bg-primary hover:bg-primary-hover text-white px-6 font-sans text-sm font-semibold shadow-md cursor-pointer transition-colors"
                   >
-                    {editingId ? "Update Walk-In Entry" : (isExistingPartner ? "Register Partner Visit Event" : "Register New Candidate Visit")}
+                    {editingId ? "Update Entry" : "Submit Visit"}
                   </button>
                 </div>
               </div>
