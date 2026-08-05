@@ -534,7 +534,7 @@ export default function AllocationForm({
       
       {/* HEADER SECTION */}
       <header className="sticky top-0 z-50 border-b border-border bg-white shadow-xs">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <button 
               type="button"
@@ -621,7 +621,7 @@ export default function AllocationForm({
       </header>
 
       {/* MAIN CONTAINER */}
-      <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <main className="flex-grow max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">
         
         {activeTab === "form" && (
           <div>
@@ -672,22 +672,22 @@ export default function AllocationForm({
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                   
                   {/* COLUMN 1: ALLOCATION DETAILS */}
-                  <div className="space-y-6">
-                    <div className="border-b border-border pb-3">
-                      <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">1</span>
+                  <div className="space-y-5">
+                    <div className="border-b border-slate-200 pb-2.5">
+                      <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">1</span>
                         Allocation Details
                       </h3>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-3.5">
                       <div>
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Transaction Type <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Transaction Type <span className="text-red-500">*</span></label>
                         <select
                           value={transactionType}
                           onChange={(e) => setTransactionType(e.target.value as any)}
                           required
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer font-semibold"
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs cursor-pointer"
                         >
                           <option value="New Allocation">New Allocation</option>
                           <option value="Reallocation">Reallocation</option>
@@ -697,23 +697,23 @@ export default function AllocationForm({
                       </div>
 
                       <div>
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Date of Allocation <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Date of Allocation <span className="text-red-500">*</span></label>
                         <input 
                           type="date" 
                           value={allocationDate}
                           onChange={(e) => setAllocationDate(e.target.value)}
                           required
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer font-semibold"
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs cursor-pointer"
                         />
                       </div>
 
                       <div>
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Operating City <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Operating City <span className="text-red-500">*</span></label>
                         <select 
                           value={cityName}
                           onChange={(e) => setCityName(e.target.value)}
                           required
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer font-semibold"
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs cursor-pointer"
                         >
                           {CITIES.map((c) => (
                             <option key={c.value} value={c.value}>{c.text}</option>
@@ -724,23 +724,23 @@ export default function AllocationForm({
                   </div>
 
                   {/* COLUMN 2: DRIVER INFORMATION */}
-                  <div className="space-y-6">
-                    <div className="border-b border-border pb-3">
-                      <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">2</span>
+                  <div className="space-y-5">
+                    <div className="border-b border-slate-200 pb-2.5">
+                      <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">2</span>
                         Driver Information
                       </h3>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-3.5">
                       {driverLookupStatus && (
-                        <div className={`p-2.5 rounded-lg text-xs font-semibold ${driverLookupStatus.includes("Found") ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-amber-50 text-amber-800 border border-amber-200"}`}>
+                        <div className={`p-2.5 rounded-lg text-xs font-medium ${driverLookupStatus.includes("Found") ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-amber-50 text-amber-800 border border-amber-200"}`}>
                           {driverLookupStatus}
                         </div>
                       )}
 
                       <div>
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Driver Phone Number <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Driver Phone Number <span className="text-red-500">*</span></label>
                         <div className="flex gap-2">
                           <input 
                             type="tel" 
@@ -750,12 +750,12 @@ export default function AllocationForm({
                             onChange={(e) => setDriverPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                             onBlur={() => driverPhone.length === 10 && handleFetchDriver(driverPhone)}
                             required
-                            className="flex-1 rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs font-mono font-semibold"
+                            className="flex-1 h-10 rounded-xl border border-slate-200 bg-white px-3 font-mono text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
                           />
                           <button
                             type="button"
                             onClick={() => handleFetchDriver(driverPhone)}
-                            className="px-3 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold rounded-xl text-xs cursor-pointer transition-colors"
+                            className="px-3.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-semibold rounded-xl text-xs cursor-pointer transition-colors"
                           >
                             Fetch
                           </button>
@@ -763,7 +763,7 @@ export default function AllocationForm({
                       </div>
 
                       <div>
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Operator / Driver ID <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Operator / Driver ID <span className="text-red-500">*</span></label>
                         <div className="flex gap-2">
                           <input 
                             type="text" 
@@ -772,12 +772,12 @@ export default function AllocationForm({
                             onChange={(e) => setDriverId(e.target.value)}
                             onBlur={() => driverId.trim().length >= 3 && handleFetchDriver(driverId)}
                             required
-                            className="flex-1 rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs font-mono"
+                            className="flex-1 h-10 rounded-xl border border-slate-200 bg-white px-3 font-mono text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
                           />
                           <button
                             type="button"
                             onClick={() => handleFetchDriver(driverId)}
-                            className="px-3 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold rounded-xl text-xs cursor-pointer transition-colors"
+                            className="px-3.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-semibold rounded-xl text-xs cursor-pointer transition-colors"
                           >
                             Fetch
                           </button>
@@ -785,19 +785,19 @@ export default function AllocationForm({
                       </div>
 
                       <div>
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Driver Name <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Driver Name <span className="text-red-500">*</span></label>
                         <input 
                           type="text" 
                           placeholder="Enter full name..."
                           value={driverName}
                           onChange={(e) => setDriverName(e.target.value)}
                           required
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs"
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
                         />
                       </div>
 
                       <div>
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Driver Rental Plan <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Driver Rental Plan <span className="text-red-500">*</span></label>
                         <select 
                           value={driverPlan}
                           onChange={(e) => {
@@ -812,7 +812,7 @@ export default function AllocationForm({
                             }
                           }}
                           required
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer font-semibold"
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs cursor-pointer"
                         >
                           <option value="">Select Plan...</option>
                           <option value="Drive to Rent">Drive to Rent</option>
@@ -824,20 +824,20 @@ export default function AllocationForm({
 
                       {/* OLA Negative Balance Input */}
                       <div>
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">OLA Negative Balance (₹)</label>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">OLA Negative Balance (₹)</label>
                         <input 
                           type="number"
                           placeholder="e.g. 1500 (if any)..."
                           value={olaNegativeBalance}
                           onChange={(e) => setOlaNegativeBalance(e.target.value)}
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs font-semibold"
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
                         />
                       </div>
 
                       {/* OLA Balance Proof Photo Card */}
                       <div>
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">OLA Balance Proof Photo</label>
-                        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 shadow-2xs">
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">OLA Balance Proof Photo</label>
+                        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-3 shadow-2xs">
                           {olaNegativeBalanceProof ? (
                             <div className="relative flex items-center justify-center bg-white rounded-lg p-1 border border-slate-200">
                               <img src={olaNegativeBalanceProof} alt="OLA Balance Proof" className="max-h-20 object-contain rounded" />
@@ -845,9 +845,9 @@ export default function AllocationForm({
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <button type="button" onClick={() => setActiveCameraTarget("olaProof")} className="flex-1 flex items-center justify-center gap-1 rounded bg-primary text-white text-[11px] font-bold py-1.5 hover:bg-primary-dark cursor-pointer transition-colors"><Camera className="h-3 w-3" /> Capture</button>
-                              <label className="flex-1 flex items-center justify-center gap-1 rounded border border-slate-300 bg-white text-slate-700 text-[11px] font-bold py-1.5 hover:bg-slate-100 cursor-pointer transition-colors">
-                                <Upload className="h-3 w-3 text-primary" /> Upload
+                              <button type="button" onClick={() => setActiveCameraTarget("olaProof")} className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-emerald-600 text-white text-[11px] font-medium py-1.5 hover:bg-emerald-700 cursor-pointer transition-colors shadow-2xs"><Camera className="h-3 w-3" /> Capture</button>
+                              <label className="flex-1 flex items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white text-slate-700 text-[11px] font-medium py-1.5 hover:bg-slate-50 cursor-pointer transition-colors shadow-2xs">
+                                <Upload className="h-3 w-3 text-emerald-600" /> Upload
                                 <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                                   const file = e.target.files?.[0];
                                   if (file) {
@@ -865,18 +865,18 @@ export default function AllocationForm({
                   </div>
 
                   {/* COLUMN 3: VEHICLE & ODOMETER SELECTION */}
-                  <div className="space-y-6">
-                    <div className="border-b border-border pb-3">
-                      <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">3</span>
+                  <div className="space-y-5">
+                    <div className="border-b border-slate-200 pb-2.5">
+                      <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">3</span>
                         Vehicle &amp; Odometer Details
                       </h3>
                     </div>
 
-                    <div className="space-y-4">
+                    <div className="space-y-3.5">
                       {/* Vehicle Autocomplete Field */}
                       <div className="relative">
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Vehicle Number <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Vehicle Number <span className="text-red-500">*</span></label>
                         <input 
                           type="text" 
                           placeholder="Type vehicle number e.g. TS09..."
@@ -884,7 +884,7 @@ export default function AllocationForm({
                           onChange={(e) => handleVehicleInputChange(e.target.value.toUpperCase())}
                           onFocus={() => vehicleNumber.trim().length >= 1 && handleVehicleInputChange(vehicleNumber)}
                           required
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs font-mono font-bold uppercase"
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-mono text-xs font-medium uppercase text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
                         />
 
                         {/* Autocomplete Dropdown Suggestions */}
@@ -902,10 +902,10 @@ export default function AllocationForm({
                                 className="w-full px-4 py-2.5 text-left hover:bg-slate-50 flex items-center justify-between transition-colors cursor-pointer"
                               >
                                 <div>
-                                  <span className="font-mono font-extrabold text-xs text-slate-900 block">{v.vehicle_number}</span>
+                                  <span className="font-mono font-bold text-xs text-slate-900 block">{v.vehicle_number}</span>
                                   <span className="text-[10px] text-slate-500 font-medium">{v.car_model} · {v.city_name}</span>
                                 </div>
-                                <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                                   v.status === 'Ready for Deployment' 
                                     ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
                                     : 'bg-amber-100 text-amber-800 border border-amber-300'
@@ -920,24 +920,24 @@ export default function AllocationForm({
 
                       {/* Odometer Reading Input */}
                       <div>
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Odometer Reading (in KM) <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Odometer Reading (in KM) <span className="text-red-500">*</span></label>
                         <input 
                           type="number"
                           placeholder="e.g. 14250..."
                           value={odometerReading}
                           onChange={(e) => setOdometerReading(e.target.value)}
                           required
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs font-mono font-semibold"
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-mono text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
                         />
                       </div>
 
                       <div>
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">GPS Active <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">GPS Active <span className="text-red-500">*</span></label>
                         <select
                           value={gpsActive}
                           onChange={(e) => setGpsActive(e.target.value)}
                           required
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer font-semibold"
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs cursor-pointer"
                         >
                           <option value="Yes">Yes</option>
                           <option value="No">No</option>
@@ -945,8 +945,8 @@ export default function AllocationForm({
                       </div>
 
                       {/* Odometer Photo Card */}
-                      <div className="flex flex-col gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 shadow-2xs mt-2">
-                        <span className="font-sans text-xs font-bold text-slate-800 text-center">Odometer Photo *</span>
+                      <div className="flex flex-col gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-3 shadow-2xs mt-2">
+                        <span className="font-sans text-xs font-medium text-slate-700 text-center">Odometer Photo *</span>
                         {odometerPhoto ? (
                           <div className="relative flex items-center justify-center bg-white rounded-lg p-1 border border-slate-200">
                             <img src={odometerPhoto} alt="Odometer" className="max-h-24 object-contain rounded" />
@@ -954,9 +954,9 @@ export default function AllocationForm({
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
-                            <button type="button" onClick={() => setActiveCameraTarget("odometer")} className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-primary text-white text-xs font-bold py-2 hover:bg-primary-dark cursor-pointer transition-colors shadow-xs"><Camera className="h-3.5 w-3.5" /> Capture</button>
-                            <label className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-xs font-bold py-2 hover:bg-slate-100 cursor-pointer transition-colors shadow-2xs">
-                              <Upload className="h-3.5 w-3.5 text-primary" /> Upload
+                            <button type="button" onClick={() => setActiveCameraTarget("odometer")} className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-emerald-600 text-white text-[11px] font-medium py-1.5 hover:bg-emerald-700 cursor-pointer transition-colors shadow-2xs"><Camera className="h-3.5 w-3.5" /> Capture</button>
+                            <label className="flex-1 flex items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white text-slate-700 text-[11px] font-medium py-1.5 hover:bg-slate-50 cursor-pointer transition-colors shadow-2xs">
+                              <Upload className="h-3.5 w-3.5 text-emerald-600" /> Upload
                               <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
@@ -974,16 +974,16 @@ export default function AllocationForm({
                 </div>
 
                 {/* 4. CAR CONDITION PHOTOS */}
-                <div className="border-t border-border pt-10 space-y-6">
-                  <div className="border-b border-border pb-3">
-                    <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">4</span>
+                <div className="border-t border-slate-200 pt-8 space-y-5">
+                  <div className="border-b border-slate-200 pb-2.5">
+                    <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">4</span>
                       Car Condition Photos <span className="text-red-500">*</span>
                     </h3>
-                    <p className="font-sans text-xs text-text-muted mt-1">Upload mandatory photos recording the vehicle's condition prior to handover.</p>
+                    <p className="font-sans text-xs text-slate-500 mt-1">Upload mandatory photos recording the vehicle's condition prior to handover.</p>
                   </div>
 
-                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-6">
+                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                     {[
                       { label: "Left-Hand (LH) Side", state: photoLhSide, setState: setPhotoLhSide, target: "lhSide" },
                       { label: "Right-Hand (RH) Side", state: photoRhSide, setState: setPhotoRhSide, target: "rhSide" },
@@ -991,40 +991,40 @@ export default function AllocationForm({
                       { label: "Back Side", state: photoBackSide, setState: setPhotoBackSide, target: "backSide" },
                       { label: "Battery Photo Upload", state: batteryPhoto, setState: setBatteryPhoto, target: "battery" }
                     ].map((ph) => (
-                      <div key={ph.label} className="space-y-2">
-                        <span className="block font-sans text-xs font-bold text-text-muted">{ph.label} <span className="text-red-500">*</span></span>
-                        <div className="w-full rounded-2xl border border-dashed border-border bg-bg/30 p-4 text-center hover:bg-bg/50 transition-all shadow-2xs">
+                      <div key={ph.label} className="space-y-1.5">
+                        <span className="block font-sans text-xs font-medium text-slate-700">{ph.label} <span className="text-red-500">*</span></span>
+                        <div className="w-full rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-3 text-center hover:bg-slate-100/50 transition-all shadow-2xs">
                           {ph.state ? (
                             <div className="relative inline-block">
                               <img 
                                 src={ph.state} 
                                 alt={ph.label} 
-                                className="h-28 w-auto object-cover rounded-xl border border-border shadow-xs"
+                                className="h-28 w-auto object-cover rounded-xl border border-slate-200 shadow-xs"
                               />
                               <button 
                                 type="button"
                                 onClick={() => ph.setState(null)}
-                                className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white border border-white hover:bg-red-700 shadow-xs cursor-pointer"
+                                className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-white border border-white hover:bg-rose-700 shadow-xs cursor-pointer"
                               >
                                 <X className="h-3 w-3" />
                               </button>
                             </div>
                           ) : (
-                            <div className="space-y-3 py-2">
-                              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                            <div className="space-y-2 py-1">
+                              <div className="mx-auto flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">
                                 <Upload className="h-4 w-4" />
                               </div>
-                              <div className="flex flex-col gap-2 justify-center items-center">
+                              <div className="flex flex-col gap-1.5 justify-center items-center">
                                 <button
                                   type="button"
                                   onClick={() => setActiveCameraTarget(ph.target as any)}
-                                  className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 font-sans text-[10px] font-bold text-white hover:bg-primary-hover shadow-xs cursor-pointer"
+                                  className="w-full flex items-center justify-center gap-1 rounded-lg bg-emerald-600 px-2 py-1 font-sans text-[11px] font-medium text-white hover:bg-emerald-700 shadow-2xs cursor-pointer"
                                 >
                                   <Camera className="h-3 w-3" />
                                   Capture
                                 </button>
-                                <label className="flex items-center gap-1 rounded-lg border border-border bg-white px-2.5 py-1 font-sans text-[10px] font-bold text-text-muted hover:bg-bg cursor-pointer transition-colors shadow-2xs">
-                                  <Upload className="h-3 w-3" />
+                                <label className="w-full flex items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-2 py-1 font-sans text-[11px] font-medium text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors shadow-2xs">
+                                  <Upload className="h-3 w-3 text-emerald-600" />
                                   Upload
                                   <input 
                                     type="file" 
@@ -1050,99 +1050,97 @@ export default function AllocationForm({
                 </div>
 
                 {/* 5. GIVEN VEHICLE INSPECTION CHECKLIST */}
-                <div className="border-t border-border pt-10 space-y-6">
-                  <div className="border-b border-border pb-3">
-                    <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">5</span>
+                <div className="border-t border-slate-200 pt-8 space-y-5">
+                  <div className="border-b border-slate-200 pb-2.5">
+                    <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">5</span>
                       Inspection Checklist: Allocated Car ({vehicleNumber || "No vehicle entered"})
                     </h3>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                    <div className="space-y-3.5">
-                      <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                        <span className="font-sans text-xs font-bold text-text">Jack</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                        <span className="font-sans text-xs font-medium text-slate-800">Jack</span>
                         <div className="flex gap-2">
                           {["Available", "Not Available"].map((opt) => (
-                            <button key={opt} type="button" onClick={() => setJack(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${jack === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
+                            <button key={opt} type="button" onClick={() => setJack(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${jack === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
                           ))}
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                        <span className="font-sans text-xs font-bold text-text">Jack Rod</span>
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                        <span className="font-sans text-xs font-medium text-slate-800">Jack Rod</span>
                         <div className="flex gap-2">
                           {["Available", "Not Available"].map((opt) => (
-                            <button key={opt} type="button" onClick={() => setJackRod(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${jackRod === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
+                            <button key={opt} type="button" onClick={() => setJackRod(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${jackRod === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
                           ))}
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                        <span className="font-sans text-xs font-bold text-text">Spanner</span>
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                        <span className="font-sans text-xs font-medium text-slate-800">Spanner</span>
                         <div className="flex gap-2">
                           {["Available", "Not Available"].map((opt) => (
-                            <button key={opt} type="button" onClick={() => setSpanner(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${spanner === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
+                            <button key={opt} type="button" onClick={() => setSpanner(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${spanner === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
                           ))}
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                        <span className="font-sans text-xs font-bold text-text">Parking Triangle</span>
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                        <span className="font-sans text-xs font-medium text-slate-800">Parking Triangle</span>
                         <div className="flex gap-2">
                           {["Available", "Not Available"].map((opt) => (
-                            <button key={opt} type="button" onClick={() => setParkingTriangle(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${parkingTriangle === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
+                            <button key={opt} type="button" onClick={() => setParkingTriangle(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${parkingTriangle === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
                           ))}
                         </div>
                       </div>
                     </div>
 
-                    <div className="space-y-3.5">
-                      <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                        <span className="font-sans text-xs font-bold text-text">Fire Extinguisher</span>
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                        <span className="font-sans text-xs font-medium text-slate-800">Fire Extinguisher</span>
                         <div className="flex gap-2">
                           {["Available", "Not Available"].map((opt) => (
-                            <button key={opt} type="button" onClick={() => setFireExtinguishers(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${fireExtinguishers === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
+                            <button key={opt} type="button" onClick={() => setFireExtinguishers(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${fireExtinguishers === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
                           ))}
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                        <span className="font-sans text-xs font-bold text-text">Seat Covers</span>
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                        <span className="font-sans text-xs font-medium text-slate-800">Seat Covers</span>
                         <div className="flex gap-2">
                           {["Available", "Not Available"].map((opt) => (
-                            <button key={opt} type="button" onClick={() => setSeatCover(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${seatCover === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
+                            <button key={opt} type="button" onClick={() => setSeatCover(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${seatCover === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
                           ))}
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                        <span className="font-sans text-xs font-bold text-text">Floor Carpets</span>
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                        <span className="font-sans text-xs font-medium text-slate-800">Floor Carpets</span>
                         <div className="flex gap-2">
                           {["Available", "Not Available"].map((opt) => (
-                            <button key={opt} type="button" onClick={() => setFloorCarpet(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${floorCarpet === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
+                            <button key={opt} type="button" onClick={() => setFloorCarpet(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${floorCarpet === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
                           ))}
                         </div>
                       </div>
 
-                      <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                        <span className="font-sans text-xs font-bold text-text">Music System</span>
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                        <span className="font-sans text-xs font-medium text-slate-800">Music System</span>
                         <div className="flex gap-2">
                           {["Available", "Not Available"].map((opt) => (
-                            <button key={opt} type="button" onClick={() => setMusicSystem(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${musicSystem === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
+                            <button key={opt} type="button" onClick={() => setMusicSystem(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${musicSystem === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
                           ))}
                         </div>
                       </div>
 
                       <div>
-                        <label className="block font-sans text-[10px] font-bold text-text-muted mb-1">Inspection Remarks (Allocated Car)</label>
-                        <input type="text" value={inspectionRemarks} onChange={(e) => setInspectionRemarks(e.target.value)} placeholder="Condition details..." className="w-full rounded-xl border border-border bg-white px-3 py-2 text-xs focus:outline-none focus:border-primary font-semibold" />
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Inspection Remarks (Allocated Car)</label>
+                        <input type="text" value={inspectionRemarks} onChange={(e) => setInspectionRemarks(e.target.value)} placeholder="Condition details..." className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20" />
                       </div>
                     </div>
                   </div>
                 </div>
-
-
 
                 {/* FORM ACTIONS */}
                 <div className="flex items-center justify-between border-t border-border pt-6 mt-8">
