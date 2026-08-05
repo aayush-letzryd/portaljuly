@@ -1440,22 +1440,22 @@ export default function WalkInForm({
                 const isExisting = v.record_type === 'existing' || v.id?.startsWith('E');
 
                 return (
-                  <div key={v.id || idx} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col gap-3 shadow-2xs">
-                    <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
-                      <div className="flex items-center gap-2">
+                  <div key={v.id || idx} className="p-4 rounded-xl border border-slate-200 bg-white flex flex-col gap-3.5 shadow-2xs hover:border-slate-300 transition-all">
+                    <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+                      <div className="flex items-center gap-1.5">
                         <span className="font-sans text-xs font-bold text-slate-900">Visit #{candidateHistory.length - idx}</span>
-                        <span className="text-xs font-mono font-bold text-slate-600">(ID: {v.id})</span>
+                        <span className="font-sans text-xs font-medium text-slate-500">(ID: {v.id})</span>
                       </div>
                       <div className="flex items-center gap-2">
-                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
-                          isExisting ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                        <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-semibold ${
+                          isExisting ? 'bg-amber-50 text-amber-800 border border-amber-200' : 'bg-emerald-50 text-emerald-800 border border-emerald-200'
                         }`}>
                           {isExisting ? 'Existing Partner Visit' : (v.joined_status || 'Candidate Walk-in')}
                         </span>
                         <button
                           type="button"
                           onClick={() => { setShowHistoryModal(false); viewRecordInline(v); }}
-                          className="rounded-lg px-2.5 py-1 border border-border bg-white text-slate-700 hover:text-primary hover:bg-slate-100 transition-all cursor-pointer flex items-center gap-1 font-semibold text-[11px] shadow-2xs"
+                          className="rounded-lg px-2.5 py-1 border border-slate-200 bg-white text-slate-700 hover:text-primary hover:bg-slate-50 transition-all cursor-pointer flex items-center gap-1 font-semibold text-[11px]"
                           title="View Record in Form"
                         >
                           <Eye className="h-3.5 w-3.5" /> View
@@ -1464,7 +1464,7 @@ export default function WalkInForm({
                           <button
                             type="button"
                             onClick={() => { setShowHistoryModal(false); fetchRecordDetailsForEdit(v.id); }}
-                            className="rounded-lg px-2.5 py-1 border border-border bg-white text-slate-700 hover:text-primary hover:bg-slate-100 transition-all cursor-pointer flex items-center gap-1 font-semibold text-[11px] shadow-2xs"
+                            className="rounded-lg px-2.5 py-1 border border-slate-200 bg-white text-slate-700 hover:text-primary hover:bg-slate-50 transition-all cursor-pointer flex items-center gap-1 font-semibold text-[11px]"
                             title="Edit Record in Form"
                           >
                             <Edit className="h-3.5 w-3.5" /> Edit
@@ -1473,44 +1473,44 @@ export default function WalkInForm({
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                    <div className="grid grid-cols-2 gap-y-3 gap-x-6 text-xs bg-slate-50/60 p-3 rounded-lg border border-slate-100">
                       <div>
-                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Reason</span>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Reason</span>
                         <span className="font-semibold text-slate-800">{v.visiting_reason || 'Hub Visit'}</span>
                       </div>
                       <div>
-                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Partner Type</span>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Partner Type</span>
                         <span className="font-semibold text-slate-800">{v.visitor_type || v.partner_type || 'Driver'}</span>
                       </div>
                       <div>
-                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">City</span>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">City</span>
                         <span className="font-semibold text-slate-800">{normalizeCity(v.city)}</span>
                       </div>
-                      <div className="col-span-3">
-                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date & Time</span>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-0.5">Date & Time</span>
                         <span className="font-semibold text-slate-800">{formattedDisplayDate} {cleanTimeStr}</span>
                       </div>
                     </div>
 
-                  {v.visit_tags && (
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {(typeof v.visit_tags === 'string' ? (v.visit_tags.startsWith('[') ? JSON.parse(v.visit_tags) : [v.visit_tags]) : v.visit_tags).map((tag: string) => (
-                        <span key={tag} className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
+                    {v.visit_tags && (
+                      <div className="flex flex-wrap gap-1">
+                        {(typeof v.visit_tags === 'string' ? (v.visit_tags.startsWith('[') ? JSON.parse(v.visit_tags) : [v.visit_tags]) : v.visit_tags).map((tag: string) => (
+                          <span key={tag} className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            {tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
 
-                  {(v.visit_notes || v.remarks) && (
-                    <div className="p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 leading-relaxed">
-                      <span className="font-semibold text-slate-900 block mb-0.5 text-[11px]">Visit Notes / Remarks:</span>
-                      {v.visit_notes || v.remarks}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+                    {(v.visit_notes || v.remarks) && (
+                      <div className="p-2.5 bg-slate-50 rounded-lg border border-slate-200/80 text-xs text-slate-700 leading-relaxed">
+                        <span className="font-semibold text-slate-900 block mb-0.5 text-[11px]">Visit Notes / Remarks:</span>
+                        {v.visit_notes || v.remarks}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
 
             <div className="px-6 py-3 border-t border-border bg-slate-50 flex justify-end">
