@@ -108,8 +108,19 @@ export default function FormSelector({ user, onSelectForm, onLogout }: FormSelec
             const role = (user.role || "").toLowerCase();
             const roleCode = (user.role_code || "").toUpperCase();
             const isAdmin = role.includes("admin") || role.includes("founder") || role.includes("ceo") || roleCode === "SA";
+            const isOnboardingExec = role.includes("onboarding") || roleCode === "OB";
+            
+            // Hide Vehicle Onboarding from Onboarding Executives
+            if (key === "vehicle_onboarding" && (isOnboardingExec || role.includes("executive"))) {
+              if (!isAdmin && !role.includes("fleet") && !role.includes("manager")) {
+                return false;
+              }
+            }
             
             if (!isAdmin) {
+              if (isOnboardingExec) {
+                return ["walkin", "onboarding", "allocation", "dropoff"].includes(key);
+              }
               return ["walkin", "onboarding", "vehicle_onboarding", "allocation", "dropoff"].includes(key);
             }
             return true;
