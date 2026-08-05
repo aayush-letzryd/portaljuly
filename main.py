@@ -4050,6 +4050,8 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
         import json
         cur.execute("""
             UPDATE july_form_onboarding SET
+                approval_status = 'Draft',
+                current_approver_id = NULL,
                 driver_name=%s, phone_number=%s, whatsapp_number=%s, dob=%s, city=%s, operating_place=%s,
                 present_address=%s, permanent_address=%s, emergency_name=%s, emergency_phone=%s, 
                 dl_number=%s, dl_expiry_date=%s, lead_source=%s, 
@@ -4084,6 +4086,17 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
             user_p_id,
             id
         ))
+
+        cur.execute("""
+            UPDATE july_onboarding
+            SET approval_status = 'Draft',
+                current_approver_id = NULL,
+                driver_name = %s,
+                city = %s,
+                updated_by = %s,
+                updated_at = (NOW() AT TIME ZONE 'Asia/Kolkata')
+            WHERE onboarding_id = %s;
+        """, (data.driver_name, data.city, user_p_id, id))
         
         new_selfie = extract_image(data.selfie_photo)
         new_dl_front = extract_image(data.dl_front)
