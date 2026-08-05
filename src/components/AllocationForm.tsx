@@ -281,17 +281,17 @@ export default function AllocationForm({
       setAllocationDate(data.allocation_date || "");
       setTransactionType(data.allocation_type || "New Allocation");
       setCityName(data.city_name || "Hyderabad");
-      setDriverId(data.driver_id || "");
-      setDriverName(data.driver_name || "");
-      setDriverPhone(data.driver_phone || "");
-      setDriverPlan(data.driver_plan || "");
-      setTypeOfPlan(data.type_of_plan || "");
-      setCarModel(data.car_model || "");
-      setVehicleNumber(data.vehicle_number || "");
-      setOdometerReading(data.odometer_reading ? String(data.odometer_reading) : "");
+      setDriverId(data.driver_id != null ? String(data.driver_id) : "");
+      setDriverName(data.driver_name != null ? String(data.driver_name) : "");
+      setDriverPhone(data.driver_phone != null ? String(data.driver_phone) : "");
+      setDriverPlan(data.driver_plan != null ? String(data.driver_plan) : "");
+      setTypeOfPlan(data.type_of_plan != null ? String(data.type_of_plan) : "");
+      setCarModel(data.car_model != null ? String(data.car_model) : "");
+      setVehicleNumber(data.vehicle_number != null ? String(data.vehicle_number) : "");
+      setOdometerReading(data.odometer_reading != null ? String(data.odometer_reading) : "");
       setOdometerPhoto(data.odometer_photo || null);
       setBatteryPhoto(data.battery_photo || null);
-      setOlaNegativeBalance(data.ola_negative_balance || "");
+      setOlaNegativeBalance(data.ola_negative_balance != null ? String(data.ola_negative_balance) : "");
       setOlaNegativeBalanceProof(data.ola_negative_balance_proof || null);
       setGpsActive(data.gps_active || "Yes");
       setPhotoLhSide(data.photo_lh_side || null);
@@ -354,29 +354,19 @@ export default function AllocationForm({
     const isDraft = targetStatus === "Draft";
 
     if (!isDraft) {
-      if (!driverId.trim()) return alert("Driver ID is required");
-      if (!driverName.trim()) return alert("Driver Name is required");
+      if (!String(driverId || "").trim()) return alert("Driver ID is required");
+      if (!String(driverName || "").trim()) return alert("Driver Name is required");
       
-      const cleanPhone = driverPhone.replace(/\D/g, "");
-      if (cleanPhone.length !== 10) {
-        return alert("Please enter a valid 10-digit Indian mobile number.");
-      }
-
-      if (!vehicleNumber.trim()) return alert("Vehicle Number is required");
-      if (!odometerReading.trim()) return alert("Odometer Reading is required");
-
-      if (!editingId) {
-        if (!photoLhSide) return alert("Left-Hand (LH) Side photo is required");
-        if (!photoRhSide) return alert("Right-Hand (RH) Side photo is required");
-        if (!photoFrontSide) return alert("Front Side photo is required");
-        if (!photoBackSide) return alert("Back Side photo is required");
-      }
+      const cleanPhone = String(driverPhone || "").replace(/\D/g, "");
+      if (!cleanPhone || cleanPhone.length < 10) return alert("Please enter a valid 10-digit driver phone number");
+      if (!String(vehicleNumber || "").trim()) return alert("Vehicle registration number is required");
     }
 
-    const token = localStorage.getItem("lr_token");
-
     try {
-      if (!isDraft) {
+      const token = localStorage.getItem("lr_token");
+
+      // Optional Inspection Log Creation
+      if (vehicleNumber && !isDraft) {
         await fetch("/api/inspection", {
           method: "POST",
           headers: {
@@ -384,7 +374,7 @@ export default function AllocationForm({
             "Authorization": `Bearer ${token}`
           },
           body: JSON.stringify({
-            vehicle_number: vehicleNumber.trim().toUpperCase(),
+            vehicle_number: String(vehicleNumber).trim().toUpperCase(),
             inspection_date: allocationDate,
             odometer_reading: odometerReading || "0",
             jack,
@@ -406,18 +396,18 @@ export default function AllocationForm({
         allocation_type: transactionType,
         sub_type: transactionType,
         city_name: cityName,
-        driver_id: driverId.trim(),
-        driver_name: driverName.trim(),
-        driver_phone: driverPhone.trim(),
-        driver_plan: driverPlan.trim() || null,
-        type_of_plan: typeOfPlan.trim() || null,
-        car_model: carModel.trim() || null,
-        vehicle_number: vehicleNumber.trim().toUpperCase(),
-        odometer_reading: odometerReading ? parseFloat(odometerReading) : null,
+        driver_id: String(driverId || "").trim(),
+        driver_name: String(driverName || "").trim(),
+        driver_phone: String(driverPhone || "").trim(),
+        driver_plan: String(driverPlan || "").trim() || null,
+        type_of_plan: String(typeOfPlan || "").trim() || null,
+        car_model: String(carModel || "").trim() || null,
+        vehicle_number: String(vehicleNumber || "").trim().toUpperCase(),
+        odometer_reading: odometerReading ? parseFloat(String(odometerReading)) : null,
         odometer_photo: odometerPhoto,
         battery_photo: batteryPhoto,
         gps_active: gpsActive,
-        ola_negative_balance: olaNegativeBalance.trim() || null,
+        ola_negative_balance: String(olaNegativeBalance || "").trim() || null,
         ola_negative_balance_proof: olaNegativeBalanceProof,
         photo_lh_side: photoLhSide,
         photo_rh_side: photoRhSide,

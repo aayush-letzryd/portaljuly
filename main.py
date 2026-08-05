@@ -4426,6 +4426,24 @@ def delete_adjustment(id: int):
 
 
 
+from decimal import Decimal
+
+def _json_serial(obj):
+    if isinstance(obj, Decimal):
+        return float(obj)
+    if hasattr(obj, "isoformat"):
+        return obj.isoformat()
+    return str(obj)
+
+def _clean_dict_decimals(rec: dict) -> dict:
+    for k, v in list(rec.items()):
+        if isinstance(v, Decimal):
+            rec[k] = float(v)
+        elif hasattr(v, "isoformat"):
+            rec[k] = v.isoformat()
+    return rec
+
+
 # ─────────────────────────────────────────────────────────
 # Vehicle Allocation Endpoints  (→ july_allocation_form)
 # ─────────────────────────────────────────────────────────
@@ -4447,9 +4465,9 @@ def _write_alloc_log(cur, allocation_id, action, old_status, new_status,
         allocation_id,
         alloc_date, vehicle_number, driver_id, driver_name,
         action, old_status, new_status,
-        json.dumps(changed_fields) if changed_fields else None,
-        json.dumps(previous_data)  if previous_data  else None,
-        json.dumps(new_data)       if new_data        else None,
+        json.dumps(changed_fields, default=_json_serial) if changed_fields else None,
+        json.dumps(previous_data, default=_json_serial)  if previous_data  else None,
+        json.dumps(new_data, default=_json_serial)       if new_data        else None,
         remarks,
         performed_by, performed_by_name
     ))
@@ -4469,7 +4487,8 @@ def get_allocations(
             SELECT a.*, COALESCE(u.username, 'Onboarding Executive 1') AS executive_name
             FROM july_allocation_form a
             LEFT JOIN july_portal_users u ON a.created_by = u.portal_user_id
-            WHERE 1=1
+            WHERE (a.status IS NULL OR LOWER(a.status) != 'draft')
+              AND (a.approval_status IS NULL OR LOWER(a.approval_status) != 'draft')
         """
         params = []
 
@@ -4499,10 +4518,7 @@ def get_allocations(
         result = []
         for row in cur.fetchall():
             rec = dict(zip(cols, row))
-            # Serialise date/timestamp fields so JSON can handle them
-            for df in ["allocation_date", "created_at", "updated_at"]:
-                if rec.get(df) and hasattr(rec[df], "isoformat"):
-                    rec[df] = rec[df].isoformat()
+            rec = _clean_dict_decimals(rec)
             
             # Format clean user-friendly allocated_by
             raw_exec = rec.get("executive_name") or "Onboarding Executive 1"
@@ -4737,10 +4753,7 @@ def get_allocation_record(id: int, authorization: Optional[str] = Header(None)):
             raise HTTPException(status_code=404, detail="Allocation record not found")
         cols = [d[0] for d in cur.description]
         rec = dict(zip(cols, r))
-        for df in ["allocation_date", "created_at", "updated_at"]:
-            if rec.get(df) and hasattr(rec[df], "isoformat"):
-                rec[df] = rec[df].isoformat()
-        return rec
+        return _clean_dict_decimals(rec)
     finally:
         postgreSQL_pool.putconn(conn)
 
