@@ -363,17 +363,20 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
     }
   };
 
-  const ensureISOUTC = (dateStr?: string): string | undefined => {
+  const ensureISOIST = (dateStr?: string): string | undefined => {
     if (!dateStr) return undefined;
     let str = dateStr.trim();
-    if ((str.includes("T") || str.includes(" ")) && !str.endsWith("Z") && !/[+-]\d{2}:?\d{2}$/.test(str)) {
-      str = str.replace(" ", "T") + "Z";
+    if (str.includes(" ") && !str.includes("T")) {
+      str = str.replace(" ", "T");
+    }
+    if (!str.endsWith("Z") && !/[+-]\d{2}:?\d{2}$/.test(str)) {
+      str = str + "+05:30";
     }
     return str;
   };
 
   const formatDateTimeComponents = (dateStr?: string) => {
-    const isoStr = ensureISOUTC(dateStr);
+    const isoStr = ensureISOIST(dateStr);
     if (!isoStr) return { date: "—", time: "" };
     try {
       const d = new Date(isoStr);

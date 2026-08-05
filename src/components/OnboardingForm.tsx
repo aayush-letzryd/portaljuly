@@ -24,17 +24,20 @@ const maskSensitiveID = (idString: string | null | undefined) => {
   return "*".repeat(cleanStr.length - 4) + cleanStr.slice(-4);
 };
 
-const ensureISOUTC = (dateStr?: string): string | undefined => {
+const ensureISOIST = (dateStr?: string): string | undefined => {
   if (!dateStr) return undefined;
   let str = dateStr.trim();
-  if ((str.includes("T") || str.includes(" ")) && !str.endsWith("Z") && !/[+-]\d{2}:?\d{2}$/.test(str)) {
-    str = str.replace(" ", "T") + "Z";
+  if (str.includes(" ") && !str.includes("T")) {
+    str = str.replace(" ", "T");
+  }
+  if (!str.endsWith("Z") && !/[+-]\d{2}:?\d{2}$/.test(str)) {
+    str = str + "+05:30";
   }
   return str;
 };
 
 const formatDisplayDate = (createdAt?: string, fallbackDate?: string): string => {
-  const isoStr = ensureISOUTC(createdAt);
+  const isoStr = ensureISOIST(createdAt);
   if (isoStr) {
     try {
       const d = new Date(isoStr);
@@ -58,7 +61,7 @@ const formatDisplayDate = (createdAt?: string, fallbackDate?: string): string =>
 };
 
 const formatDisplayTime = (createdAt?: string, fallbackTime?: string): string => {
-  const isoStr = ensureISOUTC(createdAt);
+  const isoStr = ensureISOIST(createdAt);
   if (isoStr) {
     try {
       const d = new Date(isoStr);
