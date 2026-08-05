@@ -430,6 +430,8 @@ def startup_event():
             cur.execute(f"ALTER TABLE july_walkins ADD COLUMN IF NOT EXISTS {col};")
 
         cur.execute("ALTER TABLE july_form_onboarding DROP CONSTRAINT IF EXISTS copy_form_onboarding_approval_requested_to_fkey;")
+        for col_name in ["aadhaar_number", "pan_number", "driving_license", "phone_number", "emergency_phone"]:
+            cur.execute(f"ALTER TABLE july_onboarding ALTER COLUMN {col_name} TYPE VARCHAR(100);")
 
         # ── Extra columns needed by approval workflow ─────────────────────
         for col in [
