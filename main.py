@@ -3444,7 +3444,23 @@ def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None,
         
         cur.execute(base_query, params)
         cols = [d[0] for d in cur.description]
-        return [dict(zip(cols, row)) for row in cur.fetchall()]
+        import datetime as dt_module
+        ist = dt_module.timezone(dt_module.timedelta(hours=5, minutes=30))
+        results = []
+        for row in cur.fetchall():
+            item = {}
+            for col, val in zip(cols, row):
+                if isinstance(val, (dt_module.datetime, dt_module.date)):
+                    if isinstance(val, dt_module.datetime):
+                        if val.tzinfo is None:
+                            val = val.replace(tzinfo=dt_module.timezone.utc)
+                        item[col] = val.astimezone(ist).isoformat()
+                    else:
+                        item[col] = val.isoformat()
+                else:
+                    item[col] = val
+            results.append(item)
+        return results
     finally:
         postgreSQL_pool.putconn(conn)
 
@@ -4047,7 +4063,7 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
                 ref1_name=%s, ref1_phone=%s, ref1_address=%s,
                 ref2_name=%s, ref2_phone=%s, ref2_address=%s,
                 ref3_name=%s, ref3_phone=%s, ref3_address=%s,
-                updated_by=%s, updated_at=NOW()
+                updated_by=%s, updated_at=(NOW() AT TIME ZONE 'Asia/Kolkata')
             WHERE id=%s;
         """, (
             data.driver_name, data.phone_number, data.whatsapp_number, data.dob, data.city, data.operating_place,
