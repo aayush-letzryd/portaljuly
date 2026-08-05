@@ -2813,8 +2813,8 @@ def search_walkins(q: str):
             FROM july_existing_walkins
             WHERE person_number ILIKE %s OR person_name ILIKE %s OR first_name ILIKE %s
             UNION ALL
-            SELECT 'O-' || id::text AS id, 'existing' AS record_type, '' AS first_name, '' AS last_name, driver_name AS person_name, phone_number AS person_number, city, 'Driver' AS visitor_type, 'Partner Visit' AS visiting_reason, created_at::text AS event_date, true AS is_existing_partner
-            FROM july_driver_onboarding
+            SELECT 'O-' || id::text AS id, 'existing' AS record_type, '' AS first_name, '' AS last_name, driver_name AS person_name, phone_number AS person_number, city, COALESCE(candidate_role, 'Driver') AS visitor_type, 'Partner Visit' AS visiting_reason, created_at::text AS event_date, true AS is_existing_partner
+            FROM july_form_onboarding
             WHERE phone_number ILIKE %s OR driver_name ILIKE %s
             LIMIT 10;
         """, (sp, sp, sp, sp, sp, sp, sp, sp))
