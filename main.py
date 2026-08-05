@@ -2736,6 +2736,8 @@ def get_all_walkins(
                 COALESCE(NULLIF(TRIM(CONCAT(e_up.first_name, ' ', e_up.last_name)), ''), pu_up.username, NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'Executive') AS updated_by_name,
                 COALESCE(pu.portal_user_id, n.created_by, n.executive_id) AS executive_id,
                 COALESCE(pu_up.portal_user_id, n.updated_by, pu.portal_user_id, n.created_by, n.executive_id) AS updated_by_id,
+                COALESCE(n.referred_by_name, '') AS referred_by_name,
+                COALESCE(n.referred_by_phone, '') AS referred_by_phone,
                 n.id::integer AS raw_id
             FROM july_new_walkins n
             LEFT JOIN july_portal_users pu ON pu.portal_user_id = COALESCE(n.created_by, n.executive_id)
@@ -2768,6 +2770,8 @@ def get_all_walkins(
                 COALESCE(NULLIF(TRIM(CONCAT(e_up.first_name, ' ', e_up.last_name)), ''), pu_up.username, NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'Executive') AS updated_by_name,
                 COALESCE(pu.portal_user_id, ex.created_by, ex.executive_id) AS executive_id,
                 COALESCE(pu_up.portal_user_id, ex.updated_by, pu.portal_user_id, ex.created_by, ex.executive_id) AS updated_by_id,
+                '' AS referred_by_name,
+                '' AS referred_by_phone,
                 ex.id::integer AS raw_id
             FROM july_existing_walkins ex
             LEFT JOIN july_portal_users pu ON pu.portal_user_id = COALESCE(ex.created_by, ex.executive_id)
@@ -2800,6 +2804,8 @@ def get_all_walkins(
                 COALESCE(NULLIF(TRIM(CONCAT(e_up.first_name, ' ', e_up.last_name)), ''), pu_up.username, NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'Executive') AS updated_by_name,
                 COALESCE(pu.portal_user_id, w.created_by, w.executive_id) AS executive_id,
                 COALESCE(pu_up.portal_user_id, w.updated_by, pu.portal_user_id, w.created_by, w.executive_id) AS updated_by_id,
+                COALESCE(w.referred_by_name, '') AS referred_by_name,
+                COALESCE(w.referred_by_phone, '') AS referred_by_phone,
                 w.id::integer AS raw_id
             FROM july_walkins w
             LEFT JOIN july_portal_users pu ON pu.portal_user_id = COALESCE(w.created_by, w.executive_id)
@@ -2892,7 +2898,9 @@ def get_all_walkins(
                 "updated_by_name": r[18],
                 "executive_id": r[19],
                 "updated_by": r[20],
-                "raw_id": r[21],
+                "referred_by_name": r[21],
+                "referred_by_phone": r[22],
+                "raw_id": r[23],
             })
 
         return {"items": items, "total": total_count, "page": page, "limit": limit}

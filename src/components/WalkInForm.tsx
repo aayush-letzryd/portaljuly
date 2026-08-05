@@ -770,6 +770,8 @@ export default function WalkInForm({
         "Visiting Reason",
         "Lead Channel / Source",
         "Lead Channel Details",
+        "Referred By Name",
+        "Referred By Phone",
         "Outcome Status",
         "Submission Status",
         "Visit Notes & Summary",
@@ -804,6 +806,8 @@ export default function WalkInForm({
           escapeCSV(r.visiting_reason || ''),
           escapeCSV(r.lead_channel || r.mode_of_enquiry || ''),
           escapeCSV(r.lead_channel_details || ''),
+          escapeCSV(r.referred_by_name || ''),
+          escapeCSV(r.referred_by_phone || ''),
           escapeCSV(r.joined_status || ''),
           escapeCSV(r.submission_status || 'Submitted'),
           escapeCSV(r.visit_notes || r.remarks || ''),
@@ -1094,7 +1098,7 @@ export default function WalkInForm({
                     </div>
 
                     <div className="md:col-span-12 -mt-2">
-                      <p className="font-sans text-[11px] font-medium text-slate-500 italic">
+                      <p className="font-sans text-[10px] font-normal text-slate-500">
                         This is the current date and time. The final submission timestamp will be recorded when you submit the form.
                       </p>
                     </div>
