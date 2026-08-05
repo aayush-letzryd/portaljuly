@@ -565,7 +565,13 @@ export default function WalkInForm({
 
   const loadRecordIntoForm = (record: any, id: number) => {
     setEditingId(id);
-    setInterestedPosition(record.visitor_type || "Driver");
+    const isExisting = Boolean(record.is_existing_partner || record.partner_code || record.partner_type === "Operator");
+    setIsExistingPartner(isExisting);
+    
+    const pType = (record.partner_type || record.visitor_type || "Driver").includes("Operator") ? "Operator" : "Driver";
+    setPartnerType(pType as any);
+    setInterestedPosition(pType as any);
+    
     setEnquiryDate(record.event_date || "");
     setEnquiryTime(formatTimeForInput(record.enquiry_time || "10:30 AM"));
     setCity(normalizeCity(record.city || record.city_name));
@@ -577,7 +583,8 @@ export default function WalkInForm({
     setAadhaarNumber(record.aadhaar_number || "");
     setAadhaarImage(record.aadhaar_image || null);
     setDlImage(record.dl_image || null);
-    setVisitingReason(record.visiting_reason || "Onboarding");
+    setVisitingReason(record.visiting_reason || (isExisting ? "Hisaab & Payout" : "Onboarding Inquiry"));
+    setVisitNotes(record.visit_notes || record.remarks || "");
     setLeadChannel(record.lead_channel || record.mode_of_enquiry || "Direct Walk-in");
     setLeadChannelDetails(record.lead_channel_details || "");
     setLeadSource(record.lead_channel || record.mode_of_enquiry || "Direct Walk-in");
