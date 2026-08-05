@@ -46,29 +46,22 @@ const normalizeCity = (cityVal: string): string => {
 
 const PRESET_TAGS: Record<string, string[]> = {
   Driver: [
-    "Payment / Payout Dispute",
-    "Plan Inquiry (Drive to Rent/Own)",
-    "Vehicle Swap / Issue",
-    "App / Login Technical Issue",
-    "Fastag / Toll Balance Query",
-    "Penalty / Fine Waiver Request",
+    "Payment / Payout Issue",
+    "Plan Inquiry",
+    "Vehicle Swap & Issue",
+    "App & Login Issue",
+    "Fastag & Toll Query",
+    "Penalty & Fine Waiver",
     "Shift Timing Change",
     "Document Resubmission"
   ],
   Operator: [
-    "Multi-Vehicle Remittance",
-    "Fleet Expansion / Adding Cars",
-    "Sub-Driver Assignment / Swap",
-    "Operator Commission Payout",
+    "Vehicle Remittance",
+    "Fleet Expansion",
+    "Sub-Driver Swap",
+    "Commission Payout",
     "Hisaab Settlement",
-    "Fleet Security / GPS Issue"
-  ],
-  Vendor: [
-    "Garage Repair Invoice Settlement",
-    "CNG Fuel Vendor Payout",
-    "Spare Parts Supply",
-    "Fastag Tag Installation",
-    "Insurance Claim Processing"
+    "GPS & Fleet Issue"
   ]
 };
 
@@ -837,8 +830,8 @@ export default function WalkInForm({
                 </div>
 
                 <div className="flex flex-col gap-5">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
-                    <div className="flex flex-col gap-1.5">
+                  <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                    <div className="flex flex-col gap-1.5 md:col-span-3">
                       <label className="font-sans text-xs font-semibold text-slate-700">{isExistingPartner ? "Partner Category *" : "Interested Position *"}</label>
                       <select
                         value={partnerType}
@@ -850,7 +843,7 @@ export default function WalkInForm({
                       </select>
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5 md:col-span-5">
                       <label className="font-sans text-xs font-semibold text-slate-700">Visiting Reason *</label>
                       <select
                         required
@@ -878,12 +871,12 @@ export default function WalkInForm({
                       </select>
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5 md:col-span-2">
                       <label className="font-sans text-xs font-semibold text-slate-700">Enquiry Date *</label>
                       <input type="date" required value={enquiryDate} onChange={(e) => setEnquiryDate(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary" />
                     </div>
 
-                    <div className="flex flex-col gap-1.5">
+                    <div className="flex flex-col gap-1.5 md:col-span-2">
                       <label className="font-sans text-xs font-semibold text-slate-700">Enquiry Time *</label>
                       <input type="time" required value={enquiryTime} onChange={(e) => setEnquiryTime(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary" />
                     </div>
