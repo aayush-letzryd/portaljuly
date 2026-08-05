@@ -73,6 +73,9 @@ export interface OnboardingRecord {
   cancelled_cheque_photo?: string;
   signature_photo?: string;
   platform_details?: string | Record<string, any>;
+  approval_status?: string;
+  approver_name?: string;
+  current_approver_id?: number;
   created_at: string;
 }
 

@@ -2807,6 +2807,7 @@ export default function OnboardingForm({
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Recorded By</th>
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Last Edited At</th>
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Last Edited By</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Assigned Approver</th>
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Approval Status</th>
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center whitespace-nowrap">Action</th>
                     </tr>
@@ -2814,7 +2815,7 @@ export default function OnboardingForm({
                   <tbody className="divide-y divide-border/40">
                     {paginatedRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">
+                        <td colSpan={12} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <Search className="h-8 w-8 text-border-strong mb-2 opacity-50" />
                             <p className="font-semibold">No onboarding records found matching current criteria.</p>
@@ -2876,6 +2877,10 @@ export default function OnboardingForm({
                             <td className="px-4 py-3">
                               <div className="font-bold text-slate-900 truncate">{r.updated_by_name || r.executive_name || user.name || '—'}</div>
                               <div className="text-slate-400 text-[10px] font-medium">ID: {r.updated_by || r.created_by || user.executive_id || 3}</div>
+                            </td>
+                            <td className="px-4 py-3">
+                              <div className="font-bold text-slate-900 truncate">{r.approver_name || "City Manager"}</div>
+                              {r.current_approver_id && <div className="text-slate-400 text-[10px] font-medium">ID: {r.current_approver_id}</div>}
                             </td>
                             <td className="px-4 py-3">
                               {statusBadge}
