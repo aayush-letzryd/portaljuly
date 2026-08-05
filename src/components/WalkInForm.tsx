@@ -962,8 +962,6 @@ export default function WalkInForm({
                         {isExistingPartner ? (
                           <>
                             <option value="" disabled>Select Visiting Reason / Tag...</option>
-                            <option value="Driver Manager (DM) Meet">Driver Manager (DM) Meet</option>
-                            <option value="Complaint">Complaint</option>
                             {(PRESET_TAGS[partnerType] || PRESET_TAGS["Driver"]).map((tag) => (
                               <option key={tag} value={tag}>{tag}</option>
                             ))}
