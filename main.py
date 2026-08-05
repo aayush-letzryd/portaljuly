@@ -1391,13 +1391,16 @@ def get_current_user(authorization: Optional[str] = Header(None)):
             """, (role_id,))
             permissions = [r[0] for r in cur.fetchall()]
 
+        resolved_pid = exec_id or user_id
         return {
-            "user_id": user_id, 
-            "executive_id": exec_id, 
+            "user_id": resolved_pid,
+            "portal_user_id": resolved_pid,
+            "executive_id": resolved_pid, 
             "name": name, 
             "role": role, 
             "username": username,
             "role_id": role_id,
+            "role_code": "SA" if username == "admin" or "admin" in (role or "").lower() else "OB",
             "permissions": permissions
         }
     finally:
