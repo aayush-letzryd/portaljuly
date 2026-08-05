@@ -629,9 +629,7 @@ export default function AllocationForm({
             <div className="rounded-2xl border border-border bg-white shadow-xl overflow-hidden mb-10">
               
               <div className="bg-primary text-white px-8 py-6 relative">
-                <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary-hover via-primary to-primary opacity-60" />
-                <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 overflow-hidden w-full">
-                  <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-20 -mt-20 pointer-events-none"></div>
+                <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 w-full">
                   <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-2">
                       <img src="https://letzryd.com/replica-assets/letzryd-long-png-logo-Aq2o3DNOw1i2kBMB-7ab04eaa76.png" className="h-8 brightness-0 invert" alt="LetzRyd" referrerPolicy="no-referrer" />
