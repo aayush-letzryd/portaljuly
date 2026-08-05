@@ -2823,7 +2823,8 @@ def search_walkins(q: str):
             UNION ALL
             SELECT 'O' || id::text AS id, 'existing' AS record_type, '' AS first_name, '' AS last_name, driver_name AS person_name, phone_number AS person_number, city, COALESCE(candidate_role, 'Driver') AS visitor_type, 'Partner Visit' AS visiting_reason, created_at::text AS event_date, true AS is_existing_partner
             FROM july_form_onboarding
-            WHERE phone_number ILIKE %s OR driver_name ILIKE %s
+            WHERE (phone_number ILIKE %s OR driver_name ILIKE %s)
+              AND approval_status ILIKE 'Approved%%'
             LIMIT 10;
         """, (sp, sp, sp, sp, sp, sp, sp, sp))
         
