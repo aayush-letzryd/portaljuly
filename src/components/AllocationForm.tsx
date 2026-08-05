@@ -488,23 +488,29 @@ export default function AllocationForm({
   };
 
   const filteredRecords = useMemo(() => {
-    return records.filter((r) => {
-      if (filterCity !== "all" && r.city_name !== filterCity) return false;
-      if (filterType !== "all" && r.allocation_type !== filterType) return false;
+    return records
+      .filter((r) => {
+        if (filterCity !== "all" && r.city_name !== filterCity) return false;
+        if (filterType !== "all" && r.allocation_type !== filterType) return false;
 
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        return (
-          (r.driver_name || "").toLowerCase().includes(q) ||
-          (r.driver_id || "").toLowerCase().includes(q) ||
-          (r.driver_phone || "").includes(q) ||
-          (r.vehicle_number || "").toLowerCase().includes(q) ||
-          (r.old_vehicle_number || "").toLowerCase().includes(q) ||
-          String(r.id).includes(q)
-        );
-      }
-      return true;
-    });
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          return (
+            (r.driver_name || "").toLowerCase().includes(q) ||
+            (r.driver_id || "").toLowerCase().includes(q) ||
+            (r.driver_phone || "").includes(q) ||
+            (r.vehicle_number || "").toLowerCase().includes(q) ||
+            (r.old_vehicle_number || "").toLowerCase().includes(q) ||
+            String(r.id).includes(q)
+          );
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const dateA = new Date(a.created_at || a.updated_at || 0).getTime();
+        const dateB = new Date(b.created_at || b.updated_at || 0).getTime();
+        return dateB - dateA;
+      });
   }, [records, searchQuery, filterCity, filterType]);
 
   const handleExportCSV = () => {
