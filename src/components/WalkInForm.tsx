@@ -1418,15 +1418,35 @@ export default function WalkInForm({
                   <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
                     <div className="flex items-center gap-2">
                       <span className="font-sans text-xs font-bold text-slate-900">Visit #{candidateHistory.length - idx}</span>
-                      <span className="text-xs font-mono font-medium text-slate-500">(ID: #{v.id})</span>
+                      <span className="text-xs font-mono font-bold text-slate-600">(ID: {v.id.startsWith?.('N-') || v.id.startsWith?.('E-') ? v.id : `#${v.id}`})</span>
                     </div>
-                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                      v.joined_status === 'Successfully Onboarded' ? 'bg-emerald-100 text-emerald-800' :
-                      v.joined_status === 'Follow Up Required' ? 'bg-amber-100 text-amber-800' :
-                      'bg-blue-100 text-blue-800'
-                    }`}>
-                      {v.joined_status || 'Initiated'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                        v.joined_status === 'Successfully Onboarded' ? 'bg-emerald-100 text-emerald-800' :
+                        v.joined_status === 'Follow Up Required' ? 'bg-amber-100 text-amber-800' :
+                        'bg-blue-100 text-blue-800'
+                      }`}>
+                        {v.joined_status || 'Initiated'}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => { setShowHistoryModal(false); viewRecordInline(v); }}
+                        className="rounded-lg px-2 py-1 border border-border bg-white text-slate-700 hover:text-primary hover:bg-slate-100 transition-all cursor-pointer flex items-center gap-1 font-semibold text-[11px]"
+                        title="View Record in Form"
+                      >
+                        <Eye className="h-3.5 w-3.5" /> View
+                      </button>
+                      {!isReadOnly && (
+                        <button
+                          type="button"
+                          onClick={() => { setShowHistoryModal(false); fetchRecordDetailsForEdit(v.id); }}
+                          className="rounded-lg px-2 py-1 border border-border bg-white text-slate-700 hover:text-primary hover:bg-slate-100 transition-all cursor-pointer flex items-center gap-1 font-semibold text-[11px]"
+                          title="Edit Record in Form"
+                        >
+                          <Edit className="h-3.5 w-3.5" /> Edit
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
@@ -1436,17 +1456,13 @@ export default function WalkInForm({
                     </div>
                     <div>
                       <span className="block text-[10px] font-semibold text-slate-400 uppercase">Partner Type</span>
-                      <span className="font-medium text-slate-800">{v.partner_type || 'Driver'}</span>
+                      <span className="font-medium text-slate-800">{v.visitor_type || v.partner_type || 'Driver'}</span>
                     </div>
                     <div>
                       <span className="block text-[10px] font-semibold text-slate-400 uppercase">City</span>
                       <span className="font-medium text-slate-800">{v.city || 'N/A'}</span>
                     </div>
-                    <div>
-                      <span className="block text-[10px] font-semibold text-slate-400 uppercase">Recorded By</span>
-                      <span className="font-medium text-slate-800">{v.executive_name || 'Executive'}</span>
-                    </div>
-                    <div className="col-span-2">
+                    <div className="col-span-3">
                       <span className="block text-[10px] font-semibold text-slate-400 uppercase">Date & Time</span>
                       <span className="font-medium text-slate-800">{v.event_date || v.created_at?.slice(0, 10)} {v.enquiry_time || ''}</span>
                     </div>
