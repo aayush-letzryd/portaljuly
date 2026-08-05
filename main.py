@@ -4361,7 +4361,7 @@ def lookup_driver(query: str, authorization: Optional[str] = Header(None)):
                     COALESCE(driver_name, '') AS driver_name,
                     COALESCE(phone_number, '') AS driver_phone,
                     COALESCE(city, 'Hyderabad') AS city_name,
-                    COALESCE(rental_model, '') AS driver_plan,
+                    COALESCE(NULLIF(rental_model, ''), 'Drive to Rent') AS driver_plan,
                     '' AS type_of_plan,
                     '' AS car_model
                 FROM july_form_onboarding
@@ -4389,7 +4389,7 @@ def lookup_driver(query: str, authorization: Optional[str] = Header(None)):
                     COALESCE(driver_name, '') AS driver_name,
                     COALESCE(phone_number, '') AS driver_phone,
                     COALESCE(city, 'Hyderabad') AS city_name,
-                    COALESCE(rental_model, '') AS driver_plan,
+                    COALESCE(NULLIF(rental_model, ''), 'Drive to Rent') AS driver_plan,
                     '' AS type_of_plan,
                     '' AS car_model
                 FROM july_driver_onboarding

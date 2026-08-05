@@ -133,9 +133,24 @@ export default function AllocationForm({
           if (d.driver_name) setDriverName(d.driver_name);
           if (d.driver_phone) setDriverPhone(d.driver_phone);
           if (d.city_name || d.city) setCityName(d.city_name || d.city);
-          if (d.driver_plan) setDriverPlan(d.driver_plan);
-          if (d.type_of_plan) setTypeOfPlan(d.type_of_plan);
-          if (d.car_model) setCarModel(d.car_model);
+          
+          // Case-insensitive match against PLAN_MAPPING options
+          let matchedPlan = "Drive to Rent";
+          const rawPlan = (d.driver_plan || d.rental_model || "").trim();
+          if (rawPlan) {
+            const foundKey = Object.keys(PLAN_MAPPING).find(
+              k => k.toLowerCase() === rawPlan.toLowerCase()
+            );
+            if (foundKey) matchedPlan = foundKey;
+          }
+          setDriverPlan(matchedPlan);
+          
+          // Auto-populate contract & car model
+          const contractType = d.type_of_plan || PLAN_MAPPING[matchedPlan]?.typeOfPlan || "Subscription (Daily)";
+          const modelType = d.car_model || PLAN_MAPPING[matchedPlan]?.carModel || "Tata Xpres-T EV";
+          setTypeOfPlan(contractType);
+          setCarModel(modelType);
+
           setDriverLookupStatus(`Found: ${d.driver_name || "Driver"} (${d.driver_id || "ID"})`);
         } else {
           setDriverLookupStatus("No onboarded driver record found.");
