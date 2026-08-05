@@ -542,8 +542,17 @@ export default function WalkInForm({
     }
   };
 
-  const viewRecordInline = (r: any) => {
+  const viewRecordInline = async (r: any) => {
     setIsFormReadOnly(true);
+    try {
+      const token = localStorage.getItem("lr_token");
+      const res = await fetch(`/api/walkins/${r.id}`, { headers: { "Authorization": `Bearer ${token}` }});
+      if (res.ok) {
+        const fullData = await res.json();
+        loadRecordIntoForm(fullData, r.id);
+        return;
+      }
+    } catch (e) {}
     loadRecordIntoForm(r, r.id);
   };
 
@@ -565,14 +574,19 @@ export default function WalkInForm({
 
   const loadRecordIntoForm = (record: any, id: number) => {
     setEditingId(id);
-    const isExisting = Boolean(record.is_existing_partner || record.partner_code || record.partner_type === "Operator");
+    const isExisting = Boolean(
+      record.is_existing_partner === true ||
+      record.is_existing_partner === "true" ||
+      record.partner_code ||
+      (record.visit_notes && record.visit_notes.trim().length > 0)
+    );
     setIsExistingPartner(isExisting);
     
     const pType = (record.partner_type || record.visitor_type || "Driver").includes("Operator") ? "Operator" : "Driver";
     setPartnerType(pType as any);
     setInterestedPosition(pType as any);
     
-    setEnquiryDate(record.event_date || "");
+    setEnquiryDate(record.event_date || record.created_at?.slice(0, 10) || "");
     setEnquiryTime(formatTimeForInput(record.enquiry_time || "10:30 AM"));
     setCity(normalizeCity(record.city || record.city_name));
     setOperatingPlace(record.operating_place || "");
@@ -586,7 +600,7 @@ export default function WalkInForm({
     setVisitingReason(record.visiting_reason || (isExisting ? "Hisaab & Payout" : "Onboarding Inquiry"));
     setVisitNotes(record.visit_notes || record.remarks || "");
     setLeadChannel(record.lead_channel || record.mode_of_enquiry || "Direct Walk-in");
-    setLeadChannelDetails(record.lead_channel_details || "");
+    setLeadChannelDetails(record.lead_channel_details || record.lead_source_details || "Ameerpet Hub Walk-In");
     setLeadSource(record.lead_channel || record.mode_of_enquiry || "Direct Walk-in");
     setReferredByName(record.referred_by_name || "");
     setReferredByPhone(record.referred_by_phone || "");
