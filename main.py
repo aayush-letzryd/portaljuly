@@ -8,6 +8,7 @@ from pydantic import BaseModel
 from typing import Optional, Union, Any, List
 from passlib.context import CryptContext
 import os
+import re
 import secrets
 import traceback
 import json
