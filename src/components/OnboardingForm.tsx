@@ -2749,7 +2749,8 @@ export default function OnboardingForm({
                       </tr>
                     ) : (
                       paginatedRecords.map((r) => {
-                        const role = r.vendor_type || r.candidate_role || "Driver";
+                        const rawRole = r.vendor_type || r.candidate_role || "Driver";
+                        const role = rawRole.toLowerCase().includes("operator") ? "Operator" : "Driver";
                         const appStatus = r.approval_status || "Draft";
                         let statusBadge = <span className="text-[9px] font-extrabold px-1.5 py-0.2 rounded w-max bg-slate-100 text-slate-700 border border-slate-200">Draft</span>;
                         if (appStatus.includes("Pending")) {
