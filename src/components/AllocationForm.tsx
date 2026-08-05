@@ -832,8 +832,6 @@ export default function AllocationForm({
                           <option value="Salary Model">Salary Model</option>
                         </select>
                       </div>
-
-                      </div>
                     </div>
                   </div>
 
