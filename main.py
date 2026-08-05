@@ -1916,15 +1916,18 @@ def login(req: LoginRequest, request: Request):
             permissions = [r[0] for r in cur.fetchall()]
             
         conn.commit()
+        resolved_p_id = exec_id or user_id
         return {
             "token": token,
             "user": {
-                "id": user_id,
+                "id": resolved_p_id,
+                "portal_user_id": resolved_p_id,
                 "username": username,
-                "executive_id": exec_id,
+                "executive_id": resolved_p_id,
                 "name": name,
                 "role": role,
                 "role_id": role_id,
+                "role_code": "SA" if username == "admin" or "admin" in (role or "").lower() else "OB",
                 "permissions": permissions
             }
         }
