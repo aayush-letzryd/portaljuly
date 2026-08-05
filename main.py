@@ -2858,6 +2858,50 @@ def get_all_walkins(
             legacy_query += " AND (w.partner_type = %s OR w.visitor_type = %s)"
             legacy_params.extend([visitor_type, visitor_type])
 
+        # Date & Time Period Filtering
+        s_date = from_date or start_date
+        e_date = to_date or end_date
+
+        if time_period == "custom":
+            if s_date:
+                new_query += " AND (n.event_date >= %s OR n.created_at >= %s)"
+                new_params.extend([s_date, s_date])
+                existing_query += " AND (ex.event_date >= %s OR ex.created_at >= %s)"
+                existing_params.extend([s_date, s_date])
+                legacy_query += " AND (w.event_date >= %s OR w.created_at >= %s)"
+                legacy_params.extend([s_date, s_date])
+            if e_date:
+                e_date_full = e_date + " 23:59:59" if len(e_date) == 10 else e_date
+                new_query += " AND (n.event_date <= %s OR n.created_at <= %s)"
+                new_params.extend([e_date, e_date_full])
+                existing_query += " AND (ex.event_date <= %s OR ex.created_at <= %s)"
+                existing_params.extend([e_date, e_date_full])
+                legacy_query += " AND (w.event_date <= %s OR w.created_at <= %s)"
+                legacy_params.extend([e_date, e_date_full])
+        elif time_period and time_period != "all":
+            from dateutil.relativedelta import relativedelta
+            today = datetime.now()
+            start_dt = None
+            if time_period == "beginning_of_month":
+                start_dt = today.replace(day=1).strftime("%Y-%m-%d")
+            elif time_period == "last_1_month":
+                start_dt = (today - relativedelta(months=1)).strftime("%Y-%m-%d")
+            elif time_period == "this_quarter":
+                quarter_month = ((today.month - 1) // 3) * 3 + 1
+                start_dt = today.replace(month=quarter_month, day=1).strftime("%Y-%m-%d")
+            elif time_period == "this_year":
+                start_dt = today.replace(month=1, day=1).strftime("%Y-%m-%d")
+            elif time_period == "last_1_year":
+                start_dt = (today - relativedelta(years=1)).strftime("%Y-%m-%d")
+
+            if start_dt:
+                new_query += " AND (n.event_date >= %s OR n.created_at >= %s)"
+                new_params.extend([start_dt, start_dt])
+                existing_query += " AND (ex.event_date >= %s OR ex.created_at >= %s)"
+                existing_params.extend([start_dt, start_dt])
+                legacy_query += " AND (w.event_date >= %s OR w.created_at >= %s)"
+                legacy_params.extend([start_dt, start_dt])
+
         if record_type == "new":
             union_query = f"({new_query})"
             union_params = new_params
