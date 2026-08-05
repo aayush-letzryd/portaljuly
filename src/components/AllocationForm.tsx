@@ -1458,42 +1458,40 @@ export default function AllocationForm({
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Allocation Type</th>
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Plan</th>
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Date</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Odometer</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Time</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Allocated By</th>
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
                     {filteredRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={11} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50 text-[11px]">
+                        <td colSpan={12} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50 text-[11px]">
                           No matching allocation records found in the database.
                         </td>
                       </tr>
                     ) : (
-                      filteredRecords.map((r) => {
+                      filteredRecords.map((r: any) => {
+                        const formattedTime = r.created_at 
+                          ? new Date(r.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) 
+                          : "10:30 AM";
+                        const allocatedBy = r.created_by || r.allocated_by || r.executive_name || user.name || user.username || "Admin";
+                        
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
-                            <td className="px-4 py-3.5 font-mono text-xs font-bold text-slate-700">#{r.id}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-700">#{r.id}</td>
                             <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-900">{r.driver_name || "-"}</td>
-                            <td className="px-4 py-3.5 font-mono text-xs text-slate-600">{r.driver_id || "-"}</td>
-                            <td className="px-4 py-3.5 font-mono text-xs text-slate-600">{r.driver_phone || "-"}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{r.driver_id || "-"}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{r.driver_phone || "-"}</td>
                             <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-800">{r.city_name || "-"}</td>
-                            <td className="px-4 py-3.5 font-mono text-xs font-bold text-slate-900">{r.vehicle_number || "-"}</td>
-                            <td className="px-4 py-3.5">
-                              <span className={`inline-block rounded px-2.5 py-1 font-sans text-[10px] font-bold ${ 
-                                (r.allocation_type === "New allocation" || r.allocation_type === "New Allocation") ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : 
-                                r.allocation_type === "Reallocation" ? "bg-indigo-50 text-indigo-700 border border-indigo-200" : 
-                                (r.allocation_type === "Swap" || r.allocation_type === "Car Swap") ? "bg-amber-50 text-amber-700 border border-amber-200" : 
-                                "bg-slate-100 text-slate-700 border border-slate-200" 
-                              }`}>
-                                {r.allocation_type || "Allocation"}
-                              </span>
+                            <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">{r.vehicle_number || "-"}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-700">
+                              {r.allocation_type || "New Allocation"}
                             </td>
                             <td className="px-4 py-3.5 font-sans text-xs text-slate-700">{r.driver_plan || r.type_of_plan || "-"}</td>
                             <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{r.allocation_date || "-"}</td>
-                            <td className="px-4 py-3.5 font-mono text-xs text-slate-700 font-medium">
-                              {r.odometer_reading ? `${r.odometer_reading} KM` : "-"}
-                            </td>
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{formattedTime}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-700 font-medium">{allocatedBy}</td>
                             <td className="px-4 py-3.5 text-center">
                               <div className="flex items-center justify-center gap-1">
                                 <button 
