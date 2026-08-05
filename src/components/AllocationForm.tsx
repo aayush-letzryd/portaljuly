@@ -1400,6 +1400,7 @@ export default function AllocationForm({
                     <tr className="bg-slate-50 border-b border-slate-200">
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">ALLOCATION ID</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">DRIVER NAME</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">DRIVER ID</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">CITY</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">CONTACT</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">VEHICLE NO</th>
@@ -1412,7 +1413,7 @@ export default function AllocationForm({
                   <tbody className="divide-y divide-slate-100">
                     {filteredRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="px-6 py-12 text-center text-slate-500 font-sans bg-slate-50/50 text-xs">
+                        <td colSpan={10} className="px-6 py-12 text-center text-slate-500 font-sans bg-slate-50/50 text-xs">
                           No matching allocation records found in the database.
                         </td>
                       </tr>
@@ -1442,6 +1443,7 @@ export default function AllocationForm({
                           <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
                             <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-700">#{r.id}</td>
                             <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">{r.driver_name || "—"}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-600">{r.driver_id || "—"}</td>
                             <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-800">{r.city_name || r.city || "—"}</td>
                             <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{r.driver_phone || "—"}</td>
                             <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">{r.vehicle_number || "—"}</td>
