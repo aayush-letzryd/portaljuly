@@ -3393,8 +3393,8 @@ def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None,
                 f.current_approver_id,
                 f.approved_by,
                 f.approval_note AS approval_remarks,
-                f.created_at,
-                f.updated_at,
+                COALESCE(f.created_at, f.updated_at, NOW()) AS created_at,
+                COALESCE(f.updated_at, f.created_at, NOW()) AS updated_at,
                 f.security_deposit,
                 f.custom_rent_amount AS daily_rent,
                 COALESCE(f.vendor_type, f.candidate_role, 'Driver') AS vendor_type,
@@ -6983,11 +6983,19 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
         if body.action == "APPROVE":
             cur.execute(f"""
                 UPDATE {table} SET approval_status = 'Approved',
-                    current_approver_id = NULL, approved_by = %s, approval_remarks = %s
+                    current_approver_id = NULL, approved_by = %s, approval_remarks = %s, updated_at = NOW()
                 WHERE {pk} = %s AND (current_approver_id = %s OR current_approver_id IS NULL OR %s = True) RETURNING {pk};
             """, (uid, body.remarks, record_id, uid, is_admin_or_cm))
             if not cur.fetchone():
                 raise HTTPException(status_code=403, detail="Not authorized or record not found")
+            
+            if table == "july_onboarding":
+                cur.execute("""
+                    UPDATE july_form_onboarding
+                    SET approval_status = 'Approved', current_approver_id = NULL, approved_by = %s, approval_note = %s, updated_by = %s, updated_at = NOW()
+                    WHERE id = %s;
+                """, (uid, body.remarks, uid, record_id))
+
             cur.execute("""
                 INSERT INTO july_approval_chain_logs (module_name, record_id, from_user_id, to_user_id, action, remarks)
                 VALUES (%s, %s, %s, NULL, 'APPROVED', %s);
@@ -6996,11 +7004,19 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
         elif body.action == "REJECT":
             cur.execute(f"""
                 UPDATE {table} SET approval_status = 'Rejected',
-                    current_approver_id = NULL, approved_by = %s, approval_remarks = %s
+                    current_approver_id = NULL, approved_by = %s, approval_remarks = %s, updated_at = NOW()
                 WHERE {pk} = %s AND (current_approver_id = %s OR current_approver_id IS NULL OR %s = True) RETURNING {pk};
             """, (uid, body.remarks, record_id, uid, is_admin_or_cm))
             if not cur.fetchone():
                 raise HTTPException(status_code=403, detail="Not authorized or record not found")
+            
+            if table == "july_onboarding":
+                cur.execute("""
+                    UPDATE july_form_onboarding
+                    SET approval_status = 'Rejected', current_approver_id = NULL, approved_by = %s, approval_note = %s, updated_by = %s, updated_at = NOW()
+                    WHERE id = %s;
+                """, (uid, body.remarks, uid, record_id))
+
             cur.execute("""
                 INSERT INTO july_approval_chain_logs (module_name, record_id, from_user_id, to_user_id, action, remarks)
                 VALUES (%s, %s, %s, NULL, 'REJECTED', %s);
@@ -7010,11 +7026,19 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
             if not body.forward_to_user_id:
                 raise HTTPException(status_code=400, detail="forward_to_user_id is required")
             cur.execute(f"""
-                UPDATE {table} SET current_approver_id = %s, approval_remarks = %s
+                UPDATE {table} SET current_approver_id = %s, approval_remarks = %s, updated_at = NOW()
                 WHERE {pk} = %s AND (current_approver_id = %s OR current_approver_id IS NULL OR %s = True) RETURNING {pk};
             """, (body.forward_to_user_id, body.remarks, record_id, uid, is_admin_or_cm))
             if not cur.fetchone():
                 raise HTTPException(status_code=403, detail="Not authorized or record not found")
+            
+            if table == "july_onboarding":
+                cur.execute("""
+                    UPDATE july_form_onboarding
+                    SET current_approver_id = %s, approval_requested_to = %s, approval_note = %s, updated_by = %s, updated_at = NOW()
+                    WHERE id = %s;
+                """, (body.forward_to_user_id, body.forward_to_user_id, body.remarks, uid, record_id))
+
             cur.execute("""
                 INSERT INTO july_approval_chain_logs (module_name, record_id, from_user_id, to_user_id, action, remarks)
                 VALUES (%s, %s, %s, %s, 'FORWARDED', %s);
@@ -7023,11 +7047,19 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
         elif body.action == "SEND_BACK":
             cur.execute(f"""
                 UPDATE {table} SET approval_status = 'Changes Requested',
-                    current_approver_id = created_by, approval_remarks = %s
+                    current_approver_id = created_by, approval_remarks = %s, updated_at = NOW()
                 WHERE {pk} = %s AND (current_approver_id = %s OR current_approver_id IS NULL OR %s = True) RETURNING {pk};
             """, (body.remarks, record_id, uid, is_admin_or_cm))
             if not cur.fetchone():
                 raise HTTPException(status_code=403, detail="Not authorized or record not found")
+            
+            if table == "july_onboarding":
+                cur.execute("""
+                    UPDATE july_form_onboarding
+                    SET approval_status = 'Changes Requested', current_approver_id = created_by, approval_note = %s, updated_by = %s, updated_at = NOW()
+                    WHERE id = %s;
+                """, (body.remarks, uid, record_id))
+
             cur.execute("""
                 INSERT INTO july_approval_chain_logs (module_name, record_id, from_user_id, to_user_id, action, remarks)
                 VALUES (%s, %s, %s, NULL, 'SENT_BACK', %s);

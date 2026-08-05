@@ -434,6 +434,11 @@ export default function OnboardingForm({
       }
 
       return true;
+    }).sort((a, b) => {
+      const timeA = new Date(a.updated_at || a.created_at || 0).getTime();
+      const timeB = new Date(b.updated_at || b.created_at || 0).getTime();
+      if (timeB !== timeA) return timeB - timeA;
+      return (b.id || 0) - (a.id || 0);
     });
   }, [records, searchQuery, filterCity, filterStatus, filterTimePeriod, customStartDate, customEndDate]);
 
@@ -2558,7 +2563,15 @@ export default function OnboardingForm({
                         </td>
                       </tr>
                     ) : (
-                      records.filter(r => r.approval_status === "Draft").map((r) => {
+                      records
+                        .filter(r => r.approval_status === "Draft")
+                        .sort((a, b) => {
+                          const timeA = new Date(a.updated_at || a.created_at || 0).getTime();
+                          const timeB = new Date(b.updated_at || b.created_at || 0).getTime();
+                          if (timeB !== timeA) return timeB - timeA;
+                          return (b.id || 0) - (a.id || 0);
+                        })
+                        .map((r) => {
                         const role = r.vendor_type || r.candidate_role || "Driver";
                         const appStatus = r.approval_status || "Draft";
                         const createdDate = formatDisplayDate(r.created_at);
