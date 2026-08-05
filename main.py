@@ -3203,27 +3203,31 @@ def update_walkin(walkin_id: str, data: WalkinData, authorization: Optional[str]
                 WHERE id=%s;
             """, (f_name, l_name, full_n, data.person_number, data.city, data.partner_type, data.visiting_reason, data.event_date, data.enquiry_time, data.visit_notes, user_p_id, raw_id))
 
-        elif clean_id_str.startswith("N"):
-            cur.execute("""
-                UPDATE july_new_walkins SET
-                    first_name=%s, last_name=%s, person_name=%s, person_number=%s,
-                    city=%s, operating_place=%s, interested_position=%s, visiting_reason=%s,
-                    event_date=%s, enquiry_time=%s, dl_number=%s, aadhaar_number=%s,
-                    lead_channel=%s, lead_channel_details=%s, joined_status=%s, remarks=%s,
-                    updated_at=NOW(), updated_by=%s
-                WHERE id=%s;
-            """, (f_name, l_name, full_n, data.person_number, data.city, data.operating_place, data.visitor_type, data.visiting_reason, data.event_date, data.enquiry_time, data.dl_number, data.aadhaar_number, data.lead_channel, data.lead_channel_details, data.joined_status, data.remarks, user_p_id, raw_id))
-
         else:
-            cur.execute("""
-                UPDATE july_walkins SET
-                    first_name=%s, last_name=%s, person_name=%s, person_number=%s,
-                    city=%s, visiting_reason=%s, updated_at=NOW()
-                WHERE id=%s;
-            """, (f_name, l_name, full_n, data.person_number, data.city, data.visiting_reason, raw_id))
+            cur.execute("SELECT id FROM july_new_walkins WHERE id=%s;", (raw_id,))
+            if cur.fetchone() or clean_id_str.startswith("N"):
+                cur.execute("""
+                    UPDATE july_new_walkins SET
+                        first_name=%s, last_name=%s, person_name=%s, person_number=%s,
+                        city=%s, operating_place=%s, interested_position=%s, visiting_reason=%s,
+                        event_date=%s, enquiry_time=%s, dl_number=%s, aadhaar_number=%s,
+                        lead_channel=%s, lead_channel_details=%s, joined_status=%s, remarks=%s,
+                        updated_at=NOW(), updated_by=%s
+                    WHERE id=%s;
+                """, (f_name, l_name, full_n, data.person_number, data.city, data.operating_place, data.visitor_type or data.interested_position or 'Driver', data.visiting_reason, data.event_date, data.enquiry_time, data.dl_number, data.aadhaar_number, data.lead_channel, data.lead_channel_details, data.joined_status, data.remarks, user_p_id, raw_id))
+            else:
+                cur.execute("""
+                    UPDATE july_walkins SET
+                        first_name=%s, last_name=%s, person_name=%s, person_number=%s,
+                        city=%s, visiting_reason=%s, updated_at=NOW()
+                    WHERE id=%s;
+                """, (f_name, l_name, full_n, data.person_number, data.city, data.visiting_reason, raw_id))
 
         conn.commit()
         return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         postgreSQL_pool.putconn(conn)
 
