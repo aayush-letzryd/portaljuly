@@ -330,7 +330,7 @@ export default function ChallansForm({
           <div className="hidden items-center gap-4 lg:flex">
             <div className="text-right">
               <span className="block text-[9px] font-bold text-text-dim">Current Time (IST)</span>
-              <span className="font-mono text-xs font-extrabold text-green">{currentTime}</span>
+              <span className="font-sans text-xs font-bold text-primary tracking-tight">{currentTime}</span>
             </div>
             
             <span className="h-5 border-l border-border" />
