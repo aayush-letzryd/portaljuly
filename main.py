@@ -2816,25 +2816,20 @@ def get_all_walkins(
         if city and city != "all":
             clean_c = city.strip().lower()
             if clean_c in ["blr", "bangalore", "bengaluru"]:
-                new_query += " AND (n.city ILIKE '%bangalore%' OR n.city ILIKE '%bengaluru%' OR n.city ILIKE '%blr%')"
-                existing_query += " AND (ex.city ILIKE '%bangalore%' OR ex.city ILIKE '%bengaluru%' OR ex.city ILIKE '%blr%')"
-                legacy_query += " AND (w.city ILIKE '%bangalore%' OR w.city ILIKE '%bengaluru%' OR w.city ILIKE '%blr%')"
+                c_pattern = "%bengaluru%"
             elif clean_c in ["hyd", "hyderabad"]:
-                new_query += " AND (n.city ILIKE '%hyderabad%' OR n.city ILIKE '%hyd%')"
-                existing_query += " AND (ex.city ILIKE '%hyderabad%' OR ex.city ILIKE '%hyd%')"
-                legacy_query += " AND (w.city ILIKE '%hyderabad%' OR w.city ILIKE '%hyd%')"
+                c_pattern = "%hyderabad%"
             elif clean_c in ["mum", "mumbai"]:
-                new_query += " AND (n.city ILIKE '%mumbai%' OR n.city ILIKE '%mum%')"
-                existing_query += " AND (ex.city ILIKE '%mumbai%' OR ex.city ILIKE '%mum%')"
-                legacy_query += " AND (w.city ILIKE '%mumbai%' OR w.city ILIKE '%mum%')"
+                c_pattern = "%mumbai%"
             else:
-                sp_city = f"%{city}%"
-                new_query += " AND n.city ILIKE %s"
-                new_params.append(sp_city)
-                existing_query += " AND ex.city ILIKE %s"
-                existing_params.append(sp_city)
-                legacy_query += " AND w.city ILIKE %s"
-                legacy_params.append(sp_city)
+                c_pattern = f"%{city}%"
+
+            new_query += " AND (n.city ILIKE %s OR n.city ILIKE %s)"
+            new_params.extend([c_pattern, f"%{clean_c}%"])
+            existing_query += " AND (ex.city ILIKE %s OR ex.city ILIKE %s)"
+            existing_params.extend([c_pattern, f"%{clean_c}%"])
+            legacy_query += " AND (w.city ILIKE %s OR w.city ILIKE %s)"
+            legacy_params.extend([c_pattern, f"%{clean_c}%"])
 
         if search:
             sp = f"%{search}%"
