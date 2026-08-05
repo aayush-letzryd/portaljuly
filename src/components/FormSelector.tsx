@@ -110,8 +110,8 @@ export default function FormSelector({ user, onSelectForm, onLogout }: FormSelec
             const isAdmin = role.includes("admin") || role.includes("founder") || role.includes("ceo") || roleCode === "SA";
             const isOnboardingExec = role.includes("onboarding") || roleCode === "OB";
             
-            // Hide Vehicle Onboarding from Onboarding Executives
-            if (key === "vehicle_onboarding" && (isOnboardingExec || role.includes("executive"))) {
+            // Hide Vehicle Onboarding & Drop-Off Form from Onboarding Executives
+            if ((key === "vehicle_onboarding" || key === "dropoff") && (isOnboardingExec || role.includes("executive"))) {
               if (!isAdmin && !role.includes("fleet") && !role.includes("manager")) {
                 return false;
               }
@@ -119,7 +119,7 @@ export default function FormSelector({ user, onSelectForm, onLogout }: FormSelec
             
             if (!isAdmin) {
               if (isOnboardingExec) {
-                return ["walkin", "onboarding", "allocation", "dropoff"].includes(key);
+                return ["walkin", "onboarding", "allocation"].includes(key);
               }
               return ["walkin", "onboarding", "vehicle_onboarding", "allocation", "dropoff"].includes(key);
             }
