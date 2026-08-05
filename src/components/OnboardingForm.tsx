@@ -1630,11 +1630,31 @@ export default function OnboardingForm({
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <label className="text-xs font-bold text-text-muted">WhatsApp Number</label>
-                          <label className="flex items-center gap-1 text-[10px] text-text-muted cursor-pointer hover:text-primary">
-                            <input type="checkbox" checked={differentWhatsapp} onChange={(e) => setDifferentWhatsapp(e.target.checked)} className="rounded border-border text-primary focus:ring-primary/20" /> Different?
+                          <label className="flex items-center gap-1 text-[10px] font-semibold text-slate-600 cursor-pointer hover:text-primary">
+                            <input 
+                              type="checkbox" 
+                              checked={differentWhatsapp} 
+                              onChange={(e) => {
+                                setDifferentWhatsapp(e.target.checked);
+                                if (!e.target.checked) setWhatsappNumber("");
+                              }} 
+                              className="rounded border-border text-primary focus:ring-primary/20 cursor-pointer" 
+                            /> Different?
                           </label>
                         </div>
-                        <input type="tel" disabled={!differentWhatsapp} value={differentWhatsapp ? whatsappNumber : phoneNumber} onChange={(e) => setWhatsappNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary outline-none transition-all disabled:opacity-60" placeholder="Same as phone" maxLength={10} />
+                        <input 
+                          type="tel" 
+                          disabled={!differentWhatsapp} 
+                          value={differentWhatsapp ? whatsappNumber : phoneNumber} 
+                          onChange={(e) => setWhatsappNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} 
+                          className={`w-full h-11 px-4 border rounded-xl text-sm outline-none transition-all ${
+                            differentWhatsapp 
+                              ? 'bg-white border-border text-slate-800 focus:border-primary focus:ring-2 focus:ring-primary/20 font-medium' 
+                              : 'bg-slate-50 border-border/80 text-slate-500 opacity-80 cursor-not-allowed'
+                          }`} 
+                          placeholder={differentWhatsapp ? "Enter 10-digit WhatsApp number" : "Same as phone"} 
+                          maxLength={10} 
+                        />
                       </div>
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-text-muted">Date of Birth *</label>

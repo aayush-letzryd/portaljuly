@@ -424,7 +424,8 @@ def startup_event():
 
         for col in [
             "lead_channel VARCHAR(100)",
-            "lead_channel_details VARCHAR(255)"
+            "lead_channel_details VARCHAR(255)",
+            "lead_source VARCHAR(100)"
         ]:
             cur.execute(f"ALTER TABLE july_walkins ADD COLUMN IF NOT EXISTS {col};")
 
@@ -3550,7 +3551,7 @@ def create_onboarding(data: OnboardingData, authorization: Optional[str] = Heade
                         visitor_type, event_date, city, operating_place, 
                         person_name, person_number, aadhaar_number, dl_number,
                         visiting_reason, joined_status, remarks,
-                        first_name, last_name, lead_source
+                        first_name, last_name, lead_channel
                     ) VALUES (%s, CURRENT_DATE, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id;
                 """, (
