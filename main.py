@@ -4478,6 +4478,7 @@ def get_allocations(
     query: Optional[str] = None,
     city: Optional[str] = None,
     alloc_type: Optional[str] = None,
+    status: Optional[str] = None,
     authorization: Optional[str] = Header(None)
 ):
     conn = postgreSQL_pool.getconn()
@@ -4487,10 +4488,16 @@ def get_allocations(
             SELECT a.*, COALESCE(u.username, 'Onboarding Executive 1') AS executive_name
             FROM july_allocation_form a
             LEFT JOIN july_portal_users u ON a.created_by = u.portal_user_id
-            WHERE (a.status IS NULL OR LOWER(a.status) != 'draft')
-              AND (a.approval_status IS NULL OR LOWER(a.approval_status) != 'draft')
+            WHERE 1=1
         """
         params = []
+
+        if status and status.lower() == "draft":
+            base_query += " AND (LOWER(a.status) = 'draft' OR LOWER(a.approval_status) = 'draft')"
+        elif status and status.lower() == "all":
+            pass
+        else:
+            base_query += " AND (a.status IS NULL OR LOWER(a.status) != 'draft') AND (a.approval_status IS NULL OR LOWER(a.approval_status) != 'draft')"
 
         if query:
             base_query += """ AND (

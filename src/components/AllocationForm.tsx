@@ -228,15 +228,22 @@ export default function AllocationForm({
     }
   };
 
+  const [draftRecords, setDraftRecords] = useState<any[]>([]);
+
   const fetchRecords = async () => {
     try {
       const token = localStorage.getItem("lr_token");
-      const res = await fetch("/api/allocation", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
+      const [resReg, resDrafts] = await Promise.all([
+        fetch("/api/allocation", { headers: { "Authorization": `Bearer ${token}` } }),
+        fetch("/api/allocation?status=Draft", { headers: { "Authorization": `Bearer ${token}` } })
+      ]);
+      if (resReg.ok) {
+        const data = await resReg.json();
         setRecords(data);
+      }
+      if (resDrafts.ok) {
+        const drafts = await resDrafts.json();
+        setDraftRecords(drafts);
       }
     } catch (err) {
       console.error("Error fetching records:", err);
@@ -560,9 +567,9 @@ export default function AllocationForm({
             >
               <Clock className="h-4 w-4" />
               Saved Drafts
-              {records.filter(r => r.approval_status === "Draft").length > 0 && (
+              {draftRecords.length > 0 && (
                 <span className="ml-1 px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded-full text-[10px] font-extrabold">
-                  {records.filter(r => r.approval_status === "Draft").length}
+                  {draftRecords.length}
                 </span>
               )}
             </button>
@@ -1213,7 +1220,7 @@ export default function AllocationForm({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {records.filter(r => r.status === "Draft" || r.approval_status === "Draft").length === 0 ? (
+                    {draftRecords.length === 0 ? (
                       <tr>
                         <td colSpan={10} className="px-6 py-12 text-center text-slate-500 font-sans bg-slate-50/50">
                           <div className="flex flex-col items-center justify-center gap-2">
@@ -1224,7 +1231,7 @@ export default function AllocationForm({
                         </td>
                       </tr>
                     ) : (
-                      records.filter(r => r.status === "Draft" || r.approval_status === "Draft").map((r) => {
+                      draftRecords.map((r) => {
                         const displayCity = r.city_name || r.city || "—";
                         const displayPlan = r.driver_plan || r.type_of_plan || r.plan_name || "—";
                         const displayTxType = r.sub_type || r.allocation_type || "New Allocation";
