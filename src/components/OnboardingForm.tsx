@@ -2833,26 +2833,26 @@ export default function OnboardingForm({
                             <td className="px-4 py-3">
                               {appStatus.includes("Pending") && (
                                 <div>
-                                  <div className="font-bold text-amber-900">{r.approver_name || 'Driver Manager 1'}</div>
-                                  <div className="text-amber-700/70 text-[10px] font-medium">Target ID: {r.current_approver_id || r.approval_requested_to || 21}</div>
+                                  <div className="font-bold text-slate-900">{r.approver_name || 'Driver Manager 1'}</div>
+                                  <div className="text-slate-400 text-[10px] font-medium">Target ID: {r.current_approver_id || r.approval_requested_to || 21}</div>
                                 </div>
                               )}
                               {appStatus.includes("Approved") && (
                                 <div>
-                                  <div className="font-bold text-emerald-900">{r.approved_by_name || r.updated_by_name || 'Admin'}</div>
-                                  <div className="text-emerald-700/70 text-[10px] font-medium">Approved ID: {r.approved_by || r.updated_by || 3}</div>
+                                  <div className="font-bold text-slate-900">{r.approved_by_name || r.updated_by_name || 'Admin'}</div>
+                                  <div className="text-slate-400 text-[10px] font-medium">Approved ID: {r.approved_by || r.updated_by || 3}</div>
                                 </div>
                               )}
                               {(appStatus.includes("Requested") || appStatus.includes("Counter")) && (
                                 <div>
-                                  <div className="font-bold text-blue-900">{r.approver_name || r.updated_by_name || 'City Manager 1'}</div>
-                                  <div className="text-blue-700/70 text-[10px] font-medium">Req. ID: {r.current_approver_id || r.updated_by || 20}</div>
+                                  <div className="font-bold text-slate-900">{r.approver_name || r.updated_by_name || 'City Manager 1'}</div>
+                                  <div className="text-slate-400 text-[10px] font-medium">Req. ID: {r.current_approver_id || r.updated_by || 20}</div>
                                 </div>
                               )}
                               {appStatus.includes("Reject") && (
                                 <div>
-                                  <div className="font-bold text-rose-900">{r.approved_by_name || r.updated_by_name || 'Manager'}</div>
-                                  <div className="text-rose-700/70 text-[10px] font-medium">Rejected ID: {r.approved_by || r.updated_by || 3}</div>
+                                  <div className="font-bold text-slate-900">{r.approved_by_name || r.updated_by_name || 'Manager'}</div>
+                                  <div className="text-slate-400 text-[10px] font-medium">Rejected ID: {r.approved_by || r.updated_by || 3}</div>
                                 </div>
                               )}
                               {appStatus === "Draft" && (
