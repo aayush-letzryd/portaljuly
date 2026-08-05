@@ -793,43 +793,20 @@ export default function WalkInForm({
                 </div>
 
                 {fetchBannerMsg && (
-                  <div className="bg-emerald-50/90 border border-emerald-200 rounded-xl p-4 flex flex-col gap-3 shadow-xs">
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
-                      <div className="flex items-center gap-2">
-                        <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                        <span className="text-xs font-semibold text-slate-800">{fetchBannerMsg}</span>
-                      </div>
-                      {candidateHistory.length > 0 && (
-                        <button
-                          type="button"
-                          onClick={() => setShowHistoryModal(!showHistoryModal)}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
-                        >
-                          <Clock className="w-3.5 h-3.5" />
-                          {showHistoryModal ? "Hide Prior Visits" : `View ${candidateHistory.length} Prior Visit${candidateHistory.length > 1 ? 's' : ''}`}
-                        </button>
-                      )}
+                  <div className="flex items-center justify-between gap-3 px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl text-xs">
+                    <div className="flex items-center gap-2.5 text-slate-700">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
+                      <span className="font-semibold text-slate-800">{fetchBannerMsg}</span>
                     </div>
-
-                    {showHistoryModal && candidateHistory.length > 0 && (
-                      <div className="mt-2 border-t border-emerald-200 pt-3 flex flex-col gap-2">
-                        <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Candidate Visit History Log</span>
-                        <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-1">
-                          {candidateHistory.map((v, idx) => (
-                            <div key={v.id || idx} className="bg-white p-3 rounded-lg border border-emerald-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                              <div className="flex flex-col gap-0.5">
-                                <div className="flex items-center gap-2">
-                                  <span className="font-semibold text-slate-800">Visit #{candidateHistory.length - idx} (ID: #{v.id})</span>
-                                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">{v.visiting_reason || 'Enquiry'}</span>
-                                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${v.joined_status === 'Successfully Onboarded' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{v.joined_status}</span>
-                                </div>
-                                <span className="text-xs text-slate-500">Date: {v.event_date || v.created_at?.slice(0, 10)} | City: {v.city} | Exec: {v.executive_name || 'Executive'}</span>
-                              </div>
-                              {v.remarks && <span className="text-xs text-slate-600 bg-slate-50 px-2 py-1 rounded max-w-xs truncate">"{v.remarks}"</span>}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
+                    {candidateHistory.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={() => setShowHistoryModal(true)}
+                        className="text-xs font-semibold text-emerald-700 hover:text-emerald-800 hover:underline flex items-center gap-1 cursor-pointer shrink-0"
+                      >
+                        <Clock className="w-3.5 h-3.5" />
+                        View {candidateHistory.length} Prior Visit{candidateHistory.length > 1 ? 's' : ''} →
+                      </button>
                     )}
                   </div>
                 )}
@@ -896,6 +873,19 @@ export default function WalkInForm({
                         <input type="time" required value={enquiryTime} onChange={(e) => setEnquiryTime(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary" />
                       </div>
                     </div>
+
+                    {isExistingPartner && (
+                      <div className="flex flex-col gap-1.5">
+                        <label className="font-sans text-xs font-semibold text-slate-700">Visit Outcome Status *</label>
+                        <select required value={joinedStatus} onChange={(e) => setJoinedStatus(e.target.value as OnboardingOutcome)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer">
+                            <option value="Onboarding Process Initiated">Onboarding Process Initiated</option>
+                            <option value="Successfully Onboarded">Successfully Onboarded</option>
+                            <option value="Follow Up Required">Follow Up Required</option>
+                            <option value="No Follow Up Required / Closed">No Follow Up Required / Closed</option>
+                            <option value="Others">Others</option>
+                        </select>
+                      </div>
+                    )}
                   </div>
 
                   {/* Right Column: Simple Category Tags Dropdown */}
@@ -987,7 +977,7 @@ export default function WalkInForm({
 
                 {/* Free-Text Context Notes (200-300 words max) */}
                 <div className="flex flex-col gap-1.5 mt-2">
-                  <label className="font-sans text-xs font-semibold text-text-muted flex justify-between">
+                  <label className="font-sans text-xs font-semibold text-slate-700 flex justify-between">
                     <span>Visit Notes & Executive Summary (Max ~300 words) *</span>
                     <span className="text-[10px] text-slate-400">{visitNotes.length} / 1500 chars</span>
                   </label>
@@ -1084,110 +1074,100 @@ export default function WalkInForm({
                 </div>
               )}
 
-              {/* 4. Classifications & Outcome (Bottom Section) */}
-              <div className="flex flex-col gap-5 bg-slate-50/60 p-5 rounded-2xl border border-border">
-                 <div className="flex items-center gap-2 border-b border-border pb-3">
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white font-bold text-xs">4</div>
-                    <h3 className="font-sans text-xs font-bold text-slate-800 uppercase tracking-wider">Classifications & Outcome</h3>
-                 </div>
-                 
-                 <div className={`grid grid-cols-1 ${isExistingPartner ? 'md:grid-cols-2' : 'md:grid-cols-2'} gap-6`}>
-                 
-                 {!isExistingPartner ? (
-                   <div className="flex flex-col gap-4">
-                      <div className="grid grid-cols-2 gap-4">
-                        <div className="flex flex-col gap-1.5">
-                          <label className="font-sans text-xs font-semibold text-slate-700">Interested Position</label>
-                          <select value={interestedPosition} onChange={(e) => setInterestedPosition(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer">
-                            <option value="Driver">Driver</option>
-                            <option value="Operator">Operator</option>
-                            <option value="Enquiry">Enquiry</option>
-                          </select>
-                        </div>
-                        
-                        <div className="flex flex-col gap-1.5">
-                          <label className="font-sans text-xs font-semibold text-slate-700">Lead Channel *</label>
-                          <select
-                            required
-                            value={leadChannel}
-                            onChange={(e) => {
-                              setLeadChannel(e.target.value);
-                              setLeadSource(e.target.value);
-                            }}
-                            className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer"
-                          >
-                            <option value="Direct Walk-in">Direct Walk-in</option>
-                            <option value="Telecaller">Telecaller</option>
-                            <option value="FSE">FSE</option>
-                            <option value="Vendor">Vendor</option>
-                            <option value="Driver Referral">Driver Referral</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="flex flex-col gap-1.5">
-                        <label className="font-sans text-xs font-semibold text-slate-700">
-                          Lead Channel Name / Details *
-                        </label>
-                        <input
-                          type="text"
-                          required
-                          value={leadChannelDetails}
-                          onChange={(e) => setLeadChannelDetails(e.target.value)}
-                          placeholder={
-                            leadChannel === "Direct Walk-in" ? "Enter Walk-in Location / Branch / Hub / Notes" :
-                            leadChannel === "Telecaller" ? "Enter Telecaller Name / Agent ID" :
-                            leadChannel === "FSE" ? "Enter FSE Name / Agent ID" :
-                            leadChannel === "Vendor" ? "Enter Vendor / Partner Agency Name" :
-                            leadChannel === "Driver Referral" ? "Enter Referrer Driver Details (Name / ID / Phone)" :
-                            "Enter Lead Channel Details"
-                          }
-                          className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal"
-                        />
-                      </div>
-
-                      {leadChannel === "Driver Referral" && (
+              {/* 4. Classifications & Outcome (ONLY rendered for NEW Candidates; Suppressed for Existing Partners) */}
+              {!isExistingPartner && (
+                <div className="flex flex-col gap-5 bg-slate-50/60 p-5 rounded-2xl border border-border">
+                   <div className="flex items-center gap-2 border-b border-border pb-3">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white font-bold text-xs">4</div>
+                      <h3 className="font-sans text-xs font-bold text-slate-800 uppercase tracking-wider">Classifications & Outcome</h3>
+                   </div>
+                   
+                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                     <div className="flex flex-col gap-4">
                         <div className="grid grid-cols-2 gap-4">
                           <div className="flex flex-col gap-1.5">
-                            <label className="font-sans text-xs font-semibold text-slate-700">Referred By (Name) *</label>
-                            <input type="text" required value={referredByName} onChange={(e) => setReferredByName(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal" placeholder="Referrer Name" />
+                            <label className="font-sans text-xs font-semibold text-slate-700">Interested Position</label>
+                            <select value={interestedPosition} onChange={(e) => setInterestedPosition(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer">
+                              <option value="Driver">Driver</option>
+                              <option value="Operator">Operator</option>
+                              <option value="Enquiry">Enquiry</option>
+                            </select>
                           </div>
+                          
                           <div className="flex flex-col gap-1.5">
-                            <label className="font-sans text-xs font-semibold text-slate-700">Referred By (Phone) *</label>
-                            <input type="tel" required value={referredByPhone} onChange={(e) => setReferredByPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal" placeholder="10-digit Phone" />
+                            <label className="font-sans text-xs font-semibold text-slate-700">Lead Channel *</label>
+                            <select
+                              required
+                              value={leadChannel}
+                              onChange={(e) => {
+                                setLeadChannel(e.target.value);
+                                setLeadSource(e.target.value);
+                              }}
+                              className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer"
+                            >
+                              <option value="Direct Walk-in">Direct Walk-in</option>
+                              <option value="Telecaller">Telecaller</option>
+                              <option value="FSE">FSE</option>
+                              <option value="Vendor">Vendor</option>
+                              <option value="Driver Referral">Driver Referral</option>
+                            </select>
                           </div>
                         </div>
-                      )}
-                   </div>
-                 ) : (
-                   <div className="flex flex-col justify-center p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl gap-1">
-                     <div className="flex items-center gap-2 text-xs font-semibold text-slate-800">
-                       <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
-                       <span>Existing Partner / Candidate Visit Logger</span>
+
+                        <div className="flex flex-col gap-1.5">
+                          <label className="font-sans text-xs font-semibold text-slate-700">
+                            Lead Channel Name / Details *
+                          </label>
+                          <input
+                            type="text"
+                            required
+                            value={leadChannelDetails}
+                            onChange={(e) => setLeadChannelDetails(e.target.value)}
+                            placeholder={
+                              leadChannel === "Direct Walk-in" ? "Enter Walk-in Location / Branch / Hub / Notes" :
+                              leadChannel === "Telecaller" ? "Enter Telecaller Name / Agent ID" :
+                              leadChannel === "FSE" ? "Enter FSE Name / Agent ID" :
+                              leadChannel === "Vendor" ? "Enter Vendor / Partner Agency Name" :
+                              leadChannel === "Driver Referral" ? "Enter Referrer Driver Details (Name / ID / Phone)" :
+                              "Enter Lead Channel Details"
+                            }
+                            className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal"
+                          />
+                        </div>
+
+                        {leadChannel === "Driver Referral" && (
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="flex flex-col gap-1.5">
+                              <label className="font-sans text-xs font-semibold text-slate-700">Referred By (Name) *</label>
+                              <input type="text" required value={referredByName} onChange={(e) => setReferredByName(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal" placeholder="Referrer Name" />
+                            </div>
+                            <div className="flex flex-col gap-1.5">
+                              <label className="font-sans text-xs font-semibold text-slate-700">Referred By (Phone) *</label>
+                              <input type="tel" required value={referredByPhone} onChange={(e) => setReferredByPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal" placeholder="10-digit Phone" />
+                            </div>
+                          </div>
+                        )}
                      </div>
-                     <p className="text-xs text-slate-600">Initial recruitment acquisition channels are suppressed for existing records.</p>
-                   </div>
-                 )}
 
-                 <div className="flex flex-col gap-4">
-                    <div className="flex flex-col gap-1.5">
-                      <label className="font-sans text-xs font-semibold text-slate-700">Status *</label>
-                      <select required value={joinedStatus} onChange={(e) => setJoinedStatus(e.target.value as OnboardingOutcome)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer">
-                          <option value="Onboarding Process Initiated">Onboarding Process Initiated</option>
-                          <option value="Successfully Onboarded">Successfully Onboarded</option>
-                          <option value="Follow Up Required">Follow Up Required</option>
-                          <option value="No Follow Up Required / Closed">No Follow Up Required / Closed</option>
-                          <option value="Others">Others</option>
-                      </select>
-                    </div>
-                    <div className="flex flex-col gap-1.5">
-                      <label className="font-sans text-xs font-semibold text-slate-700">Remarks</label>
-                      <textarea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} className="w-full rounded-lg border border-border p-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal resize-none" placeholder="Enter optional remarks..." />
-                    </div>
-                 </div>
-
-              </div>
-           </div>
+                     <div className="flex flex-col gap-4">
+                        <div className="flex flex-col gap-1.5">
+                          <label className="font-sans text-xs font-semibold text-slate-700">Status *</label>
+                          <select required value={joinedStatus} onChange={(e) => setJoinedStatus(e.target.value as OnboardingOutcome)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer">
+                              <option value="Onboarding Process Initiated">Onboarding Process Initiated</option>
+                              <option value="Successfully Onboarded">Successfully Onboarded</option>
+                              <option value="Follow Up Required">Follow Up Required</option>
+                              <option value="No Follow Up Required / Closed">No Follow Up Required / Closed</option>
+                              <option value="Others">Others</option>
+                          </select>
+                        </div>
+                        <div className="flex flex-col gap-1.5">
+                          <label className="font-sans text-xs font-semibold text-slate-700">Remarks</label>
+                          <textarea rows={2} value={remarks} onChange={(e) => setRemarks(e.target.value)} className="w-full rounded-lg border border-border p-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal resize-none" placeholder="Enter optional remarks..." />
+                        </div>
+                     </div>
+                  </div>
+               </div>
+              )}
 
               {/* Actions */}
               <div className="flex flex-col sm:flex-row items-center justify-between gap-4 mt-2 pt-6 border-t border-border">
@@ -1514,11 +1494,102 @@ export default function WalkInForm({
               </div>
 
             </div>
-
           </div>
         )}
 
       </main>
+
+      {showHistoryModal && candidateHistory.length > 0 && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl border border-border shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2">
+                <Clock className="w-4 h-4 text-primary" />
+                <h3 className="font-sans text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  Prior Visit History ({candidateHistory.length} Record{candidateHistory.length > 1 ? 's' : ''})
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowHistoryModal(false)}
+                className="h-7 w-7 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex flex-col gap-4">
+              {candidateHistory.map((v, idx) => (
+                <div key={v.id || idx} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col gap-3">
+                  <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+                    <div className="flex items-center gap-2">
+                      <span className="font-sans text-xs font-bold text-slate-900">Visit #{candidateHistory.length - idx}</span>
+                      <span className="text-xs font-mono font-medium text-slate-500">(ID: #{v.id})</span>
+                    </div>
+                    <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                      v.joined_status === 'Successfully Onboarded' ? 'bg-emerald-100 text-emerald-800' :
+                      v.joined_status === 'Follow Up Required' ? 'bg-amber-100 text-amber-800' :
+                      'bg-blue-100 text-blue-800'
+                    }`}>
+                      {v.joined_status || 'Initiated'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                    <div>
+                      <span className="block text-[10px] font-semibold text-slate-400 uppercase">Reason</span>
+                      <span className="font-medium text-slate-800">{v.visiting_reason || 'Enquiry'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-semibold text-slate-400 uppercase">Partner Type</span>
+                      <span className="font-medium text-slate-800">{v.partner_type || 'Driver'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-semibold text-slate-400 uppercase">City</span>
+                      <span className="font-medium text-slate-800">{v.city || 'N/A'}</span>
+                    </div>
+                    <div>
+                      <span className="block text-[10px] font-semibold text-slate-400 uppercase">Recorded By</span>
+                      <span className="font-medium text-slate-800">{v.executive_name || 'Executive'}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="block text-[10px] font-semibold text-slate-400 uppercase">Date & Time</span>
+                      <span className="font-medium text-slate-800">{v.event_date || v.created_at?.slice(0, 10)} {v.enquiry_time || ''}</span>
+                    </div>
+                  </div>
+
+                  {v.visit_tags && (
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {(typeof v.visit_tags === 'string' ? (v.visit_tags.startsWith('[') ? JSON.parse(v.visit_tags) : [v.visit_tags]) : v.visit_tags).map((tag: string) => (
+                        <span key={tag} className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          {tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {(v.visit_notes || v.remarks) && (
+                    <div className="p-2.5 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 leading-relaxed">
+                      <span className="font-semibold text-slate-900 block mb-0.5 text-[11px]">Visit Notes / Remarks:</span>
+                      {v.visit_notes || v.remarks}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <div className="px-6 py-3 border-t border-border bg-slate-50 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setShowHistoryModal(false)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {cameraActiveField && (
         <CameraCapture
