@@ -717,32 +717,121 @@ export default function WalkInForm({
     }
   };
 
-  const handleExportCSV = () => {
-    if (records.length === 0) {
-      alert("No entries available to export.");
-      return;
+  const handleExportCSV = async () => {
+    try {
+      const token = localStorage.getItem("lr_token");
+      const headers = { "Authorization": `Bearer ${token}` };
+      
+      const queryParams = new URLSearchParams();
+      if (searchQuery) queryParams.append("search", searchQuery);
+      if (filterCity !== "all") queryParams.append("city", filterCity);
+      if (filterType !== "all") queryParams.append("visitor_type", filterType);
+      if (filterRecordType !== "all") queryParams.append("record_type", filterRecordType);
+      if (filterStatus !== "all") queryParams.append("status", filterStatus);
+      if (filterTimePeriod !== "all") queryParams.append("time_period", filterTimePeriod);
+      if (filterTimePeriod === "custom") {
+        if (customStartDate) queryParams.append("from_date", customStartDate);
+        if (customEndDate) queryParams.append("to_date", customEndDate);
+      }
+      queryParams.append("page", "1");
+      queryParams.append("limit", "10000");
+
+      const res = await fetch(`/api/walkins?${queryParams.toString()}`, { headers });
+      if (!res.ok) {
+        alert("Failed to fetch full dataset for export.");
+        return;
+      }
+      const data = await res.json();
+      const exportItems = data.items || [];
+
+      if (exportItems.length === 0) {
+        alert("No entries available to export.");
+        return;
+      }
+
+      const escapeCSV = (val: any) => {
+        if (val === null || val === undefined) return '""';
+        const str = String(val).replace(/"/g, '""');
+        return `"${str}"`;
+      };
+
+      const csvHeaders = [
+        "Walk-in ID",
+        "Record Category",
+        "Candidate Full Name",
+        "First Name",
+        "Last Name",
+        "Phone Number",
+        "Operating City",
+        "Operating Place / Hub",
+        "Position / Category",
+        "Driving License",
+        "Aadhaar Number",
+        "Visiting Reason",
+        "Lead Channel / Source",
+        "Lead Channel Details",
+        "Outcome Status",
+        "Submission Status",
+        "Visit Notes & Summary",
+        "Date Created (IST)",
+        "Time Created (IST)",
+        "Recorded By Name",
+        "Recorded By User ID",
+        "Last Edited Date (IST)",
+        "Last Edited Time (IST)",
+        "Last Edited By Name",
+        "Last Edited By User ID"
+      ];
+
+      const csvRows = exportItems.map((r: any) => {
+        const cDate = r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : (r.event_date || "");
+        const cTime = r.created_at ? new Date(r.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : (r.enquiry_time || "");
+        const uDate = r.updated_at ? new Date(r.updated_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : cDate;
+        const uTime = r.updated_at ? new Date(r.updated_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : cTime;
+
+        return [
+          escapeCSV(r.id),
+          escapeCSV(r.record_type === 'existing' ? 'Existing Partner' : 'New Walk-In'),
+          escapeCSV(r.person_name || `${r.first_name || ''} ${r.last_name || ''}`.trim()),
+          escapeCSV(r.first_name || ''),
+          escapeCSV(r.last_name || ''),
+          escapeCSV(r.person_number || ''),
+          escapeCSV(r.city || r.city_name || ''),
+          escapeCSV(r.operating_place || ''),
+          escapeCSV(r.visitor_type || ''),
+          escapeCSV(r.dl_number || ''),
+          escapeCSV(r.aadhaar_number || ''),
+          escapeCSV(r.visiting_reason || ''),
+          escapeCSV(r.lead_channel || r.mode_of_enquiry || ''),
+          escapeCSV(r.lead_channel_details || ''),
+          escapeCSV(r.joined_status || ''),
+          escapeCSV(r.submission_status || 'Submitted'),
+          escapeCSV(r.visit_notes || r.remarks || ''),
+          escapeCSV(cDate),
+          escapeCSV(cTime),
+          escapeCSV(r.executive_name || ''),
+          escapeCSV(r.executive_id || ''),
+          escapeCSV(uDate),
+          escapeCSV(uTime),
+          escapeCSV(r.updated_by_name || r.executive_name || ''),
+          escapeCSV(r.updated_by || r.executive_id || '')
+        ].join(",");
+      });
+
+      const csvString = [csvHeaders.join(","), ...csvRows].join("\n");
+      const blob = new Blob([csvString], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.setAttribute("href", url);
+      link.setAttribute("download", `walkin_leads_complete_${new Date().toISOString().substring(0, 10)}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("Error exporting CSV:", err);
+      alert("An error occurred while generating CSV export.");
     }
-
-    const headers = [
-      "Walk-in ID", "Enquiry Date", "Enquiry Time", "City Hub", "First Name", "Last Name",
-      "Phone Number", "Driving License", "Aadhaar Number", "Interested Position", 
-      "Visiting Reason", "Lead Source", "Outcome Status", "Executive Name"
-    ];
-
-    const rows = records.map((r) => [
-      r.id, r.event_date, r.enquiry_time, `"${r.city_name}"`, `"${r.first_name || ''}"`, `"${r.last_name || ''}"`,
-      r.person_number, r.dl_number, maskSensitiveID(r.aadhaar_number), r.visitor_type,
-      `"${r.visiting_reason}"`, `"${r.mode_of_enquiry}"`, r.joined_status, `"${r.executive_name}"`
-    ]);
-
-    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
-    const encodedUri = encodeURI(csvContent);
-    const link = document.createElement("a");
-    link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `walkin_records_${new Date().toISOString().substring(0,10)}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
   };
 
   const totalPages = Math.ceil(totalRecords / 10) || 1;
