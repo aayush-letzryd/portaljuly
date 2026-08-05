@@ -727,20 +727,11 @@ export default function AllocationForm({
 
                   {/* COLUMN 2: DRIVER INFORMATION */}
                   <div className="space-y-6">
-                    <div className="border-b border-border pb-3 flex items-center justify-between">
+                    <div className="border-b border-border pb-3">
                       <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
                         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">2</span>
                         Driver Information
                       </h3>
-                      <button
-                        type="button"
-                        onClick={() => handleFetchDriver()}
-                        disabled={isDriverLookupLoading}
-                        className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-all cursor-pointer flex items-center gap-1 shadow-2xs disabled:opacity-60"
-                      >
-                        {isDriverLookupLoading ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />}
-                        Fetch Details
-                      </button>
                     </div>
 
                     <div className="space-y-4">
