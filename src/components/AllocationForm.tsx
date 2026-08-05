@@ -833,27 +833,6 @@ export default function AllocationForm({
                         </select>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-3">
-                        <div>
-                          <label className="block font-sans text-[11px] font-bold text-slate-600 mb-1">Plan Contract</label>
-                          <input 
-                            type="text" 
-                            placeholder="Auto-populated..."
-                            value={typeOfPlan}
-                            readOnly
-                            className="w-full rounded-xl border border-border bg-slate-50 px-3 py-2 font-sans text-xs text-slate-600 font-semibold cursor-not-allowed"
-                          />
-                        </div>
-                        <div>
-                          <label className="block font-sans text-[11px] font-bold text-slate-600 mb-1">Default Car Model</label>
-                          <input 
-                            type="text" 
-                            placeholder="Auto-populated..."
-                            value={carModel}
-                            readOnly
-                            className="w-full rounded-xl border border-border bg-slate-50 px-3 py-2 font-sans text-xs text-slate-600 font-semibold cursor-not-allowed"
-                          />
-                        </div>
                       </div>
                     </div>
                   </div>
