@@ -2855,7 +2855,7 @@ def get_all_walkins(
         cur.execute(count_q, union_params)
         total_count = cur.fetchone()[0]
 
-        final_query = f"SELECT * FROM ({union_query}) AS combined ORDER BY created_at DESC LIMIT %s OFFSET %s"
+        final_query = f"SELECT * FROM ({union_query}) AS combined ORDER BY updated_at DESC, created_at DESC LIMIT %s OFFSET %s"
         offset = (page - 1) * limit
         cur.execute(final_query, union_params + [limit, offset])
         rows = cur.fetchall()
