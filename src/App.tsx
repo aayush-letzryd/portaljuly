@@ -6,6 +6,7 @@ import OnboardingForm from "./components/OnboardingForm";
 import OperatorOnboardingForm from "./components/OperatorOnboardingForm";
 import AdjustmentForm from "./components/AdjustmentForm";
 import AllocationForm from "./components/AllocationForm";
+import DropOffForm from "./components/DropOffForm";
 import ExpensesForm from "./components/ExpensesForm";
 import VehicleOnboardingForm from "./components/VehicleOnboardingForm";
 import WorkshopsForm from "./components/WorkshopsForm";
@@ -28,7 +29,7 @@ const LOCAL_STORAGE_TOKEN_KEY = "lr_token";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [screen, setScreen] = useState<"login" | "selector" | "walkin" | "onboarding" | "operator_onboarding" | "adjustment" | "allocation" | "expenses" | "vehicle_onboarding" | "workshops" | "hubs_parking" | "rents" | "accident" | "inspection" | "users" | "vehicle_models" | "cities" | "roles" | "tickets" | "employees" | "maintenance" | "challans" | "approvals">("login");
+  const [screen, setScreen] = useState<"login" | "selector" | "walkin" | "onboarding" | "operator_onboarding" | "adjustment" | "allocation" | "dropoff" | "expenses" | "vehicle_onboarding" | "workshops" | "hubs_parking" | "rents" | "accident" | "inspection" | "users" | "vehicle_models" | "cities" | "roles" | "tickets" | "employees" | "maintenance" | "challans" | "approvals">("login");
   const [editTarget, setEditTarget] = useState<{ formType: string; id: number; isReview?: boolean } | null>(null);
   const [activeApprovalsTab, setActiveApprovalsTab] = useState<"pending" | "my-submissions" | "revisions">("pending");
   const [isInitializing, setIsInitializing] = useState(true);
@@ -182,6 +183,13 @@ export default function App() {
           onLogout={handleLogout} 
           initialEditId={editTarget?.formType === "vehicle_allocation" ? editTarget.id : undefined}
           isReviewMode={editTarget?.isReview}
+        />
+      )}
+      {screen === "dropoff" && user && (
+        <DropOffForm 
+          user={user} 
+          onBackToSelector={() => setScreen("selector")} 
+          onLogout={handleLogout} 
         />
       )}
       {screen === "expenses" && user && (

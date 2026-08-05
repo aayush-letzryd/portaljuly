@@ -759,7 +759,39 @@ def startup_event():
                     created_by                  INTEGER,
                     updated_by                  INTEGER,
                     created_at                  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
-                    updated_at                  TIMESTAMP WITH TIME ZONE
+            """)
+
+            for col in [
+                "odometer_reading NUMERIC(10, 1)",
+                "odometer_photo TEXT",
+                "battery_photo TEXT"
+            ]:
+                cur.execute(f"ALTER TABLE july_allocation_form ADD COLUMN IF NOT EXISTS {col};")
+
+            cur.execute("""
+                CREATE TABLE IF NOT EXISTS july_vehicle_dropoffs (
+                    id SERIAL PRIMARY KEY,
+                    dropoff_date VARCHAR(50),
+                    dropoff_reason VARCHAR(100),
+                    city_name VARCHAR(100),
+                    driver_id VARCHAR(100),
+                    driver_name VARCHAR(255),
+                    driver_phone VARCHAR(50),
+                    vehicle_number VARCHAR(50),
+                    odometer_reading NUMERIC(10, 1),
+                    odometer_photo TEXT,
+                    battery_photo TEXT,
+                    photo_lh_side TEXT,
+                    photo_rh_side TEXT,
+                    photo_front_side TEXT,
+                    photo_back_side TEXT,
+                    pending_dues NUMERIC(12, 2) DEFAULT 0,
+                    damage_penalty NUMERIC(12, 2) DEFAULT 0,
+                    deposit_refund_status VARCHAR(50) DEFAULT 'Pending',
+                    dropoff_location VARCHAR(100) DEFAULT 'Hub',
+                    dropoff_notes TEXT,
+                    status VARCHAR(50) DEFAULT 'Submitted',
+                    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                 );
             """)
 
@@ -1526,6 +1558,31 @@ class AllocationData(BaseModel):
     dropoff_location: Optional[str] = None
     status: Optional[str] = None
     created_by: Optional[int] = None
+    odometer_reading: Optional[Union[float, str]] = None
+    odometer_photo: Optional[Any] = None
+    battery_photo: Optional[Any] = None
+
+class DropOffData(BaseModel):
+    dropoff_date: Optional[str] = None
+    dropoff_reason: Optional[str] = None
+    city_name: Optional[str] = "Hyderabad"
+    driver_id: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_phone: Optional[str] = None
+    vehicle_number: Optional[str] = None
+    odometer_reading: Optional[Union[float, str]] = None
+    odometer_photo: Optional[Any] = None
+    battery_photo: Optional[Any] = None
+    photo_lh_side: Optional[Any] = None
+    photo_rh_side: Optional[Any] = None
+    photo_front_side: Optional[Any] = None
+    photo_back_side: Optional[Any] = None
+    pending_dues: Optional[Union[float, str]] = 0
+    damage_penalty: Optional[Union[float, str]] = 0
+    deposit_refund_status: Optional[str] = "Pending"
+    dropoff_location: Optional[str] = "Hub"
+    dropoff_notes: Optional[str] = None
+    status: Optional[str] = "Submitted"
 
 
 class ExpenseData(BaseModel):
@@ -1645,7 +1702,6 @@ class HubData(BaseModel):
     contact_person: Optional[str] = None
     designation: Optional[str] = None
 
-class RentData(BaseModel):
     level: str = "model"
     vehicle_manufacturer: Optional[str] = None
     vehicle_model: Optional[str] = None
@@ -5234,6 +5290,17 @@ def get_rents(
         return [dict(zip(cols, row)) for row in cur.fetchall()]
     finally:
         postgreSQL_pool.putconn(conn)
+
+class RentData(BaseModel):
+    level: str
+    vehicle_manufacturer: Optional[str] = None
+    vehicle_model: Optional[str] = None
+    vehicle_number: Optional[str] = None
+    vehicle_age: Optional[str] = None
+    vendor_id: Optional[str] = None
+    driver_id: Optional[str] = None
+    rent_amount: float
+    status: Optional[str] = "Active"
 
 @app.post("/api/rents")
 def create_rent(data: RentData, authorization: Optional[str] = Header(None)):

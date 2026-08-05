@@ -47,31 +47,31 @@ export default function AllocationForm({
     return () => clearInterval(timer);
   }, []);
 
-  // Form Fields State
+  // Vehicle Allocation Form Fields State
   const [editingId, setEditingId] = useState<number | null>(null);
   const [allocationDate, setAllocationDate] = useState(new Date().toISOString().split("T")[0]);
-  const [allocationType, setAllocationType] = useState<"New allocation" | "Reallocation" | "Swap" | "Dropoff">("New allocation");
-  
-  // Allocation/Drop-off type states
-  const [allocationMainType, setAllocationMainType] = useState<"Allocation" | "Drop-Off">("Allocation");
-  const [allocationSubType, setAllocationSubType] = useState<
-    "New Allocation" | "Rejoining" | "Swap" | "Driver Attrition" | "Force Recovery" | "Repair & Maintenance" | "Attraction"
-  >("New Allocation");
+  const [transactionType, setTransactionType] = useState<"New Allocation" | "Reallocation" | "Rejoining" | "Swap">("New Allocation");
 
   // New allocation fields state
   const [olaNegativeBalance, setOlaNegativeBalance] = useState("");
   const [olaNegativeBalanceProof, setOlaNegativeBalanceProof] = useState<string | null>(null);
   const [gpsActive, setGpsActive] = useState("Yes");
+  const [odometerReading, setOdometerReading] = useState("");
+  const [odometerPhoto, setOdometerPhoto] = useState<string | null>(null);
+  const [batteryPhoto, setBatteryPhoto] = useState<string | null>(null);
+  
   const [photoLhSide, setPhotoLhSide] = useState<string | null>(null);
   const [photoRhSide, setPhotoRhSide] = useState<string | null>(null);
   const [photoFrontSide, setPhotoFrontSide] = useState<string | null>(null);
   const [photoBackSide, setPhotoBackSide] = useState<string | null>(null);
 
-  // New drop-off fields state
-  const [duplicateKeyStatus, setDuplicateKeyStatus] = useState("Yes");
-  const [fastagBalanceAmount, setFastagBalanceAmount] = useState("");
-  const [fastagBalanceProof, setFastagBalanceProof] = useState<string | null>(null);
-  const [dropoffLocation, setDropoffLocation] = useState("Hub");
+  // Driver Fetch / Lookup state
+  const [driverLookupStatus, setDriverLookupStatus] = useState<string>("");
+  const [isDriverLookupLoading, setIsDriverLookupLoading] = useState<boolean>(false);
+
+  // Vehicle Autocomplete State
+  const [vehicleSuggestions, setVehicleSuggestions] = useState<any[]>([]);
+  const [showVehicleDropdown, setShowVehicleDropdown] = useState<boolean>(false);
 
   // New checklist items
   const [musicSystem, setMusicSystem] = useState("Available");
@@ -112,62 +112,66 @@ export default function AllocationForm({
   const [oldFloorCarpet, setOldFloorCarpet] = useState("Available");
   const [oldInspectionRemarks, setOldInspectionRemarks] = useState("");
 
-  // Helper to load inspection data from backend
-  const fetchLastInspectionForGiven = async (num: string) => {
-    if (!num.trim()) return;
+  const handleFetchDriver = async (searchVal?: string) => {
+    const term = searchVal || driverPhone || driverId;
+    if (!term || !term.trim()) {
+      alert("Please enter a Driver Phone Number or Driver ID to fetch details.");
+      return;
+    }
+    setIsDriverLookupLoading(true);
+    setDriverLookupStatus("");
     try {
       const token = localStorage.getItem("lr_token");
-      const res = await fetch(`/api/inspection/last/${num}`, {
+      const res = await fetch(`/api/allocation/lookup-driver?query=${encodeURIComponent(term.trim())}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
-        if (data) {
-          setJack(data.jack || "Available");
-          setJackRod(data.jack_rod || "Available");
-          setSpanner(data.spanner || "Available");
-          setParkingTriangle(data.parking_triangle || "Available");
-          setFireExtinguishers(data.fire_extinguishers || "Available");
-          setSeatCover(data.seat_cover || "Available");
-          setFloorCarpet(data.floor_carpet || "Available");
-          setMusicSystem(data.music_system || "Available");
-          setInspectionRemarks(data.remarks || "");
+        if (Array.isArray(data) && data.length > 0) {
+          const d = data[0];
+          setDriverId(d.driver_id || "");
+          setDriverName(d.driver_name || "");
+          setDriverPhone(d.phone_number || "");
+          setCityName(d.city || "Hyderabad");
+          setDriverPlan(d.driver_plan || "Drive to Rent");
+          setTypeOfPlan(d.type_of_plan || "Subscription (Daily)");
+          setCarModel(d.car_model || "Tata Xpres-T EV");
+          setDriverLookupStatus(`Found: ${d.driver_name} (${d.driver_id})`);
+        } else {
+          setDriverLookupStatus("No onboarded driver record found.");
         }
       }
     } catch (err) {
-      console.error(err);
+      setDriverLookupStatus("Failed to lookup driver details.");
+    } finally {
+      setIsDriverLookupLoading(false);
     }
   };
 
-  const fetchLastInspectionForOld = async (num: string) => {
-    if (!num.trim()) return;
-    try {
-      const token = localStorage.getItem("lr_token");
-      const res = await fetch(`/api/inspection/last/${num}`, {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data) {
-          setOldJack(data.jack || "Available");
-          setOldJackRod(data.jack_rod || "Available");
-          setOldSpanner(data.spanner || "Available");
-          setOldParkingTriangle(data.parking_triangle || "Available");
-          setOldFireExtinguishers(data.fire_extinguishers || "Available");
-          setOldSeatCover(data.seat_cover || "Available");
-          setOldFloorCarpet(data.floor_carpet || "Available");
-          setOldMusicSystem(data.music_system || "Available");
-          setOldInspectionRemarks(data.remarks || "");
+  const handleVehicleInputChange = async (val: string) => {
+    setVehicleNumber(val);
+    if (val.trim().length >= 1) {
+      try {
+        const token = localStorage.getItem("lr_token");
+        const res = await fetch(`/api/allocation/lookup-vehicle?query=${encodeURIComponent(val.trim())}`, {
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setVehicleSuggestions(data || []);
+          setShowVehicleDropdown(true);
         }
+      } catch (e) {
+        console.error(e);
       }
-    } catch (err) {
-      console.error(err);
+    } else {
+      setShowVehicleDropdown(false);
     }
   };
 
   const [cameraActive, setCameraActive] = useState(false);
   const [activeCameraTarget, setActiveCameraTarget] = useState<
-    "dropoff" | "olaProof" | "fastagProof" | "lhSide" | "rhSide" | "frontSide" | "backSide" | null
+    "lhSide" | "rhSide" | "frontSide" | "backSide" | "olaProof" | "odometer" | "battery" | null
   >(null);
 
   // Registry Search & Filter State
@@ -484,11 +488,11 @@ export default function AllocationForm({
         if (!inspRes.ok) throw new Error("Failed to log Returned Vehicle inspection checklist");
       }
 
-      // 3. Submit Allocation Payload
+      // Submit Allocation Payload
       const payload = {
         allocation_date: allocationDate,
-        allocation_type: allocationMainType,
-        sub_type: allocationSubType,
+        allocation_type: transactionType,
+        sub_type: transactionType,
         city_name: cityName,
         driver_id: driverId.trim(),
         driver_name: driverName.trim(),
@@ -496,25 +500,17 @@ export default function AllocationForm({
         driver_plan: driverPlan.trim() || null,
         type_of_plan: typeOfPlan.trim() || null,
         car_model: carModel.trim() || null,
-        
-        vehicle_number: allocationMainType === "Drop-Off" ? oldVehicleNumber.trim() : vehicleNumber.trim(),
-        gps_active: allocationMainType === "Allocation" ? gpsActive : null,
-        ola_negative_balance: allocationMainType === "Allocation" ? olaNegativeBalance.trim() || null : null,
-        ola_negative_balance_proof: allocationMainType === "Allocation" ? olaNegativeBalanceProof : null,
-        photo_lh_side: allocationMainType === "Allocation" ? photoLhSide : null,
-        photo_rh_side: allocationMainType === "Allocation" ? photoRhSide : null,
-        photo_front_side: allocationMainType === "Allocation" ? photoFrontSide : null,
-        photo_back_side: allocationMainType === "Allocation" ? photoBackSide : null,
-        
-        old_vehicle_number: (allocationMainType === "Drop-Off" || allocationSubType === "Swap") ? oldVehicleNumber.trim() : null,
-        dropoff_odometer: (allocationMainType === "Drop-Off" || allocationSubType === "Swap") ? dropoffOdometer.trim() : null,
-        dropoff_remarks: (allocationMainType === "Drop-Off" || allocationSubType === "Swap") ? dropoffRemarks.trim() : null,
-        dropoff_photo: (allocationMainType === "Drop-Off" || allocationSubType === "Swap") && allocationSubType !== "Repair & Maintenance" ? dropoffPhoto : null,
-        
-        duplicate_key_status: (allocationMainType === "Drop-Off" || allocationSubType === "Swap") ? duplicateKeyStatus : null,
-        fastag_balance_amount: (allocationMainType === "Drop-Off" || allocationSubType === "Swap") ? fastagBalanceAmount.trim() || null : null,
-        fastag_balance_proof: (allocationMainType === "Drop-Off" || allocationSubType === "Swap") ? fastagBalanceProof : null,
-        dropoff_location: (allocationMainType === "Drop-Off" || allocationSubType === "Swap") ? dropoffLocation : null,
+        vehicle_number: vehicleNumber.trim().toUpperCase(),
+        odometer_reading: odometerReading ? parseFloat(odometerReading) : null,
+        odometer_photo: odometerPhoto,
+        battery_photo: batteryPhoto,
+        gps_active: gpsActive,
+        ola_negative_balance: olaNegativeBalance.trim() || null,
+        ola_negative_balance_proof: olaNegativeBalanceProof,
+        photo_lh_side: photoLhSide,
+        photo_rh_side: photoRhSide,
+        photo_front_side: photoFrontSide,
+        photo_back_side: photoBackSide,
         status: targetStatus
       };
 
@@ -654,7 +650,7 @@ export default function AllocationForm({
               className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold tracking-wide transition-all cursor-pointer ${ activeTab === "form" ? "bg-primary text-white shadow-sm shadow-primary/20" : "text-text-muted hover:bg-slate-100 hover:text-primary" }`}
             >
               <FileText className="h-4 w-4" />
-              Allocation Form
+              Vehicle Allocation Form
             </button>
             <button
               onClick={() => setActiveTab("drafts")}
@@ -732,7 +728,7 @@ export default function AllocationForm({
                       </span>
                     </div>
                     <h1 className="font-sans text-2xl font-bold tracking-tight text-white leading-tight">
-                      {editingId ? `Edit Allocation Record #${editingId}` : "Allocation Form"}
+                      {editingId ? `Edit Vehicle Allocation Record #${editingId}` : "Vehicle Allocation Form"}
                     </h1>
                   </div>
 
@@ -765,7 +761,7 @@ export default function AllocationForm({
                 {/* 3 COLUMN DETAILS GRID */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
                   
-                  {/* COLUMN 1: ALLOCATION DETAILS */}
+                  {/* COLUMN 1: TRANSACTION & ALLOCATION DETAILS */}
                   <div className="space-y-6">
                     <div className="border-b border-border pb-3">
                       <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
@@ -776,65 +772,22 @@ export default function AllocationForm({
 
                     <div className="space-y-4">
                       <div>
-                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Allocation Type <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-2">Transaction Type <span className="text-red-500">*</span></label>
                         <select
-                          value={allocationMainType}
-                          onChange={(e) => {
-                            const val = e.target.value as "Allocation" | "Drop-Off";
-                            setAllocationMainType(val);
-                            if (val === "Allocation") {
-                              setAllocationSubType("New Allocation");
-                              setAllocationType("New allocation");
-                            } else {
-                              setAllocationSubType("Driver Attrition");
-                              setAllocationType("Dropoff");
-                            }
-                          }}
+                          value={transactionType}
+                          onChange={(e) => setTransactionType(e.target.value as any)}
                           required
                           className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer font-semibold"
                         >
-                          <option value="Allocation">Allocation</option>
-                          <option value="Drop-Off">Drop-Off</option>
+                          <option value="New Allocation">New Allocation</option>
+                          <option value="Reallocation">Reallocation</option>
+                          <option value="Rejoining">Rejoining</option>
+                          <option value="Swap">Swap</option>
                         </select>
                       </div>
 
                       <div>
-                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Sub-Type <span className="text-red-500">*</span></label>
-                        <select
-                          value={allocationSubType}
-                          onChange={(e) => {
-                            const val = e.target.value as any;
-                            setAllocationSubType(val);
-                            if (val === "Swap") {
-                              setAllocationType("Swap");
-                            } else if (allocationMainType === "Allocation") {
-                              setAllocationType("New allocation");
-                            } else {
-                              setAllocationType("Dropoff");
-                            }
-                          }}
-                          required
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer font-semibold"
-                        >
-                          {allocationMainType === "Allocation" ? (
-                            <>
-                              <option value="New Allocation">New Allocation</option>
-                              <option value="Rejoining">Rejoining</option>
-                              <option value="Swap">Swap</option>
-                            </>
-                          ) : (
-                            <>
-                              <option value="Driver Attrition">Driver Attrition</option>
-                              <option value="Force Recovery">Force Recovery</option>
-                              <option value="Repair & Maintenance">Repair & Maintenance</option>
-                              <option value="Attraction">Attraction</option>
-                            </>
-                          )}
-                        </select>
-                      </div>
-
-                      <div>
-                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Date of Allocation / Drop-Off <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-2">Date of Allocation <span className="text-red-500">*</span></label>
                         <input 
                           type="date" 
                           value={allocationDate}
@@ -845,7 +798,7 @@ export default function AllocationForm({
                       </div>
 
                       <div>
-                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">City <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-2">Operating City <span className="text-red-500">*</span></label>
                         <select 
                           value={cityName}
                           onChange={(e) => setCityName(e.target.value)}
@@ -855,446 +808,281 @@ export default function AllocationForm({
                           {CITIES.map((c) => (
                             <option key={c.value} value={c.value}>{c.text}</option>
                           ))}
-                          <option value="Chennai">Chennai</option>
-                          <option value="Delhi">Delhi</option>
                         </select>
                       </div>
                     </div>
                   </div>
 
-                  {/* COLUMN 2: DRIVER INFORMATION */}
+                  {/* COLUMN 2: DRIVER INFORMATION (FETCH SUPPORTED) */}
                   <div className="space-y-6">
-                    <div className="border-b border-border pb-3">
+                    <div className="border-b border-border pb-3 flex items-center justify-between">
                       <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
                         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">2</span>
                         Driver Information
                       </h3>
+                      <button
+                        type="button"
+                        onClick={() => handleFetchDriver()}
+                        disabled={isDriverLookupLoading}
+                        className="px-3 py-1 bg-emerald-50 text-emerald-700 border border-emerald-300 rounded-lg text-xs font-bold hover:bg-emerald-100 transition-all cursor-pointer flex items-center gap-1 shadow-2xs disabled:opacity-60"
+                      >
+                        {isDriverLookupLoading ? <RefreshCw className="h-3 w-3 animate-spin" /> : <Search className="h-3 w-3" />}
+                        Fetch Details
+                      </button>
                     </div>
 
                     <div className="space-y-4">
+                      {driverLookupStatus && (
+                        <div className={`p-2.5 rounded-lg text-xs font-semibold ${driverLookupStatus.includes("Found") ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-amber-50 text-amber-800 border border-amber-200"}`}>
+                          {driverLookupStatus}
+                        </div>
+                      )}
+
                       <div>
-                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Operator / Driver ID <span className="text-red-500">*</span></label>
-                        <input 
-                          type="text" 
-                          placeholder="Unique LetzRyd ID..."
-                          value={driverId}
-                          onChange={(e) => setDriverId(e.target.value)}
-                          required
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs"
-                        />
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Driver Phone Number <span className="text-red-500">*</span></label>
+                        <div className="flex gap-2">
+                          <input 
+                            type="tel" 
+                            placeholder="10-digit phone number..."
+                            maxLength={10}
+                            value={driverPhone}
+                            onChange={(e) => setDriverPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                            onBlur={() => driverPhone.length === 10 && handleFetchDriver(driverPhone)}
+                            required
+                            className="flex-1 rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs font-mono font-semibold"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleFetchDriver(driverPhone)}
+                            className="px-3 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold rounded-xl text-xs cursor-pointer transition-colors"
+                          >
+                            Fetch
+                          </button>
+                        </div>
                       </div>
 
                       <div>
-                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Driver Name <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Operator / Driver ID <span className="text-red-500">*</span></label>
+                        <div className="flex gap-2">
+                          <input 
+                            type="text" 
+                            placeholder="e.g. LR-4091..."
+                            value={driverId}
+                            onChange={(e) => setDriverId(e.target.value)}
+                            onBlur={() => driverId.trim().length >= 3 && handleFetchDriver(driverId)}
+                            required
+                            className="flex-1 rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleFetchDriver(driverId)}
+                            className="px-3 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold rounded-xl text-xs cursor-pointer transition-colors"
+                          >
+                            Fetch
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Driver Name <span className="text-red-500">*</span></label>
                         <input 
                           type="text" 
                           placeholder="Enter full name..."
                           value={driverName}
                           onChange={(e) => setDriverName(e.target.value)}
                           required
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs"
+                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs"
                         />
                       </div>
 
                       <div>
-                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Driver Phone Number <span className="text-red-500">*</span></label>
-                        <input 
-                          type="tel" 
-                          placeholder="10-digit mobile number..."
-                          maxLength={10}
-                          value={driverPhone}
-                          onChange={(e) => setDriverPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Driver Rental Plan <span className="text-red-500">*</span></label>
+                        <select 
+                          value={driverPlan}
+                          onChange={(e) => {
+                            const val = e.target.value;
+                            setDriverPlan(val);
+                            if (PLAN_MAPPING[val]) {
+                              setTypeOfPlan(PLAN_MAPPING[val].typeOfPlan);
+                              setCarModel(PLAN_MAPPING[val].carModel);
+                            } else {
+                              setTypeOfPlan("");
+                              setCarModel("");
+                            }
+                          }}
                           required
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs font-mono font-semibold"
+                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer font-semibold"
+                        >
+                          <option value="">Select Plan...</option>
+                          <option value="Drive to Rent">Drive to Rent</option>
+                          <option value="Drive to Own">Drive to Own</option>
+                          <option value="LetzOwn">LetzOwn</option>
+                          <option value="Salary Model">Salary Model</option>
+                        </select>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3">
+                        <div>
+                          <label className="block font-sans text-[11px] font-bold text-slate-600 mb-1">Plan Contract</label>
+                          <input 
+                            type="text" 
+                            placeholder="Auto-populated..."
+                            value={typeOfPlan}
+                            readOnly
+                            className="w-full rounded-xl border border-border bg-slate-50 px-3 py-2 font-sans text-xs text-slate-600 font-semibold cursor-not-allowed"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-sans text-[11px] font-bold text-slate-600 mb-1">Default Car Model</label>
+                          <input 
+                            type="text" 
+                            placeholder="Auto-populated..."
+                            value={carModel}
+                            readOnly
+                            className="w-full rounded-xl border border-border bg-slate-50 px-3 py-2 font-sans text-xs text-slate-600 font-semibold cursor-not-allowed"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* COLUMN 3: VEHICLE & ODOMETER SELECTION */}
+                  <div className="space-y-6">
+                    <div className="border-b border-border pb-3">
+                      <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">3</span>
+                        Vehicle &amp; Odometer Details
+                      </h3>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Vehicle Autocomplete Field */}
+                      <div className="relative">
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Vehicle Number (Search &amp; Select) <span className="text-red-500">*</span></label>
+                        <input 
+                          type="text" 
+                          placeholder="Type vehicle number e.g. TS09..."
+                          value={vehicleNumber}
+                          onChange={(e) => handleVehicleInputChange(e.target.value.toUpperCase())}
+                          onFocus={() => vehicleNumber.trim().length >= 1 && handleVehicleInputChange(vehicleNumber)}
+                          required
+                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs font-mono font-bold uppercase"
+                        />
+
+                        {/* Autocomplete Dropdown Suggestions */}
+                        {showVehicleDropdown && vehicleSuggestions.length > 0 && (
+                          <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-slate-100">
+                            {vehicleSuggestions.map((v) => (
+                              <button
+                                key={v.vehicle_number}
+                                type="button"
+                                onClick={() => {
+                                  setVehicleNumber(v.vehicle_number);
+                                  if (v.car_model) setCarModel(v.car_model);
+                                  setShowVehicleDropdown(false);
+                                }}
+                                className="w-full px-4 py-2.5 text-left hover:bg-slate-50 flex items-center justify-between transition-colors cursor-pointer"
+                              >
+                                <div>
+                                  <span className="font-mono font-extrabold text-xs text-slate-900 block">{v.vehicle_number}</span>
+                                  <span className="text-[10px] text-slate-500 font-medium">{v.car_model} · {v.city_name}</span>
+                                </div>
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-extrabold ${
+                                  v.status === 'Ready for Deployment' 
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300' 
+                                    : 'bg-amber-100 text-amber-800 border border-amber-300'
+                                }`}>
+                                  {v.status}
+                                </span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Odometer Reading Input */}
+                      <div>
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Odometer Reading (in KM) <span className="text-red-500">*</span></label>
+                        <input 
+                          type="number"
+                          placeholder="e.g. 14250..."
+                          value={odometerReading}
+                          onChange={(e) => setOdometerReading(e.target.value)}
+                          required
+                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs font-mono font-semibold"
                         />
                       </div>
 
-                      {allocationMainType === "Allocation" && (
-                        <>
-                          <div>
-                            <label className="block font-sans text-xs font-bold text-text-muted mb-2">Driver Plan <span className="text-red-500">*</span></label>
-                            <select 
-                              value={driverPlan}
-                              onChange={(e) => {
-                                const val = e.target.value;
-                                setDriverPlan(val);
-                                if (PLAN_MAPPING[val]) {
-                                  setTypeOfPlan(PLAN_MAPPING[val].typeOfPlan);
-                                  setCarModel(PLAN_MAPPING[val].carModel);
-                                } else {
-                                  setTypeOfPlan("");
-                                  setCarModel("");
-                                }
-                              }}
-                              required
-                              className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer font-semibold"
-                            >
-                              <option value="">Select Plan...</option>
-                              <option value="Drive to Rent">Drive to Rent</option>
-                              <option value="Drive to Own">Drive to Own</option>
-                              <option value="LetzOwn">LetzOwn</option>
-                              <option value="Salary Model">Salary Model</option>
-                            </select>
-                          </div>
+                      <div>
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">GPS Active <span className="text-red-500">*</span></label>
+                        <select
+                          value={gpsActive}
+                          onChange={(e) => setGpsActive(e.target.value)}
+                          required
+                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer font-semibold"
+                        >
+                          <option value="Yes">Yes</option>
+                          <option value="No">No</option>
+                        </select>
+                      </div>
 
-                          <div>
-                            <label className="block font-sans text-xs font-bold text-text-muted mb-2">Type of Plan</label>
-                            <input 
-                              type="text" 
-                              placeholder="Auto-populated..."
-                              value={typeOfPlan}
-                              readOnly
-                              className="w-full rounded-xl border border-border bg-slate-50 px-4 py-2.5 font-sans text-sm focus:outline-none transition-all shadow-2xs text-text-muted font-semibold cursor-not-allowed"
-                            />
-                          </div>
+                      {/* Meter & Battery Photo Upload Grid */}
+                      <div className="grid grid-cols-2 gap-3 pt-2">
+                        <div className="flex flex-col gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
+                          <span className="font-sans text-[11px] font-bold text-slate-800 text-center">Odometer Photo *</span>
+                          {odometerPhoto ? (
+                            <div className="relative flex items-center justify-center bg-white rounded-lg p-1">
+                              <img src={odometerPhoto} alt="Odometer" className="max-h-20 object-contain rounded" />
+                              <button type="button" onClick={() => setOdometerPhoto(null)} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 cursor-pointer"><X className="h-3 w-3" /></button>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col gap-1.5 items-center justify-center p-2 bg-white rounded-lg border border-slate-200">
+                              <button type="button" onClick={() => setActiveCameraTarget("odometer")} className="w-full flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-bold py-1.5 hover:bg-primary-dark cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
+                              <label className="w-full flex items-center justify-center gap-1 rounded border border-slate-300 bg-white text-slate-700 text-[10px] font-bold py-1.5 hover:bg-slate-100 cursor-pointer">
+                                <Upload className="h-3 w-3 text-primary" /> Upload
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const r = new FileReader();
+                                    r.onloadend = () => { if (typeof r.result === "string") setOdometerPhoto(r.result); };
+                                    r.readAsDataURL(file);
+                                  }
+                                }} />
+                              </label>
+                            </div>
+                          )}
+                        </div>
 
-                          <div>
-                            <label className="block font-sans text-xs font-bold text-text-muted mb-2">Car Model</label>
-                            <input 
-                              type="text" 
-                              placeholder="Auto-populated..."
-                              value={carModel}
-                              readOnly
-                              className="w-full rounded-xl border border-border bg-slate-50 px-4 py-2.5 font-sans text-sm focus:outline-none transition-all shadow-2xs text-text-muted font-semibold cursor-not-allowed"
-                            />
-                          </div>
-                        </>
-                      )}
+                        <div className="flex flex-col gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
+                          <span className="font-sans text-[11px] font-bold text-slate-800 text-center">Battery Photo *</span>
+                          {batteryPhoto ? (
+                            <div className="relative flex items-center justify-center bg-white rounded-lg p-1">
+                              <img src={batteryPhoto} alt="Battery" className="max-h-20 object-contain rounded" />
+                              <button type="button" onClick={() => setBatteryPhoto(null)} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 cursor-pointer"><X className="h-3 w-3" /></button>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col gap-1.5 items-center justify-center p-2 bg-white rounded-lg border border-slate-200">
+                              <button type="button" onClick={() => setActiveCameraTarget("battery")} className="w-full flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-bold py-1.5 hover:bg-primary-dark cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
+                              <label className="w-full flex items-center justify-center gap-1 rounded border border-slate-300 bg-white text-slate-700 text-[10px] font-bold py-1.5 hover:bg-slate-100 cursor-pointer">
+                                <Upload className="h-3 w-3 text-primary" /> Upload
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const r = new FileReader();
+                                    r.onloadend = () => { if (typeof r.result === "string") setBatteryPhoto(r.result); };
+                                    r.readAsDataURL(file);
+                                  }
+                                }} />
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
-
-                  {/* COLUMN 3: VEHICLE & PLAN */}
-                  {allocationMainType === "Allocation" ? (
-                    <div className="space-y-6">
-                      <div className="border-b border-border pb-3">
-                        <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
-                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">3</span>
-                          Vehicle Allocation
-                        </h3>
-                      </div>
-
-                      <div className="space-y-4">
-                        <div>
-                          <div className="flex justify-between items-center mb-2">
-                            <label className="block font-sans text-xs font-bold text-text-muted">Vehicle Number (New/Current) <span className="text-red-500">*</span></label>
-                            <button
-                              type="button"
-                              onClick={() => fetchLastInspectionForGiven(vehicleNumber)}
-                              className="text-[10px] font-bold text-primary hover:underline cursor-pointer"
-                            >
-                              Load Last Inspection
-                            </button>
-                          </div>
-                          <input 
-                            type="text" 
-                            placeholder="e.g. TS09 EA 1234..."
-                            value={vehicleNumber}
-                            onChange={(e) => setVehicleNumber(e.target.value)}
-                            onBlur={() => fetchLastInspectionForGiven(vehicleNumber)}
-                            required
-                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs font-semibold uppercase"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">GPS Active <span className="text-red-500">*</span></label>
-                          <select
-                            value={gpsActive}
-                            onChange={(e) => setGpsActive(e.target.value)}
-                            required
-                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer font-semibold"
-                          >
-                            <option value="Yes">Yes</option>
-                            <option value="No">No</option>
-                          </select>
-                        </div>
-
-                        <div className="border-t border-border/60 pt-4 mt-2 space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                          <span className="block font-sans text-[10px] font-bold text-primary uppercase tracking-wider">Additional Requirements</span>
-                          
-                          <div>
-                            <label className="block font-sans text-xs font-bold text-text-muted mb-2">Ola Negative Balance (₹)</label>
-                            <input 
-                              type="number" 
-                              placeholder="Enter negative balance (if any)..."
-                              value={olaNegativeBalance}
-                              onChange={(e) => setOlaNegativeBalance(e.target.value)}
-                              className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs font-semibold"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block font-sans text-xs font-bold text-text-muted mb-2 font-medium">Negative Balance Screenshot Proof</label>
-                            <div className="w-full rounded-xl border border-dashed border-border bg-white p-3 text-center transition-all shadow-2xs">
-                              {olaNegativeBalanceProof ? (
-                                <div className="relative inline-block">
-                                  <img 
-                                    src={olaNegativeBalanceProof} 
-                                    alt="Ola Balance Proof" 
-                                    className="h-16 w-auto object-cover rounded-lg border border-border shadow-2xs"
-                                  />
-                                  <button 
-                                    type="button"
-                                    onClick={() => setOlaNegativeBalanceProof(null)}
-                                    className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white border border-white hover:bg-red-700 shadow-xs cursor-pointer"
-                                  >
-                                    <X className="h-2.5 w-2.5" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="flex gap-2 justify-center py-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => setActiveCameraTarget("olaProof")}
-                                    className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 font-sans text-[9px] font-bold text-white hover:bg-primary-hover shadow-xs cursor-pointer"
-                                  >
-                                    <Camera className="h-2.5 w-2.5" /> Capture
-                                  </button>
-                                  <label className="flex items-center gap-1 rounded-lg border border-border bg-white px-2.5 py-1 font-sans text-[9px] font-bold text-text-muted hover:bg-bg cursor-pointer transition-colors shadow-2xs">
-                                    <Upload className="h-2.5 w-2.5" /> Upload
-                                    <input 
-                                      type="file" 
-                                      accept="image/*" 
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) {
-                                          const r = new FileReader();
-                                          r.onloadend = () => { if (typeof r.result === "string") setOlaNegativeBalanceProof(r.result); };
-                                          r.readAsDataURL(file);
-                                        }
-                                      }} 
-                                      className="hidden" 
-                                    />
-                                  </label>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-6 bg-slate-50 border border-slate-200 border-dashed rounded-2xl p-6 flex flex-col items-center justify-center text-center">
-                      <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-slate-200 text-slate-500 mb-3">
-                        <Settings className="w-6 h-6" />
-                      </div>
-                      <h4 className="font-sans text-xs font-bold text-slate-700">Drop-Off Mode Active</h4>
-                      <p className="font-sans text-[11px] text-slate-500 mt-1 max-w-xs">
-                        Enter driver credentials on the left, then scroll down to fill out the drop-off checklist and return fields.
-                      </p>
-                    </div>
-                  )}
                 </div>
 
-                 {/* CONDITIONAL PANEL 4: DROPOFF DETAILS */}
-                {(allocationMainType === "Drop-Off" || allocationSubType === "Swap") && (
-                  <div className="border-t border-border pt-10 space-y-6">
-                    <div className="border-b border-border pb-3">
-                      <h3 className="font-sans text-sm font-bold text-amber-600 flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-50 text-amber-600 text-xs font-bold">4</span>
-                        Dropoff Details (Car Return)
-                      </h3>
-                      <p className="font-sans text-xs text-text-muted mt-1">Record details of the old vehicle being returned by the partner.</p>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <div>
-                          <div className="flex justify-between items-center mb-2">
-                            <label className="block font-sans text-xs font-bold text-text-muted">Old Vehicle Number <span className="text-red-500">*</span></label>
-                            <button
-                              type="button"
-                              onClick={() => fetchLastInspectionForOld(oldVehicleNumber)}
-                              className="text-[10px] font-bold text-primary hover:underline cursor-pointer"
-                            >
-                              Load Last Inspection
-                            </button>
-                          </div>
-                          <input 
-                            type="text" 
-                            placeholder="Vehicle being returned..."
-                            value={oldVehicleNumber}
-                            onChange={(e) => setOldVehicleNumber(e.target.value)}
-                            onBlur={() => fetchLastInspectionForOld(oldVehicleNumber)}
-                            required
-                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs font-semibold uppercase"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Dropoff Odometer (KM) <span className="text-red-500">*</span></label>
-                          <input 
-                            type="number" 
-                            placeholder="Current reading..."
-                            value={dropoffOdometer}
-                            onChange={(e) => setDropoffOdometer(e.target.value)}
-                            required
-                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs font-semibold"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Drop-Off Location <span className="text-red-500">*</span></label>
-                          <select 
-                            value={dropoffLocation}
-                            onChange={(e) => setDropoffLocation(e.target.value)}
-                            required
-                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer font-semibold"
-                          >
-                            <option value="Hub">Hub</option>
-                            <option value="Service Station">Service Station</option>
-                          </select>
-                        </div>
-
-                        {(allocationSubType === "Driver Attrition" || allocationSubType === "Force Recovery") && (
-                          <div>
-                            <label className="block font-sans text-xs font-bold text-text-muted mb-2">Duplicate Key Status <span className="text-red-500">*</span></label>
-                            <select
-                              value={duplicateKeyStatus}
-                              onChange={(e) => setDuplicateKeyStatus(e.target.value)}
-                              required
-                              className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer font-semibold"
-                            >
-                              <option value="Yes">Yes</option>
-                              <option value="No">No</option>
-                            </select>
-                          </div>
-                        )}
-
-                        <div>
-                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Dropoff Remarks</label>
-                          <textarea 
-                            placeholder="Condition, damages, battery state..."
-                            value={dropoffRemarks}
-                            onChange={(e) => setDropoffRemarks(e.target.value)}
-                            rows={3}
-                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs resize-none font-semibold"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        {/* FASTag Status block */}
-                        <div className="border border-border bg-slate-50/50 p-4 rounded-2xl space-y-4">
-                          <span className="block font-sans text-[10px] font-bold text-amber-700 uppercase tracking-wider">FASTag Status</span>
-                          
-                          <div>
-                            <label className="block font-sans text-xs font-bold text-text-muted mb-2">FASTag Balance Amount (₹)</label>
-                            <input 
-                              type="number" 
-                              placeholder="FASTag balance amount..."
-                              value={fastagBalanceAmount}
-                              onChange={(e) => setFastagBalanceAmount(e.target.value)}
-                              className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs font-semibold"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block font-sans text-xs font-bold text-text-muted mb-2 font-medium">FASTag Balance Proof Screenshot</label>
-                            <div className="w-full rounded-xl border border-dashed border-border bg-white p-3 text-center transition-all shadow-2xs">
-                              {fastagBalanceProof ? (
-                                <div className="relative inline-block">
-                                  <img 
-                                    src={fastagBalanceProof} 
-                                    alt="FASTag Balance Proof" 
-                                    className="h-16 w-auto object-cover rounded-lg border border-border shadow-2xs"
-                                  />
-                                  <button 
-                                    type="button"
-                                    onClick={() => setFastagBalanceProof(null)}
-                                    className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-600 text-white border border-white hover:bg-red-700 shadow-xs cursor-pointer"
-                                  >
-                                    <X className="h-2.5 w-2.5" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="flex gap-2 justify-center py-1">
-                                  <button
-                                    type="button"
-                                    onClick={() => setActiveCameraTarget("fastagProof")}
-                                    className="flex items-center gap-1 rounded-lg bg-amber-600 px-2.5 py-1 font-sans text-[9px] font-bold text-white hover:bg-amber-700 shadow-xs cursor-pointer"
-                                  >
-                                    <Camera className="h-2.5 w-2.5" /> Capture
-                                  </button>
-                                  <label className="flex items-center gap-1 rounded-lg border border-border bg-white px-2.5 py-1 font-sans text-[9px] font-bold text-text-muted hover:bg-bg cursor-pointer transition-colors shadow-2xs">
-                                    <Upload className="h-2.5 w-2.5" /> Upload
-                                    <input 
-                                      type="file" 
-                                      accept="image/*" 
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) {
-                                          const r = new FileReader();
-                                          r.onloadend = () => { if (typeof r.result === "string") setFastagBalanceProof(r.result); };
-                                          r.readAsDataURL(file);
-                                        }
-                                      }} 
-                                      className="hidden" 
-                                    />
-                                  </label>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Photo Capture (Hidden for Repair & Maintenance) */}
-                        {allocationSubType !== "Repair & Maintenance" && (
-                          <div>
-                            <label className="block font-sans text-xs font-bold text-text-muted mb-2">
-                              Vehicle Return Photo {allocationSubType === "Attraction" && <span className="text-red-500">*</span>}
-                            </label>
-                            <div className="w-full rounded-2xl border border-dashed border-border bg-bg/30 p-6 text-center hover:bg-bg/50 transition-all shadow-2xs">
-                              {dropoffPhoto ? (
-                                <div className="relative inline-block">
-                                  <img 
-                                    src={dropoffPhoto} 
-                                    alt="Vehicle Condition Proof" 
-                                    className="h-32 w-auto object-cover rounded-xl border border-border shadow-xs"
-                                  />
-                                  <button 
-                                    type="button"
-                                    onClick={() => setDropoffPhoto(null)}
-                                    className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white border border-white hover:bg-red-700 shadow-xs cursor-pointer"
-                                  >
-                                    <X className="h-3 w-3" />
-                                  </button>
-                                </div>
-                              ) : (
-                                <div className="space-y-4">
-                                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                                    <Upload className="h-5 w-5" />
-                                  </div>
-                                  <p className="font-sans text-xs font-bold text-text-muted">Upload or capture dropoff photo</p>
-                                  <div className="flex gap-2 justify-center">
-                                    <button
-                                      type="button"
-                                      onClick={() => setActiveCameraTarget("dropoff")}
-                                      className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 font-sans text-xs font-bold text-white hover:bg-primary-hover shadow-xs cursor-pointer"
-                                    >
-                                      <Camera className="h-3 w-3" />
-                                      Capture
-                                    </button>
-                                    <label className="flex items-center gap-1 rounded-lg border border-border bg-white px-3 py-1.5 font-sans text-xs font-bold text-text-muted hover:bg-bg cursor-pointer transition-colors shadow-2xs">
-                                      <Upload className="h-3 w-3" />
-                                      Upload
-                                      <input 
-                                        type="file" 
-                                        accept="image/*" 
-                                        onChange={handleImageUpload} 
-                                        className="hidden" 
-                                      />
-                                    </label>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}                {/* 5. CAR CONDITION PHOTOS (At Allocation) */}
+                {/* 5. CAR CONDITION PHOTOS (At Allocation) */}
                 {allocationMainType === "Allocation" && (
                   <div className="border-t border-border pt-10 space-y-6">
                     <div className="border-b border-border pb-3">
@@ -1466,100 +1254,7 @@ export default function AllocationForm({
                   </div>
                 )}
 
-                {/* 7. RETURNED VEHICLE INSPECTION CHECKLIST */}
-                {(allocationMainType === "Drop-Off" || allocationSubType === "Swap") && (
-                  <div className="border-t border-border pt-10 space-y-6">
-                    <div className="border-b border-border pb-3">
-                      <h3 className="font-sans text-sm font-bold text-amber-600 flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-50 text-amber-600 text-xs font-bold">7</span>
-                        Inspection Checklist: Returned Car ({oldVehicleNumber || "No vehicle entered"})
-                      </h3>
-                    </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div className="space-y-3.5">
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                          <span className="font-sans text-xs font-bold text-text">Jack</span>
-                          <div className="flex gap-2">
-                            {["Available", "Not Available"].map((opt) => (
-                              <button key={opt} type="button" onClick={() => setOldJack(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${oldJack === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                          <span className="font-sans text-xs font-bold text-text">Jack Rod</span>
-                          <div className="flex gap-2">
-                            {["Available", "Not Available"].map((opt) => (
-                              <button key={opt} type="button" onClick={() => setOldJackRod(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${oldJackRod === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                          <span className="font-sans text-xs font-bold text-text">Spanner</span>
-                          <div className="flex gap-2">
-                            {["Available", "Not Available"].map((opt) => (
-                              <button key={opt} type="button" onClick={() => setOldSpanner(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${oldSpanner === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                          <span className="font-sans text-xs font-bold text-text">Parking Triangle</span>
-                          <div className="flex gap-2">
-                            {["Available", "Not Available"].map((opt) => (
-                              <button key={opt} type="button" onClick={() => setOldParkingTriangle(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${oldParkingTriangle === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3.5">
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                          <span className="font-sans text-xs font-bold text-text">Fire Extinguisher</span>
-                          <div className="flex gap-2">
-                            {["Available", "Not Available"].map((opt) => (
-                              <button key={opt} type="button" onClick={() => setOldFireExtinguishers(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${oldFireExtinguishers === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                          <span className="font-sans text-xs font-bold text-text">Seat Covers</span>
-                          <div className="flex gap-2">
-                            {["Available", "Not Available"].map((opt) => (
-                              <button key={opt} type="button" onClick={() => setOldSeatCover(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${oldSeatCover === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                          <span className="font-sans text-xs font-bold text-text">Floor Carpets</span>
-                          <div className="flex gap-2">
-                            {["Available", "Not Available"].map((opt) => (
-                              <button key={opt} type="button" onClick={() => setOldFloorCarpet(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${oldFloorCarpet === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                          <span className="font-sans text-xs font-bold text-text">Music System</span>
-                          <div className="flex gap-2">
-                            {["Available", "Not Available"].map((opt) => (
-                              <button key={opt} type="button" onClick={() => setOldMusicSystem(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${oldMusicSystem === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block font-sans text-[10px] font-bold text-text-muted mb-1">Inspection Remarks (Returned Car)</label>
-                          <input type="text" value={oldInspectionRemarks} onChange={(e) => setOldInspectionRemarks(e.target.value)} placeholder="Condition details..." className="w-full rounded-xl border border-border bg-white px-3 py-2 text-xs focus:outline-none focus:border-primary font-semibold" />
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
 
                 {/* FORM ACTIONS */}
                 <div className="flex items-center justify-between border-t border-border pt-6 mt-8">

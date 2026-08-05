@@ -3,7 +3,7 @@ import { User } from "../types";
 
 interface FormSelectorProps {
   user: User;
-  onSelectForm: (form: "walkin" | "onboarding" | "operator_onboarding" | "adjustment" | "allocation" | "expenses" | "vehicle_onboarding" | "workshops" | "hubs_parking" | "rents" | "accident" | "inspection" | "users" | "vehicle_models" | "cities" | "roles" | "tickets" | "employees" | "maintenance" | "challans" | "approvals") => void;
+  onSelectForm: (form: "walkin" | "onboarding" | "operator_onboarding" | "adjustment" | "allocation" | "dropoff" | "expenses" | "vehicle_onboarding" | "workshops" | "hubs_parking" | "rents" | "accident" | "inspection" | "users" | "vehicle_models" | "cities" | "roles" | "tickets" | "employees" | "maintenance" | "challans" | "approvals") => void;
   onLogout: () => void;
 }
 
@@ -15,7 +15,8 @@ const CARDS = [
   { key: "walkin",              label: "Walkin & Leads Form",   sub: "Log walk-ins & partner visit logs", icon: ClipboardList, iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: ALL_ROLES, isCompleted: true },
   { key: "onboarding",          label: "Partner Onboarding",     sub: "Onboard driver and operator",         icon: UserCheck,     iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: WRITE_ACCESS_ROLES, isCompleted: true },
   { key: "vehicle_onboarding",  label: "Vehicle Onboarding",     sub: "Add new vehicles to fleet",           icon: Truck,         iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: WRITE_ACCESS_ROLES, isCompleted: true },
-  { key: "allocation",          label: "Allocation Form",        sub: "Assign vehicle to partner",           icon: Key,           iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: ALL_ROLES, isCompleted: true },
+  { key: "allocation",          label: "Vehicle Allocation Form", sub: "Assign vehicle & handover details for onboarded drivers", icon: Key, iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: ALL_ROLES, isCompleted: true },
+  { key: "dropoff",             label: "Vehicle Drop-Off Form",   sub: "Record vehicle returns, meter photos & settlements", icon: Truck, iconBg: "bg-amber-600 text-white", iconColor: "text-white", hover: "hover:border-amber-500", allowedRoles: ALL_ROLES, isCompleted: true },
   { key: "adjustment",          label: "Adjustment Form",        sub: "Credit / debit wallet adjustments",   icon: Settings,      iconBg: "bg-yellow-light",iconColor: "text-amber-600",   hover: "hover:border-amber-500",   allowedRoles: ALL_ROLES },
   { key: "expenses",            label: "Expenses Form",          sub: "Record operational expenses",         icon: ClipboardList, iconBg: "bg-red-50",     iconColor: "text-red-600",     hover: "hover:border-rose-500",    allowedRoles: ALL_ROLES },
   { key: "workshops",           label: "Workshops Form",         sub: "Manage service vendors & garages",    icon: Wrench,        iconBg: "bg-green-light", iconColor: "text-green",       hover: "hover:border-green",       allowedRoles: ALL_ROLES },
@@ -109,7 +110,7 @@ export default function FormSelector({ user, onSelectForm, onLogout }: FormSelec
             const isAdmin = role.includes("admin") || role.includes("founder") || role.includes("ceo") || roleCode === "SA";
             
             if (!isAdmin) {
-              return ["walkin", "onboarding", "vehicle_onboarding", "allocation"].includes(key);
+              return ["walkin", "onboarding", "vehicle_onboarding", "allocation", "dropoff"].includes(key);
             }
             return true;
           }).map(({ key, label, sub, icon: Icon, iconBg, iconColor, hover, isCompleted }) => {
