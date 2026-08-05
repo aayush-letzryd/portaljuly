@@ -195,6 +195,7 @@ export default function AllocationForm({
   const [filterType, setFilterType] = useState("all");
   const [filterTime, setFilterTime] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
+  const [draftPage, setDraftPage] = useState(1);
   const PAGE_SIZE = 10;
   
   // Top header quick search
@@ -534,6 +535,9 @@ export default function AllocationForm({
 
   const totalPages = Math.ceil(filteredRecords.length / PAGE_SIZE) || 1;
   const paginatedRecords = filteredRecords.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const draftTotalPages = Math.ceil(draftRecords.length / PAGE_SIZE) || 1;
+  const paginatedDrafts = draftRecords.slice((draftPage - 1) * PAGE_SIZE, draftPage * PAGE_SIZE);
 
   const handleExportCSV = () => {
     if (filteredRecords.length === 0) return alert("No records to export");
@@ -1279,7 +1283,7 @@ export default function AllocationForm({
                         </td>
                       </tr>
                     ) : (
-                      draftRecords.map((r: any) => {
+                      paginatedDrafts.map((r: any) => {
                         const rawDate = r.updated_at || r.created_at || r.allocation_date;
                         const datePart = rawDate ? new Date(rawDate).toLocaleDateString("en-IN", {
                           day: "2-digit",
@@ -1347,10 +1351,52 @@ export default function AllocationForm({
                 </table>
               </div>
 
-              {/* FOOTER STATS */}
-              <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/50 px-6 py-3 font-sans text-xs text-slate-500">
-                <span>Showing {draftRecords.length} of {draftRecords.length} database entries</span>
-                <span className="font-sans text-[11px] text-slate-400">Database Engine: PostgreSQL</span>
+              {/* PAGINATION FOOTER */}
+              <div className="bg-slate-50 px-6 py-3 border-t border-slate-200 flex items-center justify-between font-sans text-xs text-slate-500">
+                <span>
+                  Showing {draftRecords.length === 0 ? 0 : (draftPage - 1) * PAGE_SIZE + 1}–{Math.min(draftPage * PAGE_SIZE, draftRecords.length)} of {draftRecords.length} records
+                </span>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => setDraftPage(p => Math.max(1, p - 1))}
+                    disabled={draftPage === 1}
+                    className="h-8 px-3 rounded-lg border border-slate-200 bg-white disabled:opacity-40 flex items-center gap-1 cursor-pointer hover:bg-slate-100 transition-colors text-slate-600"
+                  >
+                    <ChevronLeft className="w-3 h-3" /> Prev
+                  </button>
+                  {Array.from({ length: draftTotalPages }, (_, i) => i + 1)
+                    .filter(p => p === 1 || p === draftTotalPages || Math.abs(p - draftPage) <= 1)
+                    .reduce<(number | string)[]>((acc, p, idx, arr) => {
+                      if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("...");
+                      acc.push(p);
+                      return acc;
+                    }, [])
+                    .map((p, i) =>
+                      typeof p === "string" ? (
+                        <span key={`de-${i}`} className="px-1 text-slate-400">…</span>
+                      ) : (
+                        <button
+                          key={p}
+                          onClick={() => setDraftPage(p)}
+                          className={`h-8 w-8 rounded-lg border text-xs font-semibold transition-colors cursor-pointer ${
+                            draftPage === p
+                              ? "border-emerald-600 bg-emerald-600 text-white"
+                              : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"
+                          }`}
+                        >
+                          {p}
+                        </button>
+                      )
+                    )
+                  }
+                  <button
+                    onClick={() => setDraftPage(p => Math.min(draftTotalPages, p + 1))}
+                    disabled={draftPage === draftTotalPages || draftRecords.length === 0}
+                    className="h-8 px-3 rounded-lg border border-slate-200 bg-white disabled:opacity-40 flex items-center gap-1 cursor-pointer hover:bg-slate-100 transition-colors text-slate-600"
+                  >
+                    Next <ChevronRight className="w-3 h-3" />
+                  </button>
+                </div>
               </div>
             </div>
           </div>
