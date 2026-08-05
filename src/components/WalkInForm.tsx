@@ -1002,7 +1002,7 @@ export default function WalkInForm({
                 <div className="flex flex-col gap-5 bg-slate-50/60 p-5 rounded-2xl border border-border">
                   <div className="flex items-center gap-2 border-b border-border pb-3">
                     <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white font-bold text-xs">3</div>
-                    <h3 className="font-sans text-xs font-bold text-slate-800 uppercase tracking-wider">Identity & Document Uploads (New Candidate Onboarding)</h3>
+                    <h3 className="font-sans text-xs font-bold text-slate-800 uppercase tracking-wider">Documents</h3>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
