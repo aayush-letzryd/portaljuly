@@ -750,6 +750,36 @@ export default function WalkInForm({
 
             <form onSubmit={handleFormSubmit} className="rounded-2xl border border-border bg-white p-6 shadow-xs md:p-8 flex flex-col gap-8">
               
+              {/* Form Mode Selector: New Candidate vs Returning Partner */}
+              {!editingId && (
+                <div className="flex items-center gap-3 bg-slate-100/90 p-1.5 rounded-xl border border-slate-200">
+                  <button
+                    type="button"
+                    onClick={() => { setIsExistingPartner(false); resetForm(); }}
+                    className={`flex-1 py-2.5 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      !isExistingPartner 
+                        ? "bg-white text-slate-900 shadow-xs border border-slate-200/80" 
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    <User className="w-4 h-4 text-primary" />
+                    New Candidate Onboarding
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setIsExistingPartner(true); }}
+                    className={`flex-1 py-2.5 px-4 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-2 ${
+                      isExistingPartner 
+                        ? "bg-white text-slate-900 shadow-xs border border-slate-200/80" 
+                        : "text-slate-500 hover:text-slate-800"
+                    }`}
+                  >
+                    <RefreshCw className="w-4 h-4 text-emerald-600" />
+                    Returning Partner Visit Log
+                  </button>
+                </div>
+              )}
+
               {/* 1. Candidate Information (Top Section) */}
               <div className="flex flex-col gap-5 bg-slate-50/60 p-5 rounded-2xl border border-border">
                 <div className="flex items-center gap-2 border-b border-border pb-3">
