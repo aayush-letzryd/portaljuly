@@ -3454,7 +3454,7 @@ def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None,
                 if isinstance(val, (dt_module.datetime, dt_module.date)):
                     if isinstance(val, dt_module.datetime):
                         if val.tzinfo is None:
-                            val = val.replace(tzinfo=dt_module.timezone.utc)
+                            val = val.replace(tzinfo=ist)
                         item[col] = val.astimezone(ist).isoformat()
                     else:
                         item[col] = val.isoformat()
@@ -3708,9 +3708,9 @@ def send_onboarding_for_approval(
                 approval_requested_to = %s,
                 current_approver_id   = %s,
                 approval_note      = 'Submitted by Executive for City Manager Review',
-                approval_submitted_at = NOW(),
+                approval_submitted_at = (NOW() AT TIME ZONE 'Asia/Kolkata'),
                 updated_by         = %s,
-                updated_at         = NOW()
+                updated_at         = (NOW() AT TIME ZONE 'Asia/Kolkata')
             WHERE id = %s;
         """, (approver_id, approver_id, submitter_id, id))
 
@@ -3720,21 +3720,23 @@ def send_onboarding_for_approval(
             cur.execute("""
                 UPDATE july_onboarding
                 SET approval_status    = 'Pending Approval',
-                    current_approver_id = %s
+                    current_approver_id = %s,
+                    updated_by          = %s,
+                    updated_at          = (NOW() AT TIME ZONE 'Asia/Kolkata')
                 WHERE onboarding_id = %s;
-            """, (approver_id, id))
+            """, (approver_id, submitter_id, id))
         else:
             cur.execute("""
                 INSERT INTO july_onboarding (
                     onboarding_id, driver_id, driver_name, phone_number, city, driver_plan,
                     father_name, present_address, emergency_name, emergency_phone,
                     driving_license, pan_number, aadhaar_number,
-                    approval_status, created_by, current_approver_id, created_at
+                    approval_status, created_by, updated_by, current_approver_id, created_at, updated_at
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s,
-                          'Pending Approval', %s, %s, NOW());
+                          'Pending Approval', %s, %s, %s, (NOW() AT TIME ZONE 'Asia/Kolkata'), (NOW() AT TIME ZONE 'Asia/Kolkata'));
             """, (id, f"DRV-{id}", driver_name, phone_number, city, role_label,
                   father_name, present_address, emergency_name, emergency_phone,
-                  dl_number, pan_number, aadhaar_number, submitter_id, approver_id))
+                  dl_number, pan_number, aadhaar_number, submitter_id, submitter_id, approver_id))
 
         # ── Audit log
         cur.execute("""
@@ -6791,6 +6793,7 @@ def to_ist_iso(dt):
         if isinstance(dt, dt_module.datetime):
             if dt.tzinfo is None:
                 dt = dt.replace(tzinfo=ist_tz)
+                return dt.isoformat()
             return dt.astimezone(ist_tz).isoformat()
         return dt.isoformat()
     return str(dt)
@@ -6828,20 +6831,20 @@ def get_pending_approvals(authorization: Optional[str] = Header(None)):
             SELECT o.onboarding_id, 
                    CASE WHEN o.driver_plan ILIKE '%%Operator%%' OR o.driver_plan ILIKE '%%Partner%%' THEN 'operator_onboarding' ELSE 'individual_onboarding' END AS module, 
                    o.driver_name AS title, o.city, o.driver_plan AS subtitle,
-                   o.approval_status, o.created_at,
+                   o.approval_status, COALESCE(o.updated_at, o.created_at) AS created_at,
                    sub.username AS submitted_by,
                    COALESCE(sub_e.first_name || ' ' || COALESCE(sub_e.last_name,'') || ' (' || COALESCE(sub_r.role_name, 'Onboarding Executive') || ' — ' || COALESCE(sub_e.city, 'Hyderabad') || ')', sub.username, 'Onboarding Executive 1 (Onboarding Executive — Hyderabad)') AS submitted_by_name,
                    app_u.username AS current_approver,
                    COALESCE(app_e.first_name || ' ' || COALESCE(app_e.last_name,'') || ' (' || COALESCE(app_r.role_name, 'City Manager') || ' — ' || COALESCE(app_e.city, 'Hyderabad') || ')', app_u.username, 'City Manager 1 (City Manager — Hyderabad)') AS current_approver_name,
                    o.daily_rent, o.security_deposit
             FROM july_onboarding o
-            LEFT JOIN july_portal_users sub ON sub.portal_user_id = o.created_by
+            LEFT JOIN july_portal_users sub ON sub.portal_user_id = COALESCE(o.updated_by, o.created_by)
             LEFT JOIN july_employees sub_e ON sub_e.employee_id = sub.employee_id
             LEFT JOIN july_roles sub_r ON sub_r.role_id = sub.role_id
             LEFT JOIN july_portal_users app_u ON app_u.portal_user_id = o.current_approver_id
             LEFT JOIN july_employees app_e ON app_e.employee_id = app_u.employee_id
             LEFT JOIN july_roles app_r ON app_r.role_id = app_u.role_id
-            {where_cond} ORDER BY o.created_at DESC;
+            {where_cond} ORDER BY COALESCE(o.updated_at, o.created_at) DESC;
         """)
         for r in cur.fetchall():
             mod = r[1]
@@ -6927,7 +6930,7 @@ def get_my_submissions(authorization: Optional[str] = Header(None)):
             SELECT o.onboarding_id, 
                    CASE WHEN o.driver_plan ILIKE '%%Operator%%' OR o.driver_plan ILIKE '%%Partner%%' THEN 'operator_onboarding' ELSE 'individual_onboarding' END,
                    CASE WHEN o.driver_plan ILIKE '%%Operator%%' OR o.driver_plan ILIKE '%%Partner%%' THEN 'Partner / Operator Onboarding' ELSE 'Driver Onboarding' END,
-                   o.driver_name, o.city, o.driver_plan, o.approval_status, o.created_at,
+                   o.driver_name, o.city, o.driver_plan, o.approval_status, COALESCE(o.updated_at, o.created_at) AS created_at,
                    app_u.username,
                    COALESCE(app_e.first_name || ' ' || COALESCE(app_e.last_name,'') || ' (' || COALESCE(app_r.role_name, 'City Manager') || ' — ' || COALESCE(app_e.city, 'Hyderabad') || ')', app_u.username, 'City Manager 1 (City Manager — Hyderabad)') AS current_approver_name,
                    o.approval_remarks,
@@ -6938,11 +6941,12 @@ def get_my_submissions(authorization: Optional[str] = Header(None)):
             LEFT JOIN july_portal_users app_u ON app_u.portal_user_id = o.current_approver_id
             LEFT JOIN july_employees app_e ON app_e.employee_id = app_u.employee_id
             LEFT JOIN july_roles app_r ON app_r.role_id = app_u.role_id
-            LEFT JOIN july_portal_users sub ON sub.portal_user_id = o.created_by
+            LEFT JOIN july_portal_users sub ON sub.portal_user_id = COALESCE(o.updated_by, o.created_by)
             LEFT JOIN july_employees sub_e ON sub_e.employee_id = sub.employee_id
             LEFT JOIN july_roles sub_r ON sub_r.role_id = sub.role_id
-            WHERE o.created_by = %s ORDER BY o.created_at DESC;
-        """, (uid,))
+            WHERE (o.created_by = %s OR o.updated_by = %s OR o.onboarding_id IN (SELECT record_id FROM july_approval_chain_logs WHERE from_user_id = %s))
+            ORDER BY COALESCE(o.updated_at, o.created_at) DESC;
+        """, (uid, uid, uid))
         for r in cur.fetchall():
             submissions.append({"id": r[0], "module": r[1], "module_label": r[2],
                                 "title": r[3], "city": r[4], "subtitle": r[5],
@@ -6956,7 +6960,7 @@ def get_my_submissions(authorization: Optional[str] = Header(None)):
 
         cur.execute("""
             SELECT v.vehicle_id, 'vehicle_onboarding', 'Vehicle Onboarding',
-                   v.vehicle_number, v.city, v.manufacturer || ' ' || v.model, v.approval_status, v.created_at,
+                   v.vehicle_number, v.city, v.manufacturer || ' ' || v.model, v.approval_status, COALESCE(v.updated_at, v.created_at) AS created_at,
                    app_u.username,
                    COALESCE(app_e.first_name || ' ' || COALESCE(app_e.last_name,'') || ' (' || COALESCE(app_r.role_name, 'City Manager') || ' — ' || COALESCE(app_e.city, 'Hyderabad') || ')', app_u.username, 'City Manager 1 (City Manager — Hyderabad)') AS current_approver_name,
                    NULL AS approval_remarks,
@@ -6967,16 +6971,16 @@ def get_my_submissions(authorization: Optional[str] = Header(None)):
             LEFT JOIN july_portal_users app_u ON app_u.portal_user_id = v.current_approver_id
             LEFT JOIN july_employees app_e ON app_e.employee_id = app_u.employee_id
             LEFT JOIN july_roles app_r ON app_r.role_id = app_u.role_id
-            LEFT JOIN july_portal_users sub ON sub.portal_user_id = v.created_by
+            LEFT JOIN july_portal_users sub ON sub.portal_user_id = COALESCE(v.created_by, v.created_by)
             LEFT JOIN july_employees sub_e ON sub_e.employee_id = sub.employee_id
             LEFT JOIN july_roles sub_r ON sub_r.role_id = sub.role_id
-            WHERE v.created_by = %s ORDER BY v.created_at DESC;
-        """, (uid,))
+            WHERE (v.created_by = %s OR v.created_by = %s) ORDER BY COALESCE(v.updated_at, v.created_at) DESC;
+        """, (uid, uid))
         for r in cur.fetchall():
             submissions.append({"id": r[0], "module": r[1], "module_label": r[2],
                                 "title": r[3], "city": r[4], "subtitle": r[5],
                                 "approval_status": r[6],
-                                "created_at": r[7].isoformat() if r[7] else None,
+                                "created_at": to_ist_iso(r[7]),
                                 "current_approver": r[8], "current_approver_name": r[9].strip() if r[9] else "City Manager 1 (City Manager — Hyderabad)",
                                 "approval_remarks": r[10],
                                 "submitted_by": r[11], "submitted_by_name": r[12].strip() if r[12] else "Onboarding Executive 1 (Onboarding Executive — Hyderabad)",
