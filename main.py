@@ -1329,15 +1329,15 @@ def get_current_user(authorization: Optional[str] = Header(None)):
         
         # 1. Try july_portal_users join
         cur.execute("""
-            SELECT pu.portal_user_id, e.employee_id, 
-                   CONCAT(e.first_name, ' ', COALESCE(e.last_name, '')), 
-                   r.role_name, pu.username, pu.role_id,
-                   r.role_code, COALESCE(e.city, 'Hyderabad')
+            SELECT pu.portal_user_id, COALESCE(e.employee_id::text, pu.portal_user_id::text), 
+                   COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'User'), 
+                   COALESCE(r.role_name, pu.role, 'Executive'), pu.username, pu.role_id,
+                   COALESCE(r.role_code, 'EXEC'), COALESCE(pu.city, e.city, 'Hyderabad')
             FROM july_app_sessions s
             JOIN july_portal_users pu ON pu.portal_user_id = s.user_id
-            JOIN july_employees e ON e.employee_id = pu.employee_id
-            JOIN july_roles r ON r.role_id = pu.role_id
-            WHERE s.token = %s AND pu.account_status = 'Active';
+            LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
+            LEFT JOIN july_roles r ON r.role_id = pu.role_id
+            WHERE s.token = %s AND COALESCE(pu.account_status, 'Active') != 'Disabled';
         """, (token,))
         row = cur.fetchone()
         
@@ -4619,7 +4619,7 @@ def lookup_vehicle(query: str, authorization: Optional[str] = Header(None)):
                     WHEN received_allocated = 'Allocated' OR received_allocated = 'Deployed' THEN 'Already Deployed'
                     ELSE COALESCE(received_allocated, 'Ready for Deployment')
                 END AS status
-            FROM july_vehicle_onboarding_1
+            FROM july_vehicle_onboarding
             WHERE vehicle_number ILIKE %s OR model ILIKE %s
             ORDER BY id DESC LIMIT 10;
         """, (f"%{clean_q}%", f"%{clean_q}%"))
@@ -5155,7 +5155,7 @@ def get_all_vehicles(search: Optional[str] = None, city: Optional[str] = None, t
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        query = "SELECT * FROM july_vehicle_onboarding_1 WHERE 1=1"
+        query = "SELECT * FROM july_vehicle_onboarding WHERE 1=1"
         params = []
         if search:
             query += " AND (vehicle_number ILIKE %s OR model ILIKE %s OR letzryd_unique_no ILIKE %s)"
@@ -5179,13 +5179,13 @@ def get_vehicle_stats(authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding_1;")
+        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding;")
         total = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding_1 WHERE received_allocated = 'In Process';")
+        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding WHERE received_allocated = 'In Process';")
         receiving = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding_1 WHERE received_allocated = 'PDI Done';")
+        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding WHERE received_allocated = 'PDI Done';")
         allocation = cur.fetchone()[0]
-        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding_1 WHERE cng_installed = 'Yes';")
+        cur.execute("SELECT COUNT(*) FROM july_vehicle_onboarding WHERE cng_installed = 'Yes';")
         cng = cur.fetchone()[0]
         return {
             "total_fleet": total,
@@ -5202,7 +5202,7 @@ def get_single_vehicle(id: int, authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT * FROM july_vehicle_onboarding_1 WHERE id = %s;", (id,))
+        cur.execute("SELECT * FROM july_vehicle_onboarding WHERE id = %s;", (id,))
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Vehicle record not found")
@@ -5227,7 +5227,7 @@ def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[s
     try:
         cur = conn.cursor()
         cur.execute("""
-            INSERT INTO july_vehicle_onboarding_1 (
+            INSERT INTO july_vehicle_onboarding (
                 vehicle_number, letzryd_unique_no, city_name, model, received_allocated, delivery_month,
                 registration_date, rto_tax_validity, permit_validity, fitness_validity, pollution_validity, insurance_validity,
                 insurance_broker, insurance_underwriter, insurance_start_date,
@@ -5272,11 +5272,11 @@ def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[s
 
         import json
         cur.execute("""
-            INSERT INTO july_vehicle_onboarding_1_logs
-              (vehicle_id, vehicle_ob_id, vehicle_number, action, old_status, new_status,
+            INSERT INTO july_vehicle_logs
+              (vehicle_ob_id, vehicle_number, action, old_status, new_status,
                changed_fields, performed_by, performed_by_name)
-            VALUES (%s, %s, %s, 'CREATE', NULL, %s, %s, %s, %s);
-        """, (new_id, new_id, data.vehicle_number or "DRAFT-VEH",
+            VALUES (%s, %s, 'CREATE', NULL, %s, %s, %s, %s);
+        """, (new_id, data.vehicle_number or "DRAFT-VEH",
               data.approval_status or 'Draft',
               json.dumps({"city": data.city_name, "model": data.model}),
               uid, user_name))
@@ -5304,7 +5304,7 @@ def update_vehicle_record(id: int, data: VehicleOnboardingData, authorization: O
         if id == 0:
             return create_vehicle_record(data, authorization)
 
-        cur.execute("SELECT approval_status, vehicle_number FROM july_vehicle_onboarding_1 WHERE id=%s;", (id,))
+        cur.execute("SELECT approval_status, vehicle_number FROM july_vehicle_onboarding WHERE id=%s;", (id,))
         old_veh = cur.fetchone()
         if not old_veh:
             return create_vehicle_record(data, authorization)
@@ -5313,7 +5313,7 @@ def update_vehicle_record(id: int, data: VehicleOnboardingData, authorization: O
         old_veh_number = old_veh[1] or data.vehicle_number
 
         cur.execute("""
-            UPDATE july_vehicle_onboarding_1 SET
+            UPDATE july_vehicle_onboarding SET
                 vehicle_number=%s, letzryd_unique_no=%s, city_name=%s, model=%s, received_allocated=%s, delivery_month=%s,
                 registration_date=%s, rto_tax_validity=%s, permit_validity=%s, fitness_validity=%s, pollution_validity=%s, insurance_validity=%s, 
                 insurance_broker=%s, insurance_underwriter=%s, insurance_start_date=%s,
@@ -5351,11 +5351,11 @@ def update_vehicle_record(id: int, data: VehicleOnboardingData, authorization: O
 
         import json
         cur.execute("""
-            INSERT INTO july_vehicle_onboarding_1_logs
-              (vehicle_id, vehicle_ob_id, vehicle_number, action, old_status, new_status,
+            INSERT INTO july_vehicle_logs
+              (vehicle_ob_id, vehicle_number, action, old_status, new_status,
                changed_fields, performed_by, performed_by_name)
-            VALUES (%s, %s, %s, 'UPDATE', %s, %s, %s, %s, %s);
-        """, (id, id, data.vehicle_number or old_veh_number, old_veh_status,
+            VALUES (%s, %s, 'UPDATE', %s, %s, %s, %s, %s);
+        """, (id, data.vehicle_number or old_veh_number, old_veh_status,
               data.approval_status or 'Draft',
               json.dumps({"city": data.city_name, "model": data.model}),
               uid, user_name))
@@ -5371,7 +5371,7 @@ def delete_vehicle_record(id: int, authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("DELETE FROM july_vehicle_onboarding_1 WHERE id = %s RETURNING id;", (id,))
+        cur.execute("DELETE FROM july_vehicle_onboarding WHERE id = %s RETURNING id;", (id,))
         deleted = cur.fetchone()
         if not deleted:
             raise HTTPException(status_code=404, detail="Vehicle record not found")
@@ -6642,12 +6642,12 @@ def get_july_user(authorization: Optional[str] = Header(None)):
         
         # 1. Try direct match on july_portal_users.portal_user_id
         cur.execute("""
-            SELECT pu.portal_user_id, e.first_name || ' ' || COALESCE(e.last_name, ''), 
-                   r.role_name, pu.username, e.city, pu.role_id
+            SELECT pu.portal_user_id, COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'User'), 
+                   COALESCE(r.role_name, pu.role, 'Executive'), pu.username, COALESCE(pu.city, e.city, 'Hyderabad'), pu.role_id
             FROM july_app_sessions s
             JOIN july_portal_users pu ON pu.portal_user_id = s.user_id
-            JOIN july_employees e ON e.employee_id = pu.employee_id
-            JOIN july_roles r ON r.role_id = pu.role_id
+            LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
+            LEFT JOIN july_roles r ON r.role_id = pu.role_id
             WHERE s.token = %s;
         """, (token,))
         row = cur.fetchone()
@@ -6679,11 +6679,11 @@ def get_july_user(authorization: Optional[str] = Header(None)):
                     target_username = 'executive'
 
                 cur.execute("""
-                    SELECT pu.portal_user_id, e.first_name || ' ' || COALESCE(e.last_name, ''), 
-                           r.role_name, pu.username, e.city, pu.role_id
+                    SELECT pu.portal_user_id, COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'User'), 
+                           COALESCE(r.role_name, pu.role, 'Executive'), pu.username, COALESCE(pu.city, e.city, 'Hyderabad'), pu.role_id
                     FROM july_portal_users pu
-                    JOIN july_employees e ON e.employee_id = pu.employee_id
-                    JOIN july_roles r ON r.role_id = pu.role_id
+                    LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
+                    LEFT JOIN july_roles r ON r.role_id = pu.role_id
                     WHERE pu.username = %s;
                 """, (target_username,))
                 row = cur.fetchone()
@@ -6691,12 +6691,13 @@ def get_july_user(authorization: Optional[str] = Header(None)):
         # 3. Default fallback to @super_admin if still not resolved
         if not row:
             cur.execute("""
-                SELECT pu.portal_user_id, e.first_name || ' ' || COALESCE(e.last_name, ''), 
-                       r.role_name, pu.username, e.city, pu.role_id
+                SELECT pu.portal_user_id, COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'User'), 
+                       COALESCE(r.role_name, pu.role, 'Executive'), pu.username, COALESCE(pu.city, e.city, 'Hyderabad'), pu.role_id
                 FROM july_portal_users pu
-                JOIN july_employees e ON e.employee_id = pu.employee_id
-                JOIN july_roles r ON r.role_id = pu.role_id
-                WHERE pu.username = 'super_admin';
+                LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
+                LEFT JOIN july_roles r ON r.role_id = pu.role_id
+                WHERE pu.username = 'super_admin' OR pu.portal_user_id = 3
+                LIMIT 1;
             """)
             row = cur.fetchone()
 
