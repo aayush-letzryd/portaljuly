@@ -201,11 +201,11 @@ export default function WalkInForm({
         const data = await res.json();
         if (data && data.length > 0) {
           const match = data[0];
-          const priorVisits = data.filter((r: any) => r.id && !r.id.startsWith("O-"));
+          const priorVisits = data.filter((r: any) => r.id && (r.id.startsWith("E") || r.id.startsWith("N")));
           applyRecordAutoFill(match);
           setCandidateHistory(priorVisits);
 
-          const isEx = Boolean(match.is_existing_partner || match.record_type === "existing" || match.id?.startsWith("O-"));
+          const isEx = Boolean(match.is_existing_partner || match.record_type === "existing" || match.id?.startsWith("O") || match.id?.startsWith("E"));
           const name = match.person_name || "Partner";
           if (isEx) {
             setFetchBannerMsg(priorVisits.length > 0 ? `Found Onboarded Partner: ${name} (${priorVisits.length} prior visit${priorVisits.length > 1 ? 's' : ''})` : `Found Onboarded Partner: ${name}`);
@@ -285,11 +285,11 @@ export default function WalkInForm({
             const data = await res.json();
             if (data && data.length > 0) {
               const match = data[0]; 
-              const priorVisits = data.filter((r: any) => r.id && !r.id.startsWith("O-"));
+              const priorVisits = data.filter((r: any) => r.id && (r.id.startsWith("E") || r.id.startsWith("N")));
               applyRecordAutoFill(match);
               setCandidateHistory(priorVisits);
 
-              const isEx = Boolean(match.is_existing_partner || match.record_type === "existing" || match.id?.startsWith("O-"));
+              const isEx = Boolean(match.is_existing_partner || match.record_type === "existing" || match.id?.startsWith("O") || match.id?.startsWith("E"));
               const name = match.person_name || "Partner";
               if (isEx) {
                 setFetchBannerMsg(priorVisits.length > 0 ? `Found Onboarded Partner: ${name} (${priorVisits.length} prior visit${priorVisits.length > 1 ? 's' : ''})` : `Found Onboarded Partner: ${name}`);
@@ -1426,60 +1426,71 @@ export default function WalkInForm({
             </div>
 
             <div className="p-6 overflow-y-auto flex flex-col gap-4">
-              {candidateHistory.map((v, idx) => (
-                <div key={v.id || idx} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col gap-3">
-                  <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-sans text-xs font-bold text-slate-900">Visit #{candidateHistory.length - idx}</span>
-                      <span className="text-xs font-mono font-bold text-slate-600">(ID: {v.id})</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
-                        v.joined_status === 'Successfully Onboarded' ? 'bg-emerald-100 text-emerald-800' :
-                        v.joined_status === 'Follow Up Required' ? 'bg-amber-100 text-amber-800' :
-                        'bg-blue-100 text-blue-800'
-                      }`}>
-                        {v.joined_status || 'Initiated'}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => { setShowHistoryModal(false); viewRecordInline(v); }}
-                        className="rounded-lg px-2 py-1 border border-border bg-white text-slate-700 hover:text-primary hover:bg-slate-100 transition-all cursor-pointer flex items-center gap-1 font-semibold text-[11px]"
-                        title="View Record in Form"
-                      >
-                        <Eye className="h-3.5 w-3.5" /> View
-                      </button>
-                      {!isReadOnly && (
+              {candidateHistory.map((v, idx) => {
+                const rawDateStr = v.event_date || v.created_at || "";
+                const cleanDateStr = rawDateStr.split(" ")[0].split("T")[0];
+                const cleanTimeStr = v.enquiry_time || (rawDateStr.includes(" ") ? rawDateStr.split(" ")[1].slice(0, 5) : "");
+                let formattedDisplayDate = cleanDateStr;
+                try {
+                  if (cleanDateStr && cleanDateStr.length >= 8) {
+                    formattedDisplayDate = new Date(cleanDateStr).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+                  }
+                } catch (e) {}
+
+                const isExisting = v.record_type === 'existing' || v.id?.startsWith('E');
+
+                return (
+                  <div key={v.id || idx} className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col gap-3 shadow-2xs">
+                    <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
+                      <div className="flex items-center gap-2">
+                        <span className="font-sans text-xs font-bold text-slate-900">Visit #{candidateHistory.length - idx}</span>
+                        <span className="text-xs font-mono font-bold text-slate-600">(ID: {v.id})</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                          isExisting ? 'bg-amber-100 text-amber-800 border border-amber-200' : 'bg-emerald-100 text-emerald-800 border border-emerald-200'
+                        }`}>
+                          {isExisting ? 'Existing Partner Visit' : (v.joined_status || 'Candidate Walk-in')}
+                        </span>
                         <button
                           type="button"
-                          onClick={() => { setShowHistoryModal(false); fetchRecordDetailsForEdit(v.id); }}
-                          className="rounded-lg px-2 py-1 border border-border bg-white text-slate-700 hover:text-primary hover:bg-slate-100 transition-all cursor-pointer flex items-center gap-1 font-semibold text-[11px]"
-                          title="Edit Record in Form"
+                          onClick={() => { setShowHistoryModal(false); viewRecordInline(v); }}
+                          className="rounded-lg px-2.5 py-1 border border-border bg-white text-slate-700 hover:text-primary hover:bg-slate-100 transition-all cursor-pointer flex items-center gap-1 font-semibold text-[11px] shadow-2xs"
+                          title="View Record in Form"
                         >
-                          <Edit className="h-3.5 w-3.5" /> Edit
+                          <Eye className="h-3.5 w-3.5" /> View
                         </button>
-                      )}
+                        {!isReadOnly && (
+                          <button
+                            type="button"
+                            onClick={() => { setShowHistoryModal(false); fetchRecordDetailsForEdit(v.id); }}
+                            className="rounded-lg px-2.5 py-1 border border-border bg-white text-slate-700 hover:text-primary hover:bg-slate-100 transition-all cursor-pointer flex items-center gap-1 font-semibold text-[11px] shadow-2xs"
+                            title="Edit Record in Form"
+                          >
+                            <Edit className="h-3.5 w-3.5" /> Edit
+                          </button>
+                        )}
+                      </div>
                     </div>
-                  </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                    <div>
-                      <span className="block text-[10px] font-semibold text-slate-400 uppercase">Reason</span>
-                      <span className="font-medium text-slate-800">{v.visiting_reason || 'Enquiry'}</span>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Reason</span>
+                        <span className="font-semibold text-slate-800">{v.visiting_reason || 'Hub Visit'}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Partner Type</span>
+                        <span className="font-semibold text-slate-800">{v.visitor_type || v.partner_type || 'Driver'}</span>
+                      </div>
+                      <div>
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">City</span>
+                        <span className="font-semibold text-slate-800">{normalizeCity(v.city)}</span>
+                      </div>
+                      <div className="col-span-3">
+                        <span className="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">Date & Time</span>
+                        <span className="font-semibold text-slate-800">{formattedDisplayDate} {cleanTimeStr}</span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="block text-[10px] font-semibold text-slate-400 uppercase">Partner Type</span>
-                      <span className="font-medium text-slate-800">{v.visitor_type || v.partner_type || 'Driver'}</span>
-                    </div>
-                    <div>
-                      <span className="block text-[10px] font-semibold text-slate-400 uppercase">City</span>
-                      <span className="font-medium text-slate-800">{v.city || 'N/A'}</span>
-                    </div>
-                    <div className="col-span-3">
-                      <span className="block text-[10px] font-semibold text-slate-400 uppercase">Date & Time</span>
-                      <span className="font-medium text-slate-800">{v.event_date || v.created_at?.slice(0, 10)} {v.enquiry_time || ''}</span>
-                    </div>
-                  </div>
 
                   {v.visit_tags && (
                     <div className="flex flex-wrap gap-1 mt-1">
