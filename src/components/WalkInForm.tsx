@@ -154,6 +154,7 @@ export default function WalkInForm({
   const [candidateHistory, setCandidateHistory] = useState<any[]>([]);
   const [fetchBannerMsg, setFetchBannerMsg] = useState<string>("");
   const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false);
+  const [viewRecord, setViewRecord] = useState<any | null>(null);
 
   const applyRecordAutoFill = (match: any) => {
     setFirstName(match.first_name || match.person_name?.split(" ")[0] || "");
@@ -761,15 +762,28 @@ export default function WalkInForm({
                   <div className="flex flex-col gap-1.5">
                     <label className="font-sans text-xs font-semibold text-slate-700">Phone Number *</label>
                     <div className="relative flex items-center">
-                      <input type="tel" placeholder="Enter 10-digit number" required value={personNumber} onChange={(e) => setPersonNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} className="w-full h-11 rounded-lg border border-border pl-3 pr-24 text-xs bg-white outline-none focus:border-primary text-slate-800" />
-                      <button
-                        type="button"
-                        onClick={handleFetchByPhone}
-                        className="absolute right-1.5 top-1.5 bottom-1.5 px-3 bg-primary hover:bg-primary-dark text-white text-xs font-semibold rounded-md transition-all flex items-center gap-1 cursor-pointer shadow-xs"
-                      >
-                        <Search className="w-3.5 h-3.5" />
-                        Fetch
-                      </button>
+                      <input type="tel" placeholder="Enter 10-digit number" required value={personNumber} onChange={(e) => setPersonNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} className="w-full h-11 rounded-lg border border-border pl-3 pr-32 text-xs bg-white outline-none focus:border-primary text-slate-800" />
+                      <div className="absolute right-1.5 top-1.5 bottom-1.5 flex items-center gap-1">
+                        {personNumber && (
+                          <button
+                            type="button"
+                            onClick={() => resetForm()}
+                            className="px-2 h-full bg-slate-100 hover:bg-slate-200 text-slate-600 text-xs font-semibold rounded-md transition-all flex items-center gap-1 cursor-pointer"
+                            title="Clear & Reset Form for New Candidate"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            Clear
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={handleFetchByPhone}
+                          className="px-3 h-full bg-primary hover:bg-primary-dark text-white text-xs font-semibold rounded-md transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                        >
+                          <Search className="w-3.5 h-3.5" />
+                          Fetch
+                        </button>
+                      </div>
                     </div>
                   </div>
 
@@ -1264,9 +1278,10 @@ export default function WalkInForm({
                               {r.updated_by_name || r.executive_name || '—'}
                             </td>
                             <td className="px-4 py-3 text-center">
-                              <div className="inline-flex gap-2 justify-center">
-                                <button type="button" onClick={() => fetchRecordDetailsForEdit(r.id)} className="rounded-lg px-2 py-1 border border-border bg-white text-text-muted hover:text-primary hover:bg-slate-50 transition-all cursor-pointer flex items-center gap-1 font-bold"><Edit className="h-3.5 w-3.5" /> Edit</button>
-                                <button type="button" onClick={() => { if (window.confirm('Delete this draft?')) handleDeleteRecord(r.id); }} className="rounded-lg p-1 border border-border bg-white text-text-muted hover:text-rose-500 hover:bg-rose-50 border-rose-200 transition-all cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button>
+                              <div className="inline-flex gap-1.5 justify-center">
+                                <button type="button" onClick={() => setViewRecord(r)} className="rounded-lg p-1 border border-border bg-white text-slate-600 hover:text-primary hover:bg-slate-50 transition-all cursor-pointer" title="View Full Details"><Eye className="h-3.5 w-3.5" /></button>
+                                <button type="button" onClick={() => fetchRecordDetailsForEdit(r.id)} className="rounded-lg px-2 py-1 border border-border bg-white text-slate-700 hover:text-primary hover:bg-slate-50 transition-all cursor-pointer flex items-center gap-1 font-semibold text-[11px]"><Edit className="h-3.5 w-3.5" /> Edit</button>
+                                <button type="button" onClick={() => { if (window.confirm('Delete this draft?')) handleDeleteRecord(r.id); }} className="rounded-lg p-1 border border-border bg-white text-slate-600 hover:text-rose-500 hover:bg-rose-50 border-rose-200 transition-all cursor-pointer" title="Delete Draft"><Trash2 className="h-3.5 w-3.5" /></button>
                               </div>
                             </td>
                           </tr>
@@ -1466,15 +1481,15 @@ export default function WalkInForm({
                             </td>
                             <td className="px-4 py-3"><span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${statusColor}`}>{displayStatus}</span></td>
                             <td className="px-4 py-3 text-center">
-                              {/* RBAC: Hide Action buttons if user is read-only */}
-                              {!isReadOnly ? (
-                                <div className="inline-flex gap-2">
-                                  <button type="button" onClick={() => fetchRecordDetailsForEdit(r.id)} className="rounded-lg p-1 border border-border bg-white text-text-muted hover:text-primary hover:bg-slate-50 transition-all cursor-pointer"><Edit className="h-3.5 w-3.5" /></button>
-                                  <button type="button" onClick={() => { if (window.confirm('Delete this record?')) handleDeleteRecord(r.id); }} className="rounded-lg p-1 border border-border bg-white text-text-muted hover:text-rose-500 hover:bg-rose-50 border-rose-200 transition-all cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button>
-                                </div>
-                              ) : (
-                                <span className="text-[10px] text-slate-400 italic font-semibold">View Only</span>
-                              )}
+                              <div className="inline-flex gap-1.5 justify-center">
+                                <button type="button" onClick={() => setViewRecord(r)} className="rounded-lg p-1 border border-border bg-white text-slate-600 hover:text-primary hover:bg-slate-50 transition-all cursor-pointer" title="View Full Details"><Eye className="h-3.5 w-3.5" /></button>
+                                {!isReadOnly && (
+                                  <>
+                                    <button type="button" onClick={() => fetchRecordDetailsForEdit(r.id)} className="rounded-lg p-1 border border-border bg-white text-slate-600 hover:text-primary hover:bg-slate-50 transition-all cursor-pointer" title="Edit Entry"><Edit className="h-3.5 w-3.5" /></button>
+                                    <button type="button" onClick={() => { if (window.confirm('Delete this record?')) handleDeleteRecord(r.id); }} className="rounded-lg p-1 border border-border bg-white text-slate-600 hover:text-rose-500 hover:bg-rose-50 border-rose-200 transition-all cursor-pointer" title="Delete Entry"><Trash2 className="h-3.5 w-3.5" /></button>
+                                  </>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );
@@ -1582,6 +1597,133 @@ export default function WalkInForm({
               <button
                 type="button"
                 onClick={() => setShowHistoryModal(false)}
+                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {viewRecord && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl border border-border shadow-xl w-full max-w-2xl max-h-[85vh] flex flex-col overflow-hidden">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between bg-slate-50">
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4 text-primary" />
+                <h3 className="font-sans text-xs font-bold text-slate-800 uppercase tracking-wider">
+                  Walk-In Entry #{viewRecord.id} Details
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setViewRecord(null)}
+                className="h-7 w-7 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 flex items-center justify-center text-xs font-bold transition-colors cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="p-6 overflow-y-auto flex flex-col gap-5">
+              {/* Section 1: Candidate Info */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col gap-3">
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-200 pb-1.5">Candidate Details</span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">Full Name</span>
+                    <span className="font-semibold text-slate-900">{viewRecord.first_name ? `${viewRecord.first_name} ${viewRecord.last_name}`.trim() : (viewRecord.person_name || 'N/A')}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">Contact Phone</span>
+                    <span className="font-semibold text-slate-900">{viewRecord.person_number || 'N/A'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">Operating City</span>
+                    <span className="font-semibold text-slate-900">{viewRecord.city || viewRecord.city_name || 'N/A'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Section 2: Visit & Enquiry Details */}
+              <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col gap-3">
+                <span className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-200 pb-1.5">Visit & Outcome Details</span>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                  <div>
+                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">Partner Category</span>
+                    <span className="font-semibold text-slate-900">{viewRecord.partner_type || viewRecord.visitor_type || 'Driver'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">Visiting Reason</span>
+                    <span className="font-semibold text-slate-900">{viewRecord.visiting_reason || 'Enquiry'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">Outcome Status</span>
+                    <span className={`inline-block px-2.5 py-0.5 rounded-full text-xs font-semibold ${
+                      viewRecord.joined_status === 'Successfully Onboarded' ? 'bg-emerald-100 text-emerald-800' :
+                      viewRecord.joined_status === 'Follow Up Required' ? 'bg-amber-100 text-amber-800' :
+                      'bg-blue-100 text-blue-800'
+                    }`}>{viewRecord.joined_status || 'Initiated'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">Enquiry Date & Time</span>
+                    <span className="font-medium text-slate-800">{viewRecord.event_date || viewRecord.created_at?.slice(0, 10)} {viewRecord.enquiry_time || ''}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">Recorded By</span>
+                    <span className="font-medium text-slate-800">{viewRecord.executive_name || 'Executive'}</span>
+                  </div>
+                  <div>
+                    <span className="block text-[10px] font-semibold text-slate-400 uppercase">Last Updated By</span>
+                    <span className="font-medium text-slate-800">{viewRecord.updated_by_name || viewRecord.executive_name || '—'}</span>
+                  </div>
+                </div>
+
+                {viewRecord.visit_tags && (
+                  <div className="flex flex-wrap gap-1.5 mt-1">
+                    <span className="text-[10px] font-semibold text-slate-400 uppercase block w-full">Category Tags:</span>
+                    {(typeof viewRecord.visit_tags === 'string' ? (viewRecord.visit_tags.startsWith('[') ? JSON.parse(viewRecord.visit_tags) : [viewRecord.visit_tags]) : viewRecord.visit_tags).map((tag: string) => (
+                      <span key={tag} className="px-2.5 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-800 border border-emerald-200">
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                {(viewRecord.visit_notes || viewRecord.remarks) && (
+                  <div className="p-3 bg-white rounded-lg border border-slate-200 text-xs text-slate-700 leading-relaxed mt-1">
+                    <span className="font-semibold text-slate-900 block mb-0.5">Visit Notes & Executive Summary:</span>
+                    {viewRecord.visit_notes || viewRecord.remarks}
+                  </div>
+                )}
+              </div>
+
+              {/* Section 3: Identity & Documents (If Present) */}
+              {(viewRecord.aadhaar_number || viewRecord.dl_number) && (
+                <div className="p-4 rounded-xl border border-slate-200 bg-slate-50/50 flex flex-col gap-3">
+                  <span className="text-xs font-bold text-slate-800 uppercase tracking-wider border-b border-slate-200 pb-1.5">KYC & Document Records</span>
+                  <div className="grid grid-cols-2 gap-3 text-xs">
+                    {viewRecord.aadhaar_number && (
+                      <div>
+                        <span className="block text-[10px] font-semibold text-slate-400 uppercase">Aadhaar Card</span>
+                        <span className="font-semibold text-slate-900">{viewRecord.aadhaar_number}</span>
+                      </div>
+                    )}
+                    {viewRecord.dl_number && (
+                      <div>
+                        <span className="block text-[10px] font-semibold text-slate-400 uppercase">Driving License</span>
+                        <span className="font-semibold text-slate-900">{viewRecord.dl_number}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="px-6 py-3 border-t border-border bg-slate-50 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setViewRecord(null)}
                 className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-800 text-xs font-semibold rounded-lg transition-colors cursor-pointer"
               >
                 Close
