@@ -1240,21 +1240,22 @@ export default function AllocationForm({
                 <table className="w-full text-left whitespace-nowrap border-collapse">
                   <thead className="bg-slate-50 border-b border-slate-200">
                     <tr>
-                      <th className="px-5 py-3.5 font-sans text-xs font-semibold text-slate-700 text-left">Draft ID</th>
-                      <th className="px-5 py-3.5 font-sans text-xs font-semibold text-slate-700 text-left">Driver Info</th>
-                      <th className="px-5 py-3.5 font-sans text-xs font-semibold text-slate-700 text-left">Vehicle Number</th>
-                      <th className="px-5 py-3.5 font-sans text-xs font-semibold text-slate-700 text-left">City</th>
-                      <th className="px-5 py-3.5 font-sans text-xs font-semibold text-slate-700 text-left">Transaction Type</th>
-                      <th className="px-5 py-3.5 font-sans text-xs font-semibold text-slate-700 text-left">Rental Plan</th>
-                      <th className="px-5 py-3.5 font-sans text-xs font-semibold text-slate-700 text-left">Last Saved</th>
-                      <th className="px-5 py-3.5 font-sans text-xs font-semibold text-slate-700 text-left">Status</th>
-                      <th className="px-5 py-3.5 font-sans text-xs font-semibold text-slate-700 text-center">Actions</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Draft ID</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Driver Name</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Phone Number</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Driver ID</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Vehicle Number</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">City</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Transaction Type</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Rental Plan</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Last Saved</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-center">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
                     {records.filter(r => r.status === "Draft").length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="px-6 py-12 text-center text-slate-500 font-sans bg-slate-50/50">
+                        <td colSpan={10} className="px-6 py-12 text-center text-slate-500 font-sans bg-slate-50/50">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <CheckCircle className="h-8 w-8 text-emerald-500 mb-2 opacity-60" />
                             <p className="font-semibold text-slate-800">No saved drafts found!</p>
@@ -1264,7 +1265,6 @@ export default function AllocationForm({
                       </tr>
                     ) : (
                       records.filter(r => r.status === "Draft").map((r) => {
-                        const appStatus = r.status || "Draft";
                         const displayCity = r.city_name || r.city || "—";
                         const displayPlan = r.driver_plan || r.type_of_plan || r.plan_name || "—";
                         const displayTxType = r.sub_type || r.allocation_type || "New Allocation";
@@ -1279,39 +1279,35 @@ export default function AllocationForm({
                         }) : "—";
 
                         return (
-                          <tr key={r.id} className="hover:bg-amber-50/30 transition-colors group">
-                            <td className="px-5 py-4 font-sans text-xs font-bold text-slate-900">
+                          <tr key={r.id} className="hover:bg-amber-50/30 transition-colors">
+                            <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-700">
                               #{r.id}
                             </td>
-                            <td className="px-5 py-4 font-sans text-xs">
-                              <span className="font-bold text-slate-900 block">{r.driver_name || "—"}</span>
-                              <span className="text-[11px] text-slate-500 font-medium">{r.driver_phone || "—"} {r.driver_id ? `(${r.driver_id})` : ""}</span>
+                            <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-900">
+                              {r.driver_name || "—"}
                             </td>
-                            <td className="px-5 py-4 font-sans text-xs">
-                              <span className="font-semibold text-emerald-800 bg-emerald-50 border border-emerald-200/60 px-2.5 py-1 rounded-lg">
-                                {r.vehicle_number || "—"}
-                              </span>
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-600">
+                              {r.driver_phone || "—"}
                             </td>
-                            <td className="px-5 py-4 font-sans text-xs font-semibold text-slate-700">
-                              <span className="px-2.5 py-1 rounded-lg bg-slate-100 text-slate-800 text-[11px]">
-                                {displayCity}
-                              </span>
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-600">
+                              {r.driver_id || "—"}
                             </td>
-                            <td className="px-5 py-4 font-sans text-xs font-medium text-slate-700">
+                            <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">
+                              {r.vehicle_number || "—"}
+                            </td>
+                            <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-800">
+                              {displayCity}
+                            </td>
+                            <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-700">
                               {displayTxType}
                             </td>
-                            <td className="px-5 py-4 font-sans text-xs font-medium text-slate-700">
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-700">
                               {displayPlan}
                             </td>
-                            <td className="px-5 py-4 font-sans text-[11px] text-slate-500 font-medium">
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-600">
                               {formattedDate}
                             </td>
-                            <td className="px-5 py-4 font-sans">
-                              <span className="px-2.5 py-1 rounded-lg text-[10px] font-semibold bg-amber-100 text-amber-800 border border-amber-300">
-                                {appStatus}
-                              </span>
-                            </td>
-                            <td className="px-5 py-4 text-center font-sans">
+                            <td className="px-4 py-3.5 text-center font-sans">
                               <div className="flex items-center justify-center gap-2">
                                 <button 
                                   onClick={() => loadRecordForEdit(r.id)}
