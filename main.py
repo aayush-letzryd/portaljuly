@@ -261,6 +261,61 @@ def startup_event():
         ]:
             cur.execute(f"ALTER TABLE july_walkins ADD COLUMN IF NOT EXISTS {col};")
 
+        # ── july_new_walkins & july_existing_walkins ─────────
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS july_new_walkins (
+                id SERIAL PRIMARY KEY,
+                first_name VARCHAR(100),
+                last_name VARCHAR(100),
+                person_name VARCHAR(200),
+                person_number VARCHAR(15),
+                city VARCHAR(100),
+                operating_place VARCHAR(200),
+                interested_position VARCHAR(50) DEFAULT 'Driver',
+                visiting_reason VARCHAR(200),
+                event_date DATE,
+                enquiry_time VARCHAR(20),
+                dl_number VARCHAR(100),
+                aadhaar_number VARCHAR(30),
+                aadhaar_image TEXT,
+                dl_image TEXT,
+                lead_channel VARCHAR(100),
+                lead_channel_details VARCHAR(300),
+                referred_by_name VARCHAR(100),
+                referred_by_phone VARCHAR(15),
+                joined_status VARCHAR(100) DEFAULT 'Onboarding Process Initiated',
+                remarks TEXT,
+                submission_status VARCHAR(50) DEFAULT 'Submitted',
+                executive_id INTEGER,
+                created_by INTEGER,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP,
+                updated_by INTEGER
+            );
+        """)
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS july_existing_walkins (
+                id SERIAL PRIMARY KEY,
+                person_number VARCHAR(15),
+                first_name VARCHAR(100),
+                last_name VARCHAR(100),
+                person_name VARCHAR(200),
+                city VARCHAR(100),
+                partner_type VARCHAR(50) DEFAULT 'Driver',
+                visiting_reason VARCHAR(200),
+                event_date DATE,
+                enquiry_time VARCHAR(20),
+                visit_notes TEXT,
+                submission_status VARCHAR(50) DEFAULT 'Submitted',
+                executive_id INTEGER,
+                created_by INTEGER,
+                created_at TIMESTAMP DEFAULT NOW(),
+                updated_at TIMESTAMP,
+                updated_by INTEGER
+            );
+        """)
+        conn.commit()
+
         # ── july_driver_onboarding ───────────────────────────
         cur.execute("""
             CREATE TABLE IF NOT EXISTS july_driver_onboarding (
@@ -2557,7 +2612,7 @@ def get_stats(
 
 
 # ─────────────────────────────────────────────────────────
-# Walk-ins — List
+# Walk-ins — List (UNION of july_new_walkins, july_existing_walkins & july_walkins archive)
 # ─────────────────────────────────────────────────────────
 @app.get("/api/walkins")
 def get_all_walkins(
@@ -2574,49 +2629,92 @@ def get_all_walkins(
     page: Optional[int] = 1,
     limit: Optional[int] = 10
 ):
-    user_city = None
-    is_global = True
-    if authorization:
-        try:
-            curr_user = get_current_user(authorization)
-            r_code = curr_user.get("role_code", "")
-            is_global = r_code in ["SA", "BH", "FL", "FE", "AU"] or curr_user.get("role") in ["Super Admin", "Admin", "Business Head"]
-            user_city = curr_user.get("city", "Hyderabad")
-        except Exception:
-            pass
-
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        
-        base_query = """
+
+        new_query = """
             SELECT
-                w.id AS id,
-                w.visitor_type,
-                w.event_date,
-                COALESCE(w.enquiry_time, '10:30 AM') AS enquiry_time,
-                COALESCE(w.mode_of_enquiry, 'Walk-in / In-Person') AS mode_of_enquiry,
+                'N-' || n.id::text AS id,
+                'new' AS record_type,
+                n.interested_position AS visitor_type,
+                n.event_date,
+                COALESCE(n.enquiry_time, '10:30') AS enquiry_time,
+                n.first_name,
+                n.last_name,
+                n.city AS city_name,
+                n.person_name,
+                n.person_number,
+                n.visiting_reason,
+                n.joined_status,
+                n.lead_channel,
+                n.lead_channel_details,
+                n.created_at,
+                COALESCE(n.submission_status, 'Submitted') AS submission_status,
+                COALESCE(n.updated_at, n.created_at) AS updated_at,
+                COALESCE(e.first_name || ' ' || COALESCE(e.last_name, ''), 'Executive') AS executive_name,
+                COALESCE(e_up.first_name || ' ' || COALESCE(e_up.last_name, ''), '') AS updated_by_name,
+                n.id::integer AS raw_id
+            FROM july_new_walkins n
+            LEFT JOIN july_portal_users pu ON pu.portal_user_id = COALESCE(n.created_by, n.executive_id)
+            LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
+            LEFT JOIN july_portal_users pu_up ON pu_up.portal_user_id = n.updated_by
+            LEFT JOIN july_employees e_up ON e_up.employee_id = pu_up.employee_id
+            WHERE 1=1
+        """
+
+        existing_query = """
+            SELECT
+                'E-' || ex.id::text AS id,
+                'existing' AS record_type,
+                ex.partner_type AS visitor_type,
+                ex.event_date,
+                COALESCE(ex.enquiry_time, '10:30') AS enquiry_time,
+                ex.first_name,
+                ex.last_name,
+                ex.city AS city_name,
+                ex.person_name,
+                ex.person_number,
+                ex.visiting_reason,
+                'Partner Visit' AS joined_status,
+                '' AS lead_channel,
+                '' AS lead_channel_details,
+                ex.created_at,
+                COALESCE(ex.submission_status, 'Submitted') AS submission_status,
+                COALESCE(ex.updated_at, ex.created_at) AS updated_at,
+                COALESCE(e.first_name || ' ' || COALESCE(e.last_name, ''), 'Executive') AS executive_name,
+                COALESCE(e_up.first_name || ' ' || COALESCE(e_up.last_name, ''), '') AS updated_by_name,
+                ex.id::integer AS raw_id
+            FROM july_existing_walkins ex
+            LEFT JOIN july_portal_users pu ON pu.portal_user_id = COALESCE(ex.created_by, ex.executive_id)
+            LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
+            LEFT JOIN july_portal_users pu_up ON pu_up.portal_user_id = ex.updated_by
+            LEFT JOIN july_employees e_up ON e_up.employee_id = pu_up.employee_id
+            WHERE 1=1
+        """
+
+        legacy_query = """
+            SELECT
+                w.id::text AS id,
+                CASE WHEN w.is_existing_partner THEN 'existing' ELSE 'new' END AS record_type,
+                COALESCE(w.partner_type, w.visitor_type, 'Driver') AS visitor_type,
+                CASE WHEN w.event_date ~ '^\d{4}-\d{2}-\d{2}$' THEN w.event_date::date ELSE w.created_at::date END AS event_date,
+                COALESCE(w.enquiry_time, '10:30') AS enquiry_time,
                 w.first_name,
                 w.last_name,
-                COALESCE(w.referred_by_name, '') AS referred_by_name,
-                COALESCE(w.referred_by_phone, '') AS referred_by_phone,
                 w.city AS city_name,
-                w.operating_place,
-                COALESCE(w.created_by, w.executive_id) AS executive_id,
-                COALESCE(e.first_name || ' ' || COALESCE(e.last_name, ''), 'Onboarding Executive 1') AS executive_name,
                 w.person_name,
                 w.person_number,
-                COALESCE(w.aadhaar_number, '') AS aadhaar_number,
-                COALESCE(w.dl_number, '') AS dl_number,
                 w.visiting_reason,
                 COALESCE(w.joined_status, 'Onboarding Process Initiated') AS joined_status,
-                COALESCE(w.remarks, '') AS remarks,
                 COALESCE(w.lead_channel, '') AS lead_channel,
                 COALESCE(w.lead_channel_details, '') AS lead_channel_details,
                 w.created_at,
                 COALESCE(w.submission_status, 'Submitted') AS submission_status,
                 COALESCE(w.updated_at, w.created_at) AS updated_at,
-                COALESCE(e_up.first_name || ' ' || COALESCE(e_up.last_name, ''), e.first_name || ' ' || COALESCE(e.last_name, ''), 'Onboarding Executive 1') AS updated_by_name
+                COALESCE(e.first_name || ' ' || COALESCE(e.last_name, ''), 'Executive') AS executive_name,
+                COALESCE(e_up.first_name || ' ' || COALESCE(e_up.last_name, ''), '') AS updated_by_name,
+                w.id::integer AS raw_id
             FROM july_walkins w
             LEFT JOIN july_portal_users pu ON pu.portal_user_id = COALESCE(w.created_by, w.executive_id)
             LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
@@ -2624,148 +2722,101 @@ def get_all_walkins(
             LEFT JOIN july_employees e_up ON e_up.employee_id = pu_up.employee_id
             WHERE 1=1
         """
-        
-        params = []
+
+        new_params = []
+        existing_params = []
+        legacy_params = []
 
         if city and city != "all":
-            base_query += " AND w.city ILIKE %s"
-            params.append(f"%{city}%")
-        
+            new_query += " AND n.city ILIKE %s"
+            new_params.append(f"%{city}%")
+            existing_query += " AND ex.city ILIKE %s"
+            existing_params.append(f"%{city}%")
+            legacy_query += " AND w.city ILIKE %s"
+            legacy_params.append(f"%{city}%")
+
         if search:
-            base_query += """
-                AND (
-                    w.person_name ILIKE %s
-                    OR w.first_name ILIKE %s
-                    OR w.last_name ILIKE %s
-                    OR w.person_number ILIKE %s
-                    OR w.id::text ILIKE %s
-                )
-            """
-            search_pattern = f"%{search}%"
-            params.extend([search_pattern] * 5)
-            
+            sp = f"%{search}%"
+            new_query += " AND (n.person_name ILIKE %s OR n.first_name ILIKE %s OR n.person_number ILIKE %s OR n.id::text ILIKE %s)"
+            new_params.extend([sp, sp, sp, sp])
+            existing_query += " AND (ex.person_name ILIKE %s OR ex.first_name ILIKE %s OR ex.person_number ILIKE %s OR ex.id::text ILIKE %s)"
+            existing_params.extend([sp, sp, sp, sp])
+            legacy_query += " AND (w.person_name ILIKE %s OR w.first_name ILIKE %s OR w.person_number ILIKE %s OR w.id::text ILIKE %s)"
+            legacy_params.extend([sp, sp, sp, sp])
+
         if visitor_type and visitor_type != "all":
-            base_query += " AND w.visitor_type = %s"
-            params.append(visitor_type)
-            
-        if status == "Draft":
-            base_query += " AND (w.submission_status = 'Draft' OR w.joined_status = 'Draft')"
-        elif status and status != "all":
-            base_query += " AND w.joined_status = %s AND (w.submission_status IS NULL OR w.submission_status != 'Draft')"
-            params.append(status)
-        else:
-            base_query += " AND (w.submission_status IS NULL OR w.submission_status != 'Draft')"
-            
-        if time_period == "custom" or start_date or end_date or from_date or to_date:
-            s_date = start_date or from_date
-            e_date = end_date or to_date
-            if s_date:
-                base_query += " AND (w.event_date >= %s OR w.created_at >= %s)"
-                params.extend([s_date, s_date])
-            if e_date:
-                base_query += " AND (w.event_date <= %s OR w.created_at <= %s)"
-                params.extend([e_date, e_date + " 23:59:59"])
-        elif time_period and time_period != "all":
-            from datetime import datetime
-            from dateutil.relativedelta import relativedelta
-            
-            today = datetime.now()
-            
-            if time_period == "beginning_of_month":
-                start_dt = today.replace(day=1).strftime("%Y-%m-%d")
-                base_query += " AND w.event_date >= %s"
-                params.append(start_dt)
-            elif time_period == "last_1_month":
-                start_dt = (today - relativedelta(months=1)).strftime("%Y-%m-%d")
-                base_query += " AND w.event_date >= %s"
-                params.append(start_dt)
-            elif time_period == "this_year":
-                start_dt = today.replace(month=1, day=1).strftime("%Y-%m-%d")
-                base_query += " AND w.event_date >= %s"
-                params.append(start_dt)
-            elif time_period == "last_1_year":
-                start_dt = (today - relativedelta(years=1)).strftime("%Y-%m-%d")
-                base_query += " AND w.event_date >= %s"
-                params.append(start_dt)
-                
-        count_query = f"SELECT COUNT(*) FROM ({base_query}) AS total_subquery"
-        cur.execute(count_query, params)
+            new_query += " AND n.interested_position = %s"
+            new_params.append(visitor_type)
+            existing_query += " AND ex.partner_type = %s"
+            existing_params.append(visitor_type)
+            legacy_query += " AND (w.partner_type = %s OR w.visitor_type = %s)"
+            legacy_params.extend([visitor_type, visitor_type])
+
+        union_query = f"({new_query}) UNION ALL ({existing_query}) UNION ALL ({legacy_query})"
+        union_params = new_params + existing_params + legacy_params
+
+        count_q = f"SELECT COUNT(*) FROM ({union_query}) AS cnt"
+        cur.execute(count_q, union_params)
         total_count = cur.fetchone()[0]
-        
-        base_query += " ORDER BY w.id DESC LIMIT %s OFFSET %s"
+
+        final_query = f"SELECT * FROM ({union_query}) AS combined ORDER BY created_at DESC LIMIT %s OFFSET %s"
         offset = (page - 1) * limit
-        params.extend([limit, offset])
-        
-        cur.execute(base_query, params)
+        cur.execute(final_query, union_params + [limit, offset])
         rows = cur.fetchall()
-        
+
         items = []
         for r in rows:
             items.append({
                 "id": r[0],
-                "visitor_type": r[1],
-                "event_date": r[2],
-                "enquiry_time": r[3],
-                "mode_of_enquiry": r[4],
+                "record_type": r[1],
+                "visitor_type": r[2],
+                "event_date": r[3].isoformat() if r[3] else None,
+                "enquiry_time": r[4],
                 "first_name": r[5],
                 "last_name": r[6],
-                "referred_by_name": r[7],
-                "referred_by_phone": r[8],
-                "city_name": r[9],
-                "city": r[9],
-                "operating_place": r[10],
-                "executive_id": r[11],
-                "executive_name": r[12],
-                "person_name": r[13],
-                "person_number": r[14],
-                "aadhaar_number": r[15],
-                "dl_number": r[16],
-                "visiting_reason": r[17],
-                "joined_status": r[18],
-                "remarks": r[19],
-                "lead_channel": r[20],
-                "lead_channel_details": r[21],
-                "created_at": r[22].isoformat() if r[22] else None,
-                "submission_status": r[23],
-                "updated_at": r[24].isoformat() if r[24] else (r[22].isoformat() if r[22] else None),
-                "updated_by_name": r[25]
+                "city": r[7],
+                "city_name": r[7],
+                "person_name": r[8],
+                "person_number": r[9],
+                "visiting_reason": r[10],
+                "joined_status": r[11],
+                "lead_channel": r[12],
+                "lead_channel_details": r[13],
+                "created_at": r[14].isoformat() if r[14] else None,
+                "submission_status": r[15],
+                "updated_at": r[16].isoformat() if r[16] else None,
+                "executive_name": r[17],
+                "updated_by_name": r[18],
+                "raw_id": r[19],
             })
-            
-        return {
-            "items": items,
-            "total": total_count,
-            "page": page,
-            "limit": limit
-        }
+
+        return {"items": items, "total": total_count, "page": page, "limit": limit}
     finally:
         postgreSQL_pool.putconn(conn)
 
 
 # ─────────────────────────────────────────────────────────
-# Walk-ins — Search for Linking
+# Walk-ins — Search across tables
 # ─────────────────────────────────────────────────────────
 @app.get("/api/walkins/search")
 def search_walkins(q: str):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        search_pattern = f"%{q}%"
+        sp = f"%{q}%"
         cur.execute("""
-            SELECT id, first_name, last_name, person_name, person_number, city, dl_number, aadhaar_number, joined_status, aadhaar_image, dl_image,
-                   visitor_type, is_existing_partner, partner_type, partner_code, visit_tags, visit_notes, visiting_reason, event_date, remarks
-            FROM july_walkins
-            WHERE id::text = %s 
-               OR person_number ILIKE %s 
-               OR dl_number ILIKE %s
-               OR first_name ILIKE %s
-               OR last_name ILIKE %s
-               OR person_name ILIKE %s
-            ORDER BY id DESC LIMIT 10;
-        """, (q, search_pattern, search_pattern, search_pattern, search_pattern, search_pattern))
+            SELECT 'N-' || id::text AS id, 'new' AS record_type, first_name, last_name, person_name, person_number, city, interested_position AS visitor_type, visiting_reason, event_date::text, false AS is_existing_partner
+            FROM july_new_walkins
+            WHERE person_number ILIKE %s OR person_name ILIKE %s OR first_name ILIKE %s
+            UNION ALL
+            SELECT 'E-' || id::text AS id, 'existing' AS record_type, first_name, last_name, person_name, person_number, city, partner_type AS visitor_type, visiting_reason, event_date::text, true AS is_existing_partner
+            FROM july_existing_walkins
+            WHERE person_number ILIKE %s OR person_name ILIKE %s OR first_name ILIKE %s
+            LIMIT 10;
+        """, (sp, sp, sp, sp, sp, sp))
         
         cols = [d[0] for d in cur.description]
-        result = [dict(zip(cols, row)) for row in cur.fetchall()]
-        return result
+        return [dict(zip(cols, row)) for row in cur.fetchall()]
     finally:
         postgreSQL_pool.putconn(conn)
 
@@ -2802,50 +2853,116 @@ def get_preset_visit_tags():
 
 
 # ─────────────────────────────────────────────────────────
-# Walk-ins — Single
+# Walk-ins — Get Single Record
 # ─────────────────────────────────────────────────────────
 @app.get("/api/walkins/{walkin_id}")
-def get_walkin(walkin_id: int):
+def get_walkin(walkin_id: str):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("""
-            SELECT
-                w.visitor_type, w.event_date, w.city, w.operating_place, w.executive_id,
-                w.person_name, w.person_number, w.aadhaar_number, w.dl_number,
-                w.visiting_reason, w.joined_status, w.remarks,
-                COALESCE(u.name, '') AS executive_name,
-                w.first_name, w.last_name, w.enquiry_time, w.mode_of_enquiry,
-                w.referred_by_name, w.referred_by_phone,
-                w.aadhaar_image, w.dl_image,
-                w.lead_channel, w.lead_channel_details
-            FROM july_walkins w
-            LEFT JOIN copy_users u ON u.id = w.executive_id
-            WHERE w.id = %s;
-        """, (walkin_id,))
-        r = cur.fetchone()
-        if r:
-            return {
-                "visitor_type": r[0], "event_date": r[1], "city": r[2], "operating_place": r[3],
-                "executive_id": r[4], "person_name": r[5], "person_number": r[6],
-                "aadhaar_number": r[7], "dl_number": r[8],
-                "visiting_reason": r[9], "joined_status": r[10], "remarks": r[11],
-                "executive_name": r[12],
-                "first_name": r[13], "last_name": r[14], "enquiry_time": r[15],
-                "mode_of_enquiry": r[16], "referred_by_name": r[17], "referred_by_phone": r[18],
-                "aadhaar_image": r[19], "dl_image": r[20],
-                "lead_channel": r[21], "lead_channel_details": r[22]
-            }
-        raise HTTPException(status_code=404, detail="Walkin not found")
+        if str(walkin_id).startswith("E-"):
+            raw_id = int(walkin_id[2:])
+            cur.execute("""
+                SELECT id, first_name, last_name, person_name, person_number,
+                       city, partner_type, visiting_reason, event_date, enquiry_time,
+                       visit_notes, submission_status, created_at
+                FROM july_existing_walkins WHERE id = %s;
+            """, (raw_id,))
+            r = cur.fetchone()
+            if r:
+                return {
+                    "record_type": "existing",
+                    "id": f"E-{r[0]}",
+                    "raw_id": r[0],
+                    "first_name": r[1], "last_name": r[2], "person_name": r[3],
+                    "person_number": r[4], "city": r[5],
+                    "partner_type": r[6], "is_existing_partner": True,
+                    "visiting_reason": r[7],
+                    "event_date": r[8].isoformat() if r[8] else None,
+                    "enquiry_time": r[9],
+                    "visit_notes": r[10],
+                    "submission_status": r[11],
+                    "created_at": r[12].isoformat() if r[12] else None,
+                }
+            raise HTTPException(status_code=404, detail="Existing walkin not found")
+
+        elif str(walkin_id).startswith("N-"):
+            raw_id = int(walkin_id[2:])
+            cur.execute("""
+                SELECT id, first_name, last_name, person_name, person_number,
+                       city, operating_place, interested_position, visiting_reason,
+                       event_date, enquiry_time, dl_number, aadhaar_number,
+                       aadhaar_image, dl_image, lead_channel, lead_channel_details,
+                       referred_by_name, referred_by_phone, joined_status, remarks, created_at
+                FROM july_new_walkins WHERE id = %s;
+            """, (raw_id,))
+            r = cur.fetchone()
+            if r:
+                return {
+                    "record_type": "new",
+                    "id": f"N-{r[0]}",
+                    "raw_id": r[0],
+                    "first_name": r[1], "last_name": r[2], "person_name": r[3],
+                    "person_number": r[4], "city": r[5], "operating_place": r[6],
+                    "interested_position": r[7], "visitor_type": r[7],
+                    "is_existing_partner": False,
+                    "visiting_reason": r[8],
+                    "event_date": r[9].isoformat() if r[9] else None,
+                    "enquiry_time": r[10],
+                    "dl_number": r[11], "aadhaar_number": r[12],
+                    "aadhaar_image": r[13], "dl_image": r[14],
+                    "lead_channel": r[15], "lead_channel_details": r[16],
+                    "referred_by_name": r[17], "referred_by_phone": r[18],
+                    "joined_status": r[19], "remarks": r[20],
+                    "created_at": r[21].isoformat() if r[21] else None,
+                }
+            raise HTTPException(status_code=404, detail="New walkin not found")
+
+        else:
+            raw_id = int(walkin_id)
+            cur.execute("""
+                SELECT w.visitor_type, w.event_date, w.city, w.operating_place, w.executive_id,
+                       w.person_name, w.person_number, w.aadhaar_number, w.dl_number,
+                       w.visiting_reason, w.joined_status, w.remarks,
+                       COALESCE(u.name, '') AS executive_name,
+                       w.first_name, w.last_name, w.enquiry_time, w.mode_of_enquiry,
+                       w.referred_by_name, w.referred_by_phone,
+                       w.aadhaar_image, w.dl_image,
+                       w.lead_channel, w.lead_channel_details,
+                       w.is_existing_partner, w.partner_type, w.visit_notes
+                FROM july_walkins w
+                LEFT JOIN copy_users u ON u.id = w.executive_id
+                WHERE w.id = %s;
+            """, (raw_id,))
+            r = cur.fetchone()
+            if r:
+                is_ex = bool(r[23])
+                return {
+                    "record_type": "existing" if is_ex else "new",
+                    "visitor_type": r[0], "event_date": r[1], "city": r[2], "operating_place": r[3],
+                    "executive_id": r[4], "person_name": r[5], "person_number": r[6],
+                    "aadhaar_number": r[7], "dl_number": r[8],
+                    "visiting_reason": r[9], "joined_status": r[10], "remarks": r[11],
+                    "executive_name": r[12],
+                    "first_name": r[13], "last_name": r[14], "enquiry_time": r[15],
+                    "mode_of_enquiry": r[16], "referred_by_name": r[17], "referred_by_phone": r[18],
+                    "aadhaar_image": r[19], "dl_image": r[20],
+                    "lead_channel": r[21], "lead_channel_details": r[22],
+                    "is_existing_partner": is_ex,
+                    "partner_type": r[24], "visit_notes": r[25],
+                }
+            raise HTTPException(status_code=404, detail="Walkin not found")
     finally:
         postgreSQL_pool.putconn(conn)
 
+
 class WalkinData(BaseModel):
+    record_type: Optional[str] = 'new'
     visitor_type: Optional[str] = 'Driver'
     event_date: Optional[str] = None
     enquiry_time: Optional[str] = None
     city: Optional[str] = 'Hyderabad'
-    operating_place: Optional[str] = 'Hitec City Hub'
+    operating_place: Optional[str] = None
     first_name: Optional[str] = None
     last_name: Optional[str] = None
     person_name: Optional[str] = None
@@ -2882,18 +2999,13 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
     try:
         cur = conn.cursor()
 
-        # If portal_user_id is missing (fallback login), resolve via username
         if not user_p_id:
             username = user.get("username") or ""
-            cur.execute(
-                "SELECT portal_user_id FROM july_portal_users WHERE username = %s LIMIT 1;",
-                (username,)
-            )
+            cur.execute("SELECT portal_user_id FROM july_portal_users WHERE username = %s LIMIT 1;", (username,))
             row = cur.fetchone()
             if row:
                 user_p_id = row[0]
 
-        # Verify user_p_id exists in july_portal_users for FK constraint
         if user_p_id:
             cur.execute("SELECT 1 FROM july_portal_users WHERE portal_user_id = %s;", (user_p_id,))
             if not cur.fetchone():
@@ -2902,68 +3014,68 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
         f_name = (data.first_name or "").strip()
         l_name = (data.last_name or "").strip()
         full_n = (data.person_name or f"{f_name} {l_name}").strip()
-        sub_status = data.submission_status or ('Draft' if data.joined_status == 'Draft' else 'Submitted')
+        is_existing = data.is_existing_partner or data.record_type == 'existing'
 
-        tags_json = json.dumps(data.visit_tags) if isinstance(data.visit_tags, list) else (data.visit_tags if isinstance(data.visit_tags, str) else '[]')
+        if is_existing:
+            cur.execute("""
+                INSERT INTO july_existing_walkins
+                  (first_name, last_name, person_name, person_number, city,
+                   partner_type, visiting_reason, event_date, enquiry_time,
+                   visit_notes, submission_status, executive_id, created_by)
+                VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                RETURNING id;
+            """, (
+                f_name, l_name, full_n,
+                str(data.person_number) if data.person_number else '',
+                str(data.city) if data.city else 'Hyderabad',
+                data.partner_type or data.visitor_type or 'Driver',
+                data.visiting_reason or 'Visit',
+                data.event_date or datetime.now().strftime("%Y-%m-%d"),
+                data.enquiry_time or '10:30',
+                data.visit_notes or data.remarks or '',
+                'Submitted',
+                user_p_id, user_p_id
+            ))
+            new_id = cur.fetchone()[0]
+            conn.commit()
+            return {"success": True, "walkin_id": f"E-{new_id}", "record_type": "existing"}
 
-        cur.execute("""
-            INSERT INTO july_walkins
-              (visitor_type, event_date, enquiry_time, city, operating_place, executive_id,
-               first_name, last_name, person_name, person_number, aadhaar_number, dl_number,
-               visiting_reason, mode_of_enquiry, lead_channel, lead_channel_details,
-               referred_by_name, referred_by_phone, joined_status, submission_status, remarks,
-               aadhaar_image, dl_image, created_by, approval_status,
-               is_existing_partner, partner_type, partner_code, visit_tags, visit_notes)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-            RETURNING id;
-        """, (
-            data.visitor_type or 'Driver',
-            data.event_date or datetime.now().strftime("%Y-%m-%d"),
-            data.enquiry_time or '10:30 AM',
-            str(data.city) if data.city is not None else 'Hyderabad',
-            data.operating_place or 'Hitec City Hub',
-            user_p_id,
-            f_name,
-            l_name,
-            full_n,
-            str(data.person_number) if data.person_number else '',
-            data.aadhaar_number or '',
-            data.dl_number or '',
-            data.visiting_reason or 'Onboarding',
-            data.mode_of_enquiry or 'Walk-in / In-Person',
-            data.lead_channel or 'Direct Walk-in',
-            data.lead_channel_details or '',
-            data.referred_by_name or '',
-            data.referred_by_phone or '',
-            data.joined_status or 'Onboarding Process Initiated',
-            sub_status,
-            data.remarks or (data.visit_notes or ''),
-            data.aadhaar_image or None,
-            data.dl_image or None,
-            user_p_id,
-            'Submitted',
-            data.is_existing_partner or False,
-            data.partner_type or 'Driver',
-            data.partner_code or '',
-            tags_json,
-            data.visit_notes or data.remarks or ''
-        ))
-        walkin_id = cur.fetchone()[0]
+        else:
+            cur.execute("""
+                INSERT INTO july_new_walkins
+                  (first_name, last_name, person_name, person_number, city, operating_place,
+                   interested_position, visiting_reason, event_date, enquiry_time,
+                   dl_number, aadhaar_number, aadhaar_image, dl_image,
+                   lead_channel, lead_channel_details, referred_by_name, referred_by_phone,
+                   joined_status, remarks, submission_status, executive_id, created_by)
+                VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                RETURNING id;
+            """, (
+                f_name, l_name, full_n,
+                str(data.person_number) if data.person_number else '',
+                str(data.city) if data.city else 'Hyderabad',
+                data.operating_place or '',
+                data.visitor_type or data.partner_type or 'Driver',
+                data.visiting_reason or 'Onboarding Inquiry',
+                data.event_date or datetime.now().strftime("%Y-%m-%d"),
+                data.enquiry_time or '10:30',
+                data.dl_number or '',
+                data.aadhaar_number or '',
+                data.aadhaar_image or None,
+                data.dl_image or None,
+                data.lead_channel or 'Direct Walk-in',
+                data.lead_channel_details or '',
+                data.referred_by_name or '',
+                data.referred_by_phone or '',
+                data.joined_status or 'Onboarding Process Initiated',
+                data.remarks or '',
+                'Submitted',
+                user_p_id, user_p_id
+            ))
+            new_id = cur.fetchone()[0]
+            conn.commit()
+            return {"success": True, "walkin_id": f"N-{new_id}", "record_type": "new"}
 
-        # ── Audit log ────────────────────────────────────────────────────────
-        cur.execute("""
-            INSERT INTO july_walkin_logs
-              (walkin_id, action, old_status, new_status, changed_fields,
-               performed_by, performed_by_name)
-            VALUES (%s, 'CREATE', NULL, %s,
-                    %s, %s, %s);
-        """, (walkin_id,
-              sub_status,
-              f'{{"person_name":"{full_n}","city":"{data.city}"}}',
-              user_p_id, user_name))
-
-        conn.commit()
-        return {"success": True, "walkin_id": walkin_id}
     finally:
         postgreSQL_pool.putconn(conn)
 
@@ -2972,189 +3084,70 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
 # Walk-ins — Update
 # ─────────────────────────────────────────────────────────
 @app.put("/api/walkins/{walkin_id}")
-def update_walkin(walkin_id: int, data: WalkinData, authorization: Optional[str] = Header(None)):
+def update_walkin(walkin_id: str, data: WalkinData, authorization: Optional[str] = Header(None)):
     user = get_current_user(authorization)
-    # Resolve valid portal_user_id — fallback login users may only have user_id (copy_app_users.id)
     user_p_id = user.get("portal_user_id")
-    user_name = user.get("name") or user.get("username") or "Unknown"
-
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-
-        # If portal_user_id is missing, try resolving via username in july_portal_users
-        if not user_p_id:
-            username = user.get("username") or ""
-            cur.execute(
-                "SELECT portal_user_id FROM july_portal_users WHERE username = %s LIMIT 1;",
-                (username,)
-            )
-            row = cur.fetchone()
-            if row:
-                user_p_id = row[0]
-
-        # Verify user_p_id exists in july_portal_users for FK constraint
-        if user_p_id:
-            cur.execute("SELECT 1 FROM july_portal_users WHERE portal_user_id = %s;", (user_p_id,))
-            if not cur.fetchone():
-                user_p_id = None
-
-
         f_name = (data.first_name or "").strip()
         l_name = (data.last_name or "").strip()
         full_n = (data.person_name or f"{f_name} {l_name}").strip()
-        sub_status = data.submission_status or ('Draft' if data.joined_status == 'Draft' else 'Submitted')
 
-        # Capture old record before update to calculate exact diffs
-        cur.execute("""
-            SELECT visitor_type, event_date, enquiry_time, city, operating_place,
-                   first_name, last_name, person_name, person_number, aadhaar_number, dl_number,
-                   visiting_reason, mode_of_enquiry, lead_channel, lead_channel_details,
-                   referred_by_name, referred_by_phone, joined_status, remarks, submission_status
-            FROM july_walkins WHERE id=%s;
-        """, (walkin_id,))
-        old_row = cur.fetchone()
-        old_data = {}
-        old_status = None
-        if old_row:
-            old_status = old_row[17]
-            old_data = {
-                "visitor_type": old_row[0], "event_date": old_row[1], "enquiry_time": old_row[2],
-                "city": old_row[3], "operating_place": old_row[4], "first_name": old_row[5],
-                "last_name": old_row[6], "person_name": old_row[7], "person_number": old_row[8],
-                "aadhaar_number": old_row[9], "dl_number": old_row[10], "visiting_reason": old_row[11],
-                "mode_of_enquiry": old_row[12], "lead_channel": old_row[13], "lead_channel_details": old_row[14],
-                "referred_by_name": old_row[15], "referred_by_phone": old_row[16], "joined_status": old_row[17],
-                "remarks": old_row[18], "submission_status": old_row[19]
-            }
+        if str(walkin_id).startswith("E-"):
+            raw_id = int(walkin_id[2:])
+            cur.execute("""
+                UPDATE july_existing_walkins SET
+                    first_name=%s, last_name=%s, person_name=%s, person_number=%s,
+                    city=%s, partner_type=%s, visiting_reason=%s, event_date=%s,
+                    enquiry_time=%s, visit_notes=%s, updated_at=NOW(), updated_by=%s
+                WHERE id=%s;
+            """, (f_name, l_name, full_n, data.person_number, data.city, data.partner_type, data.visiting_reason, data.event_date, data.enquiry_time, data.visit_notes, user_p_id, raw_id))
 
-        cur.execute("""
-            UPDATE july_walkins SET
-                visitor_type=%s, event_date=%s, enquiry_time=%s, city=%s, operating_place=%s,
-                first_name=%s, last_name=%s, person_name=%s, person_number=%s,
-                aadhaar_number=%s, dl_number=%s, visiting_reason=%s, mode_of_enquiry=%s,
-                lead_channel=%s, lead_channel_details=%s, referred_by_name=%s, referred_by_phone=%s,
-                joined_status=%s, submission_status=%s, remarks=%s,
-                aadhaar_image=COALESCE(%s, aadhaar_image), dl_image=COALESCE(%s, dl_image),
-                updated_by=%s, updated_at=NOW()
-            WHERE id=%s;
-        """, (
-            data.visitor_type,
-            data.event_date,
-            data.enquiry_time,
-            str(data.city) if data.city is not None else 'Hyderabad',
-            data.operating_place,
-            f_name,
-            l_name,
-            full_n,
-            str(data.person_number) if data.person_number else '',
-            data.aadhaar_number,
-            data.dl_number,
-            data.visiting_reason,
-            data.mode_of_enquiry,
-            data.lead_channel,
-            data.lead_channel_details,
-            data.referred_by_name,
-            data.referred_by_phone,
-            data.joined_status or 'Onboarding Process Initiated',
-            sub_status,
-            data.remarks,
-            data.aadhaar_image,
-            data.dl_image,
-            user_p_id,
-            walkin_id
-        ))
+        elif str(walkin_id).startswith("N-"):
+            raw_id = int(walkin_id[2:])
+            cur.execute("""
+                UPDATE july_new_walkins SET
+                    first_name=%s, last_name=%s, person_name=%s, person_number=%s,
+                    city=%s, operating_place=%s, interested_position=%s, visiting_reason=%s,
+                    event_date=%s, enquiry_time=%s, dl_number=%s, aadhaar_number=%s,
+                    lead_channel=%s, lead_channel_details=%s, joined_status=%s, remarks=%s,
+                    updated_at=NOW(), updated_by=%s
+                WHERE id=%s;
+            """, (f_name, l_name, full_n, data.person_number, data.city, data.operating_place, data.visitor_type, data.visiting_reason, data.event_date, data.enquiry_time, data.dl_number, data.aadhaar_number, data.lead_channel, data.lead_channel_details, data.joined_status, data.remarks, user_p_id, raw_id))
 
-        # Calculate exact changed fields for audit log
-        new_data_map = {
-            "visitor_type": data.visitor_type, "event_date": data.event_date, "enquiry_time": data.enquiry_time,
-            "city": str(data.city) if data.city is not None else 'Hyderabad', "operating_place": data.operating_place,
-            "first_name": f_name, "last_name": l_name, "person_name": full_n,
-            "person_number": str(data.person_number) if data.person_number else '',
-            "aadhaar_number": data.aadhaar_number, "dl_number": data.dl_number,
-            "visiting_reason": data.visiting_reason, "mode_of_enquiry": data.mode_of_enquiry,
-            "lead_channel": data.lead_channel, "lead_channel_details": data.lead_channel_details,
-            "referred_by_name": data.referred_by_name, "referred_by_phone": data.referred_by_phone,
-            "joined_status": data.joined_status or 'Onboarding Process Initiated',
-            "submission_status": sub_status,
-            "remarks": data.remarks
-        }
-        
-        diffs = {}
-        for k, new_v in new_data_map.items():
-            old_v = old_data.get(k)
-            if old_v != new_v and not (not old_v and not new_v):
-                diffs[k] = {"old": old_v, "new": new_v}
-
-        changed_json = json.dumps(diffs) if diffs else json.dumps({"person_name": full_n})
-
-        # Full row snapshots for previous_data and new_data
-        new_data_snapshot = {
-            "visitor_type": data.visitor_type, "event_date": data.event_date,
-            "enquiry_time": data.enquiry_time,
-            "city": str(data.city) if data.city is not None else 'Hyderabad',
-            "operating_place": data.operating_place, "first_name": f_name,
-            "last_name": l_name, "person_name": full_n,
-            "person_number": str(data.person_number) if data.person_number else '',
-            "aadhaar_number": data.aadhaar_number, "dl_number": data.dl_number,
-            "visiting_reason": data.visiting_reason, "mode_of_enquiry": data.mode_of_enquiry,
-            "lead_channel": data.lead_channel, "lead_channel_details": data.lead_channel_details,
-            "referred_by_name": data.referred_by_name, "referred_by_phone": data.referred_by_phone,
-            "joined_status": data.joined_status or 'Onboarding Process Initiated',
-            "submission_status": sub_status,
-            "remarks": data.remarks,
-            "updated_by": user_p_id
-        }
-
-        # ── Audit log ────────────────────────────────────────────────────────
-        action = 'UPDATE'
-        cur.execute("""
-            INSERT INTO july_walkin_logs
-              (walkin_id, action, old_status, new_status, changed_fields,
-               previous_data, new_data,
-               performed_by, performed_by_name)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
-        """, (walkin_id, action, old_status, data.joined_status,
-              changed_json,
-              json.dumps(old_data),
-              json.dumps(new_data_snapshot),
-              user_p_id, user_name))
+        else:
+            raw_id = int(walkin_id)
+            cur.execute("""
+                UPDATE july_walkins SET
+                    first_name=%s, last_name=%s, person_name=%s, person_number=%s,
+                    city=%s, visiting_reason=%s, updated_at=NOW()
+                WHERE id=%s;
+            """, (f_name, l_name, full_n, data.person_number, data.city, data.visiting_reason, raw_id))
 
         conn.commit()
         return {"success": True}
     finally:
         postgreSQL_pool.putconn(conn)
 
+
 # ─────────────────────────────────────────────────────────
 # Walk-ins — Delete
 # ─────────────────────────────────────────────────────────
 @app.delete("/api/walkins/{walkin_id}")
-def delete_walkin(walkin_id: int, authorization: Optional[str] = Header(None)):
-    user = get_current_user(authorization)
-    user_p_id = user.get("portal_user_id") or user.get("user_id") or 1
-    user_name = user.get("name") or user.get("username") or "Unknown"
+def delete_walkin(walkin_id: str, authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        # Capture name before delete for log
-        cur.execute("SELECT person_name, joined_status FROM july_walkins WHERE id = %s;", (walkin_id,))
-        old = cur.fetchone()
-        if not old:
-            raise HTTPException(status_code=404, detail="Walkin record not found")
-        old_name, old_status = old
-
-        # Write log BEFORE delete (so walkin_id still exists for reference)
-        cur.execute("""
-            INSERT INTO july_walkin_logs
-              (walkin_id, action, old_status, new_status, changed_fields,
-               performed_by, performed_by_name)
-            VALUES (%s, 'DELETE', %s, 'DELETED',
-                    %s, %s, %s);
-        """, (walkin_id, old_status,
-              f'{{"person_name":"{old_name}"}}',
-              user_p_id, user_name))
-
-        cur.execute("DELETE FROM july_walkins WHERE id = %s;", (walkin_id,))
+        if str(walkin_id).startswith("E-"):
+            raw_id = int(walkin_id[2:])
+            cur.execute("DELETE FROM july_existing_walkins WHERE id = %s;", (raw_id,))
+        elif str(walkin_id).startswith("N-"):
+            raw_id = int(walkin_id[2:])
+            cur.execute("DELETE FROM july_new_walkins WHERE id = %s;", (raw_id,))
+        else:
+            raw_id = int(walkin_id)
+            cur.execute("DELETE FROM july_walkins WHERE id = %s;", (raw_id,))
         conn.commit()
         return {"success": True}
     finally:

@@ -451,6 +451,7 @@ export default function WalkInForm({
       submission_status: isDraft ? "Draft" : "Submitted",
       remarks: visitNotes.trim() || remarks.trim() || undefined,
       is_existing_partner: isExistingPartner,
+      record_type: isExistingPartner ? 'existing' : 'new',
       partner_type: partnerType,
       partner_code: partnerCode,
       visit_tags: selectedTags,
@@ -612,6 +613,7 @@ export default function WalkInForm({
     // Python booleans serialize as "True"/"False" strings, not JSON true/false
     const rawFlag = record.is_existing_partner;
     const isExisting = Boolean(
+      record.record_type === 'existing' ||
       rawFlag === true ||
       rawFlag === "True" ||
       rawFlag === "true" ||
@@ -1306,14 +1308,19 @@ export default function WalkInForm({
 
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/50 transition-colors text-[11px] font-sans">
-                            <td className="px-4 py-3 font-mono font-bold text-slate-900">#{r.id}</td>
+                            <td className="px-4 py-3 font-mono font-bold text-slate-900">{r.id.startsWith?.('N-') || r.id.startsWith?.('E-') ? r.id : `#${r.id}`}</td>
                             <td className="px-4 py-3 font-bold text-slate-900">
                               {r.first_name ? `${r.first_name} ${r.last_name}`.trim() : (r.person_name || 'N/A')}
                             </td>
                             <td className="px-4 py-3 font-bold text-slate-700">{normalizeCity(r.city || r.city_name)}</td>
                             <td className="px-4 py-3 font-semibold text-slate-800">{r.person_number || 'N/A'}</td>
                             <td className="px-4 py-3">
-                              <span className="inline-block rounded-md px-2 py-0.5 text-[10px] font-bold bg-slate-100 text-slate-700">{r.visitor_type}</span>
+                              <div className="flex flex-col gap-0.5">
+                                <span className="font-semibold text-slate-800">{r.visitor_type}</span>
+                                <span className={`text-[9px] font-extrabold px-1.5 py-0.2 rounded w-max ${r.record_type === 'existing' ? 'bg-amber-100 text-amber-800' : 'bg-emerald-100 text-emerald-800'}`}>
+                                  {r.record_type === 'existing' ? 'Existing Partner' : 'New Walk-In'}
+                                </span>
+                              </div>
                             </td>
                             <td className="px-4 py-3">
                               <div className="font-bold text-slate-900">{r.executive_name}</div>
