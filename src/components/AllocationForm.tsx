@@ -671,9 +671,9 @@ export default function AllocationForm({
               <form onSubmit={(e) => handleSubmit(e, "Submitted")} className="p-8 space-y-10">
                 
                 {/* 3 COLUMN DETAILS GRID */}
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                   
-                  {/* COLUMN 1: TRANSACTION & ALLOCATION DETAILS */}
+                  {/* COLUMN 1: ALLOCATION DETAILS */}
                   <div className="space-y-6">
                     <div className="border-b border-border pb-3">
                       <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
@@ -684,7 +684,7 @@ export default function AllocationForm({
 
                     <div className="space-y-4">
                       <div>
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-2">Transaction Type <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Transaction Type <span className="text-red-500">*</span></label>
                         <select
                           value={transactionType}
                           onChange={(e) => setTransactionType(e.target.value as any)}
@@ -699,7 +699,7 @@ export default function AllocationForm({
                       </div>
 
                       <div>
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-2">Date of Allocation <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Date of Allocation <span className="text-red-500">*</span></label>
                         <input 
                           type="date" 
                           value={allocationDate}
@@ -710,7 +710,7 @@ export default function AllocationForm({
                       </div>
 
                       <div>
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-2">Operating City <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Operating City <span className="text-red-500">*</span></label>
                         <select 
                           value={cityName}
                           onChange={(e) => setCityName(e.target.value)}
@@ -725,7 +725,7 @@ export default function AllocationForm({
                     </div>
                   </div>
 
-                  {/* COLUMN 2: DRIVER INFORMATION (FETCH SUPPORTED) */}
+                  {/* COLUMN 2: DRIVER INFORMATION */}
                   <div className="space-y-6">
                     <div className="border-b border-border pb-3 flex items-center justify-between">
                       <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
@@ -832,46 +832,6 @@ export default function AllocationForm({
                           <option value="Salary Model">Salary Model</option>
                         </select>
                       </div>
-
-                      {/* OLA Negative Balance & Proof */}
-                      <div>
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">OLA Negative Balance (₹)</label>
-                        <input 
-                          type="number"
-                          placeholder="e.g. 1500 (if any)..."
-                          value={olaNegativeBalance}
-                          onChange={(e) => setOlaNegativeBalance(e.target.value)}
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs font-semibold"
-                        />
-                      </div>
-
-                      {/* OLA Balance Proof Photo */}
-                      <div>
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">OLA Balance Proof Photo</label>
-                        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
-                          {olaNegativeBalanceProof ? (
-                            <div className="relative flex items-center justify-center bg-white rounded-lg p-1">
-                              <img src={olaNegativeBalanceProof} alt="OLA Balance Proof" className="max-h-24 object-contain rounded" />
-                              <button type="button" onClick={() => setOlaNegativeBalanceProof(null)} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 cursor-pointer"><X className="h-3.5 w-3.5" /></button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <button type="button" onClick={() => setActiveCameraTarget("olaProof")} className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-primary text-white text-xs font-bold py-2 hover:bg-primary-dark cursor-pointer transition-colors"><Camera className="h-3.5 w-3.5" /> Capture</button>
-                              <label className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-xs font-bold py-2 hover:bg-slate-100 cursor-pointer transition-colors">
-                                <Upload className="h-3.5 w-3.5 text-primary" /> Upload
-                                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    const r = new FileReader();
-                                    r.onloadend = () => { if (typeof r.result === "string") setOlaNegativeBalanceProof(r.result); };
-                                    r.readAsDataURL(file);
-                                  }
-                                }} />
-                              </label>
-                            </div>
-                          )}
-                        </div>
-                      </div>
                     </div>
                   </div>
 
@@ -955,59 +915,103 @@ export default function AllocationForm({
                         </select>
                       </div>
 
-                      {/* Meter & Battery Photo Upload Grid */}
-                      <div className="grid grid-cols-2 gap-3 pt-2">
-                        <div className="flex flex-col gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
-                          <span className="font-sans text-[11px] font-bold text-slate-800 text-center">Odometer Photo *</span>
-                          {odometerPhoto ? (
-                            <div className="relative flex items-center justify-center bg-white rounded-lg p-1">
-                              <img src={odometerPhoto} alt="Odometer" className="max-h-20 object-contain rounded" />
-                              <button type="button" onClick={() => setOdometerPhoto(null)} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 cursor-pointer"><X className="h-3 w-3" /></button>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col gap-1.5 items-center justify-center p-2 bg-white rounded-lg border border-slate-200">
-                              <button type="button" onClick={() => setActiveCameraTarget("odometer")} className="w-full flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-bold py-1.5 hover:bg-primary-dark cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
-                              <label className="w-full flex items-center justify-center gap-1 rounded border border-slate-300 bg-white text-slate-700 text-[10px] font-bold py-1.5 hover:bg-slate-100 cursor-pointer">
-                                <Upload className="h-3 w-3 text-primary" /> Upload
-                                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    const r = new FileReader();
-                                    r.onloadend = () => { if (typeof r.result === "string") setOdometerPhoto(r.result); };
-                                    r.readAsDataURL(file);
-                                  }
-                                }} />
-                              </label>
-                            </div>
-                          )}
-                        </div>
-
-                        <div className="flex flex-col gap-1.5 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3">
-                          <span className="font-sans text-[11px] font-bold text-slate-800 text-center">Battery Photo *</span>
-                          {batteryPhoto ? (
-                            <div className="relative flex items-center justify-center bg-white rounded-lg p-1">
-                              <img src={batteryPhoto} alt="Battery" className="max-h-20 object-contain rounded" />
-                              <button type="button" onClick={() => setBatteryPhoto(null)} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 cursor-pointer"><X className="h-3 w-3" /></button>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col gap-1.5 items-center justify-center p-2 bg-white rounded-lg border border-slate-200">
-                              <button type="button" onClick={() => setActiveCameraTarget("battery")} className="w-full flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-bold py-1.5 hover:bg-primary-dark cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
-                              <label className="w-full flex items-center justify-center gap-1 rounded border border-slate-300 bg-white text-slate-700 text-[10px] font-bold py-1.5 hover:bg-slate-100 cursor-pointer">
-                                <Upload className="h-3 w-3 text-primary" /> Upload
-                                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                                  const file = e.target.files?.[0];
-                                  if (file) {
-                                    const r = new FileReader();
-                                    r.onloadend = () => { if (typeof r.result === "string") setBatteryPhoto(r.result); };
-                                    r.readAsDataURL(file);
-                                  }
-                                }} />
-                              </label>
-                            </div>
-                          )}
-                        </div>
+                      <div>
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">OLA Negative Balance (₹)</label>
+                        <input 
+                          type="number"
+                          placeholder="e.g. 1500 (if any)..."
+                          value={olaNegativeBalance}
+                          onChange={(e) => setOlaNegativeBalance(e.target.value)}
+                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs font-semibold"
+                        />
                       </div>
                     </div>
+                  </div>
+                </div>
+
+                {/* DEDICATED PROOF & METER PHOTOS GRID BAR */}
+                <div className="border-t border-border pt-8">
+                  <h4 className="font-sans text-xs font-bold text-slate-700 mb-3 tracking-wide uppercase">Handover Proof &amp; Meter Verification Photos</h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    
+                    {/* Odometer Photo Card */}
+                    <div className="flex flex-col gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-4 shadow-2xs">
+                      <span className="font-sans text-xs font-bold text-slate-800 text-center">Odometer Photo <span className="text-red-500">*</span></span>
+                      {odometerPhoto ? (
+                        <div className="relative flex items-center justify-center bg-white rounded-xl p-2 border border-slate-200">
+                          <img src={odometerPhoto} alt="Odometer" className="max-h-24 object-contain rounded-lg" />
+                          <button type="button" onClick={() => setOdometerPhoto(null)} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 cursor-pointer shadow-xs"><X className="h-3.5 w-3.5" /></button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2 pt-1">
+                          <button type="button" onClick={() => setActiveCameraTarget("odometer")} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-primary text-white text-xs font-bold py-2 hover:bg-primary-dark cursor-pointer transition-colors shadow-xs"><Camera className="h-3.5 w-3.5" /> Capture</button>
+                          <label className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-bold py-2 hover:bg-slate-100 cursor-pointer transition-colors shadow-2xs">
+                            <Upload className="h-3.5 w-3.5 text-primary" /> Upload
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const r = new FileReader();
+                                r.onloadend = () => { if (typeof r.result === "string") setOdometerPhoto(r.result); };
+                                r.readAsDataURL(file);
+                              }
+                            }} />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Battery Photo Card */}
+                    <div className="flex flex-col gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-4 shadow-2xs">
+                      <span className="font-sans text-xs font-bold text-slate-800 text-center">Battery Photo <span className="text-red-500">*</span></span>
+                      {batteryPhoto ? (
+                        <div className="relative flex items-center justify-center bg-white rounded-xl p-2 border border-slate-200">
+                          <img src={batteryPhoto} alt="Battery" className="max-h-24 object-contain rounded-lg" />
+                          <button type="button" onClick={() => setBatteryPhoto(null)} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 cursor-pointer shadow-xs"><X className="h-3.5 w-3.5" /></button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2 pt-1">
+                          <button type="button" onClick={() => setActiveCameraTarget("battery")} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-primary text-white text-xs font-bold py-2 hover:bg-primary-dark cursor-pointer transition-colors shadow-xs"><Camera className="h-3.5 w-3.5" /> Capture</button>
+                          <label className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-bold py-2 hover:bg-slate-100 cursor-pointer transition-colors shadow-2xs">
+                            <Upload className="h-3.5 w-3.5 text-primary" /> Upload
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const r = new FileReader();
+                                r.onloadend = () => { if (typeof r.result === "string") setBatteryPhoto(r.result); };
+                                r.readAsDataURL(file);
+                              }
+                            }} />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* OLA Balance Proof Photo Card */}
+                    <div className="flex flex-col gap-2 rounded-2xl border border-dashed border-slate-300 bg-slate-50/70 p-4 shadow-2xs">
+                      <span className="font-sans text-xs font-bold text-slate-800 text-center">OLA Balance Proof Photo</span>
+                      {olaNegativeBalanceProof ? (
+                        <div className="relative flex items-center justify-center bg-white rounded-xl p-2 border border-slate-200">
+                          <img src={olaNegativeBalanceProof} alt="OLA Balance Proof" className="max-h-24 object-contain rounded-lg" />
+                          <button type="button" onClick={() => setOlaNegativeBalanceProof(null)} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 cursor-pointer shadow-xs"><X className="h-3.5 w-3.5" /></button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2 pt-1">
+                          <button type="button" onClick={() => setActiveCameraTarget("olaProof")} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-primary text-white text-xs font-bold py-2 hover:bg-primary-dark cursor-pointer transition-colors shadow-xs"><Camera className="h-3.5 w-3.5" /> Capture</button>
+                          <label className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-slate-700 text-xs font-bold py-2 hover:bg-slate-100 cursor-pointer transition-colors shadow-2xs">
+                            <Upload className="h-3.5 w-3.5 text-primary" /> Upload
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                const r = new FileReader();
+                                r.onloadend = () => { if (typeof r.result === "string") setOlaNegativeBalanceProof(r.result); };
+                                r.readAsDataURL(file);
+                              }
+                            }} />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+
                   </div>
                 </div>
 
