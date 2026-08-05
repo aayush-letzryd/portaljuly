@@ -664,8 +664,8 @@ export default function WalkInForm({
               onClick={onBackToSelector}
             />
             <span className="hidden h-5 border-l border-border sm:inline-block" />
-            <span className="hidden font-sans text-xs font-medium text-text-muted sm:inline-block">
-              Lead Generation
+            <span className="hidden font-sans text-xs font-semibold text-slate-700 sm:inline-block">
+              Walk-In Form
             </span>
           </div>
 
