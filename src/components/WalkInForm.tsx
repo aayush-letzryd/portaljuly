@@ -793,17 +793,17 @@ export default function WalkInForm({
                 </div>
 
                 {fetchBannerMsg && (
-                  <div className="bg-emerald-50/90 border border-emerald-300 rounded-xl p-4 flex flex-col gap-3 shadow-xs">
+                  <div className="bg-emerald-50/90 border border-emerald-200 rounded-xl p-4 flex flex-col gap-3 shadow-xs">
                     <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                       <div className="flex items-center gap-2">
-                        <ShieldCheck className="w-5 h-5 text-emerald-600 shrink-0" />
-                        <span className="text-xs font-bold text-slate-900">{fetchBannerMsg}</span>
+                        <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                        <span className="text-xs font-semibold text-slate-800">{fetchBannerMsg}</span>
                       </div>
                       {candidateHistory.length > 0 && (
                         <button
                           type="button"
                           onClick={() => setShowHistoryModal(!showHistoryModal)}
-                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
+                          className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-lg transition-all cursor-pointer flex items-center gap-1.5 shrink-0"
                         >
                           <Clock className="w-3.5 h-3.5" />
                           {showHistoryModal ? "Hide Prior Visits" : `View ${candidateHistory.length} Prior Visit${candidateHistory.length > 1 ? 's' : ''}`}
@@ -813,19 +813,19 @@ export default function WalkInForm({
 
                     {showHistoryModal && candidateHistory.length > 0 && (
                       <div className="mt-2 border-t border-emerald-200 pt-3 flex flex-col gap-2">
-                        <span className="text-[11px] font-extrabold text-emerald-900 uppercase tracking-wider">Candidate Visit History Log</span>
+                        <span className="text-xs font-bold text-slate-800 uppercase tracking-wider">Candidate Visit History Log</span>
                         <div className="grid grid-cols-1 gap-2 max-h-48 overflow-y-auto pr-1">
                           {candidateHistory.map((v, idx) => (
                             <div key={v.id || idx} className="bg-white p-3 rounded-lg border border-emerald-200/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
                               <div className="flex flex-col gap-0.5">
                                 <div className="flex items-center gap-2">
-                                  <span className="font-bold text-slate-900">Visit #{candidateHistory.length - idx} (ID: #{v.id})</span>
-                                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-700">{v.visiting_reason || 'Enquiry'}</span>
-                                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${v.joined_status === 'Successfully Onboarded' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{v.joined_status}</span>
+                                  <span className="font-semibold text-slate-800">Visit #{candidateHistory.length - idx} (ID: #{v.id})</span>
+                                  <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-slate-100 text-slate-700">{v.visiting_reason || 'Enquiry'}</span>
+                                  <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${v.joined_status === 'Successfully Onboarded' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'}`}>{v.joined_status}</span>
                                 </div>
-                                <span className="text-[11px] text-slate-500">Date: {v.event_date || v.created_at?.slice(0, 10)} | City: {v.city} | Exec: {v.executive_name || 'Executive'}</span>
+                                <span className="text-xs text-slate-500">Date: {v.event_date || v.created_at?.slice(0, 10)} | City: {v.city} | Exec: {v.executive_name || 'Executive'}</span>
                               </div>
-                              {v.remarks && <span className="text-[11px] text-slate-600 italic bg-slate-50 px-2 py-1 rounded max-w-xs truncate">"{v.remarks}"</span>}
+                              {v.remarks && <span className="text-xs text-slate-600 bg-slate-50 px-2 py-1 rounded max-w-xs truncate">"{v.remarks}"</span>}
                             </div>
                           ))}
                         </div>
@@ -845,7 +845,7 @@ export default function WalkInForm({
                     </h3>
                   </div>
                   {isExistingPartner && (
-                    <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-extrabold text-[10px] rounded-full uppercase tracking-wider">
+                    <span className="px-2.5 py-1 bg-emerald-100 text-emerald-800 font-semibold text-xs rounded-lg border border-emerald-200">
                       Active Partner Mode (KYC Suppressed)
                     </span>
                   )}
@@ -1090,73 +1090,84 @@ export default function WalkInForm({
                     <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-white font-bold text-xs">4</div>
                     <h3 className="font-sans text-xs font-bold text-slate-800 uppercase tracking-wider">Classifications & Outcome</h3>
                  </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                  
-                 <div className="flex flex-col gap-4">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex flex-col gap-1.5">
-                        <label className="font-sans text-xs font-semibold text-slate-700">Interested Position</label>
-                        <select value={interestedPosition} onChange={(e) => setInterestedPosition(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer">
-                          <option value="Driver">Driver</option>
-                          <option value="Operator">Operator</option>
-                          <option value="Enquiry">Enquiry</option>
-                        </select>
-                      </div>
-                      
-                      <div className="flex flex-col gap-1.5">
-                        <label className="font-sans text-xs font-semibold text-slate-700">Lead Channel *</label>
-                        <select
-                          required
-                          value={leadChannel}
-                          onChange={(e) => {
-                            setLeadChannel(e.target.value);
-                            setLeadSource(e.target.value);
-                          }}
-                          className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer"
-                        >
-                          <option value="Direct Walk-in">Direct Walk-in</option>
-                          <option value="Telecaller">Telecaller</option>
-                          <option value="FSE">FSE</option>
-                          <option value="Vendor">Vendor</option>
-                          <option value="Driver Referral">Driver Referral</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-1.5">
-                      <label className="font-sans text-xs font-semibold text-slate-700">
-                        Lead Channel Name / Details *
-                      </label>
-                      <input
-                        type="text"
-                        required
-                        value={leadChannelDetails}
-                        onChange={(e) => setLeadChannelDetails(e.target.value)}
-                        placeholder={
-                          leadChannel === "Direct Walk-in" ? "Enter Walk-in Location / Branch / Hub / Notes" :
-                          leadChannel === "Telecaller" ? "Enter Telecaller Name / Agent ID" :
-                          leadChannel === "FSE" ? "Enter FSE Name / Agent ID" :
-                          leadChannel === "Vendor" ? "Enter Vendor / Partner Agency Name" :
-                          leadChannel === "Driver Referral" ? "Enter Referrer Driver Details (Name / ID / Phone)" :
-                          "Enter Lead Channel Details"
-                        }
-                        className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal"
-                      />
-                    </div>
-
-                    {leadChannel === "Driver Referral" && (
+                 <div className={`grid grid-cols-1 ${isExistingPartner ? 'md:grid-cols-2' : 'md:grid-cols-2'} gap-6`}>
+                 
+                 {!isExistingPartner ? (
+                   <div className="flex flex-col gap-4">
                       <div className="grid grid-cols-2 gap-4">
                         <div className="flex flex-col gap-1.5">
-                          <label className="font-sans text-xs font-semibold text-slate-700">Referred By (Name) *</label>
-                          <input type="text" required value={referredByName} onChange={(e) => setReferredByName(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal" placeholder="Referrer Name" />
+                          <label className="font-sans text-xs font-semibold text-slate-700">Interested Position</label>
+                          <select value={interestedPosition} onChange={(e) => setInterestedPosition(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer">
+                            <option value="Driver">Driver</option>
+                            <option value="Operator">Operator</option>
+                            <option value="Enquiry">Enquiry</option>
+                          </select>
                         </div>
+                        
                         <div className="flex flex-col gap-1.5">
-                          <label className="font-sans text-xs font-semibold text-slate-700">Referred By (Phone) *</label>
-                          <input type="tel" required value={referredByPhone} onChange={(e) => setReferredByPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal" placeholder="10-digit Phone" />
+                          <label className="font-sans text-xs font-semibold text-slate-700">Lead Channel *</label>
+                          <select
+                            required
+                            value={leadChannel}
+                            onChange={(e) => {
+                              setLeadChannel(e.target.value);
+                              setLeadSource(e.target.value);
+                            }}
+                            className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer"
+                          >
+                            <option value="Direct Walk-in">Direct Walk-in</option>
+                            <option value="Telecaller">Telecaller</option>
+                            <option value="FSE">FSE</option>
+                            <option value="Vendor">Vendor</option>
+                            <option value="Driver Referral">Driver Referral</option>
+                          </select>
                         </div>
                       </div>
-                    )}
-                 </div>
+
+                      <div className="flex flex-col gap-1.5">
+                        <label className="font-sans text-xs font-semibold text-slate-700">
+                          Lead Channel Name / Details *
+                        </label>
+                        <input
+                          type="text"
+                          required
+                          value={leadChannelDetails}
+                          onChange={(e) => setLeadChannelDetails(e.target.value)}
+                          placeholder={
+                            leadChannel === "Direct Walk-in" ? "Enter Walk-in Location / Branch / Hub / Notes" :
+                            leadChannel === "Telecaller" ? "Enter Telecaller Name / Agent ID" :
+                            leadChannel === "FSE" ? "Enter FSE Name / Agent ID" :
+                            leadChannel === "Vendor" ? "Enter Vendor / Partner Agency Name" :
+                            leadChannel === "Driver Referral" ? "Enter Referrer Driver Details (Name / ID / Phone)" :
+                            "Enter Lead Channel Details"
+                          }
+                          className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal"
+                        />
+                      </div>
+
+                      {leadChannel === "Driver Referral" && (
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="flex flex-col gap-1.5">
+                            <label className="font-sans text-xs font-semibold text-slate-700">Referred By (Name) *</label>
+                            <input type="text" required value={referredByName} onChange={(e) => setReferredByName(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal" placeholder="Referrer Name" />
+                          </div>
+                          <div className="flex flex-col gap-1.5">
+                            <label className="font-sans text-xs font-semibold text-slate-700">Referred By (Phone) *</label>
+                            <input type="tel" required value={referredByPhone} onChange={(e) => setReferredByPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal" placeholder="10-digit Phone" />
+                          </div>
+                        </div>
+                      )}
+                   </div>
+                 ) : (
+                   <div className="flex flex-col justify-center p-4 bg-emerald-50/70 border border-emerald-200 rounded-xl gap-1">
+                     <div className="flex items-center gap-2 text-xs font-semibold text-slate-800">
+                       <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                       <span>Existing Partner / Candidate Visit Logger</span>
+                     </div>
+                     <p className="text-xs text-slate-600">Initial recruitment acquisition channels are suppressed for existing records.</p>
+                   </div>
+                 )}
 
                  <div className="flex flex-col gap-4">
                     <div className="flex flex-col gap-1.5">
