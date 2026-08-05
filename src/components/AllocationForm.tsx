@@ -1187,36 +1187,6 @@ export default function AllocationForm({
         {/* TAB 1.5: SAVED DRAFTS */}
         {activeTab === "drafts" && (
           <div className="space-y-6">
-            
-            {/* Bento Grid Metrics for Drafts */}
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              <div className="rounded-xl border border-amber-200 bg-amber-50/40 p-5 shadow-xs flex justify-between items-center">
-                <div className="flex flex-col">
-                  <span className="font-sans text-[10px] font-bold text-amber-800 uppercase tracking-wider">Total Saved Drafts</span>
-                  <span className="font-sans text-3xl font-extrabold text-amber-700 mt-1">
-                    {records.filter(r => r.status === "Draft").length}
-                  </span>
-                  <span className="font-sans text-[10px] text-amber-600 mt-1">Unsent allocation forms saved locally</span>
-                </div>
-                <div className="rounded-xl bg-amber-100 text-amber-700 p-3">
-                  <Clock className="h-6 w-6" />
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-border bg-white p-5 shadow-xs flex justify-between items-center">
-                <div className="flex flex-col">
-                  <span className="font-sans text-[10px] font-bold text-text-dim uppercase tracking-wider">In Progress Allocations</span>
-                  <span className="font-sans text-3xl font-extrabold text-primary mt-1">
-                    {records.filter(r => r.status === "Draft").length}
-                  </span>
-                  <span className="font-sans text-[10px] text-text-muted mt-1">Saved as draft entries</span>
-                </div>
-                <div className="rounded-xl bg-blue-50 text-primary p-3">
-                  <Settings className="h-6 w-6" />
-                </div>
-              </div>
-            </div>
-
             {/* Drafts List Table */}
             <div className="bg-surface rounded-2xl shadow-sm border border-border/60 overflow-hidden relative">
               <div className="bg-white p-6 border-b border-border/40 flex justify-between items-center">
