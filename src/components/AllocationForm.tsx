@@ -1446,21 +1446,26 @@ export default function AllocationForm({
 
               {/* TABLE CONTAINER */}
               <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+                <table className="w-full text-left border-collapse whitespace-nowrap">
                   <thead>
                     <tr className="bg-slate-50 border-b border-border/60">
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider w-16">ID</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Driver Details</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Allocation Details</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Plan &amp; Vehicle</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Odometer Details</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center w-24">Action</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">ID</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Driver Name</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Driver ID</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Phone Number</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">City</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Car Allocated</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Allocation Type</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Plan</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Date</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Odometer</th>
+                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
                     {filteredRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={6} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50 text-[11px]">
+                        <td colSpan={11} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50 text-[11px]">
                           No matching allocation records found in the database.
                         </td>
                       </tr>
@@ -1469,37 +1474,25 @@ export default function AllocationForm({
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
                             <td className="px-4 py-3.5 font-mono text-xs font-bold text-slate-700">#{r.id}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-900">{r.driver_name || "-"}</td>
+                            <td className="px-4 py-3.5 font-mono text-xs text-slate-600">{r.driver_id || "-"}</td>
+                            <td className="px-4 py-3.5 font-mono text-xs text-slate-600">{r.driver_phone || "-"}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-800">{r.city_name || "-"}</td>
+                            <td className="px-4 py-3.5 font-mono text-xs font-bold text-slate-900">{r.vehicle_number || "-"}</td>
                             <td className="px-4 py-3.5">
-                              <div className="font-sans text-xs font-semibold text-slate-900">{r.driver_name}</div>
-                              <div className="font-sans text-[11px] text-slate-500 mt-0.5">ID: {r.driver_id} · {r.driver_phone}</div>
+                              <span className={`inline-block rounded px-2.5 py-1 font-sans text-[10px] font-bold ${ 
+                                (r.allocation_type === "New allocation" || r.allocation_type === "New Allocation") ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : 
+                                r.allocation_type === "Reallocation" ? "bg-indigo-50 text-indigo-700 border border-indigo-200" : 
+                                (r.allocation_type === "Swap" || r.allocation_type === "Car Swap") ? "bg-amber-50 text-amber-700 border border-amber-200" : 
+                                "bg-slate-100 text-slate-700 border border-slate-200" 
+                              }`}>
+                                {r.allocation_type || "Allocation"}
+                              </span>
                             </td>
-                            <td className="px-4 py-3.5">
-                              <div className="font-sans text-xs font-semibold text-slate-900">{r.city_name}</div>
-                              <div className="flex items-center gap-2 mt-1">
-                                <span className={`inline-block rounded px-2 py-0.5 font-sans text-[10px] font-semibold ${ 
-                                  (r.allocation_type === "New allocation" || r.allocation_type === "New Allocation") ? "bg-emerald-50 text-emerald-700 border border-emerald-200" : 
-                                  r.allocation_type === "Reallocation" ? "bg-indigo-50 text-indigo-700 border border-indigo-200" : 
-                                  (r.allocation_type === "Swap" || r.allocation_type === "Car Swap") ? "bg-amber-50 text-amber-700 border border-amber-200" : 
-                                  "bg-slate-100 text-slate-700 border border-slate-200" 
-                                }`}>
-                                  {r.allocation_type}
-                                </span>
-                                <span className="font-sans text-[11px] text-slate-400">{r.allocation_date}</span>
-                              </div>
-                            </td>
-                            <td className="px-4 py-3.5">
-                              <div className="font-mono text-xs font-bold text-slate-900">{r.vehicle_number}</div>
-                              {r.car_model && <div className="font-sans text-[11px] text-slate-600 mt-0.5">{r.car_model}</div>}
-                              {(r.driver_plan || r.type_of_plan) && (
-                                <div className="font-sans text-[11px] text-slate-400 mt-0.5">
-                                  Plan: {r.driver_plan || "-"} ({r.type_of_plan || "-"})
-                                </div>
-                              )}
-                            </td>
-                            <td className="px-4 py-3.5">
-                              <div className="font-mono text-xs text-slate-700 font-medium">
-                                {r.odometer_reading ? `${r.odometer_reading} KM` : "-"}
-                              </div>
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-700">{r.driver_plan || r.type_of_plan || "-"}</td>
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{r.allocation_date || "-"}</td>
+                            <td className="px-4 py-3.5 font-mono text-xs text-slate-700 font-medium">
+                              {r.odometer_reading ? `${r.odometer_reading} KM` : "-"}
                             </td>
                             <td className="px-4 py-3.5 text-center">
                               <div className="flex items-center justify-center gap-1">
