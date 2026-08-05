@@ -271,7 +271,7 @@ export default function OnboardingForm({
   const [entryMode, setEntryMode] = useState<"new" | "walkin" | "retrieve">("new");
   
   // RESTORED: Third Party Platforms
-  const [thirdPartyPlatform, setThirdPartyPlatform] = useState<string>("None");
+  const [selectedPlatforms, setSelectedPlatforms] = useState<string[]>(["None"]);
   const [platformDetails, setPlatformDetails] = useState<Record<string, {id: string, photo: string | null}>>({});
   
   const [documentsVerified, setDocumentsVerified] = useState(false);
@@ -304,7 +304,26 @@ export default function OnboardingForm({
   const [aadhaarPhoto, setAadhaarPhoto] = useState<string | null>(null);
   const [aadhaarCardFront, setAadhaarCardFront] = useState<string | null>(null);
   const [aadhaarCardBack, setAadhaarCardBack] = useState<string | null>(null);
-  const [localAddressProof, setLocalAddressProof] = useState<string | null>(null);
+  const [localAddressProofFiles, setLocalAddressProofFiles] = useState<string[]>([]);
+  
+  const togglePlatform = (plat: string) => {
+    if (plat === "None") {
+      setSelectedPlatforms(["None"]);
+    } else {
+      let next = selectedPlatforms.filter(p => p !== "None");
+      if (next.includes(plat)) {
+        next = next.filter(p => p !== plat);
+      } else {
+        next.push(plat);
+      }
+      if (next.length === 0) next = ["None"];
+      setSelectedPlatforms(next);
+    }
+  };
+
+  const removeLocalAddressFile = (index: number) => {
+    setLocalAddressProofFiles(prev => prev.filter((_, idx) => idx !== index));
+  };
   
   // Manager Revision Remarks State
   const [approvalRemarks, setApprovalRemarks] = useState<string | null>(null);
@@ -759,7 +778,7 @@ export default function OnboardingForm({
       aadhaar_card_front: aadhaarCardFront || undefined,
       aadhaar_card_back: aadhaarCardBack || undefined,
       driver_email: driverEmail.trim() || undefined,
-      local_address_proof: localAddressProof || undefined,
+      local_address_proof: localAddressProofFiles.length > 0 ? JSON.stringify(localAddressProofFiles) : undefined,
       ref1_name: ref1Name.trim() || undefined,
       ref1_phone: ref1Phone.trim() || undefined,
       ref1_address: ref1Address.trim() || undefined,
@@ -783,7 +802,10 @@ export default function OnboardingForm({
       cheque2_photo: cheque2Photo || undefined,
       cheque3_photo: cheque3Photo || undefined,
       signature_photo: signaturePhoto || undefined,
-      platform_details: platformDetails,
+      platform_details: {
+        selected_platforms: selectedPlatforms,
+        details: platformDetails
+      },
       approval_status: targetStatus,
       approval_requested_to: targetStatus === "Pending Approval" ? approvalRequestedTo : undefined,
       approval_note: approvalSubmissionNote.trim() || undefined
@@ -910,7 +932,7 @@ export default function OnboardingForm({
     setAadhaarPhoto(null);
     setAadhaarCardFront(null);
     setAadhaarCardBack(null);
-    setLocalAddressProof(null);
+    setLocalAddressProofFiles([]);
     setDriverEmail("");
     setRef1Name("");
     setRef1Phone("");
@@ -936,7 +958,7 @@ export default function OnboardingForm({
     setCheque2Photo(null);
     setCheque3Photo(null);
     setSignaturePhoto(null);
-    setThirdPartyPlatform("None");
+    setSelectedPlatforms(["None"]);
     setPlatformDetails({});
     setEntryMode("new");
     setSameAsCandidateName(false);
@@ -957,7 +979,13 @@ export default function OnboardingForm({
           if (field === "aadhaar") setAadhaarPhoto(reader.result);
           if (field === "aadhaar_front") setAadhaarCardFront(reader.result);
           if (field === "aadhaar_back") setAadhaarCardBack(reader.result);
-          if (field === "local_address_proof") setLocalAddressProof(reader.result);
+          if (field === "local_address_proof") {
+            if (localAddressProofFiles.length < 4) {
+              setLocalAddressProofFiles(prev => [...prev, reader.result as string]);
+            } else {
+              alert("Maximum 4 files allowed for Local Address Proof.");
+            }
+          }
           if (field === "cheque") setCancelledChequePhoto(reader.result);
           if (field === "cheque2") setCheque2Photo(reader.result);
           if (field === "cheque3") setCheque3Photo(reader.result);
@@ -1029,7 +1057,22 @@ export default function OnboardingForm({
       setAadhaarPhoto(data.aadhaar_card_photo || null);
       setAadhaarCardFront(data.aadhaar_card_front || null);
       setAadhaarCardBack(data.aadhaar_card_back || null);
-      setLocalAddressProof(data.local_address_proof || null);
+      
+      if (data.local_address_proof) {
+        try {
+          if (typeof data.local_address_proof === 'string' && data.local_address_proof.startsWith("[")) {
+            setLocalAddressProofFiles(JSON.parse(data.local_address_proof));
+          } else if (Array.isArray(data.local_address_proof)) {
+            setLocalAddressProofFiles(data.local_address_proof);
+          } else {
+            setLocalAddressProofFiles([data.local_address_proof]);
+          }
+        } catch (e) {
+          setLocalAddressProofFiles([data.local_address_proof]);
+        }
+      } else {
+        setLocalAddressProofFiles([]);
+      }
       setDriverEmail(data.driver_email || "");
       setRef1Name(data.ref1_name || "");
       setRef1Phone(data.ref1_phone || "");
@@ -1060,13 +1103,18 @@ export default function OnboardingForm({
       setApprovalStatus(data.approval_status || null);
       
       try {
-        const pDetails = typeof data.platform_details === 'string' ? JSON.parse(data.platform_details) : (data.platform_details || {});
-        setPlatformDetails(pDetails);
-        const platforms = Object.keys(pDetails);
-        setThirdPartyPlatform(platforms.length > 0 ? platforms[0] : "None");
+        let pObj = typeof data.platform_details === 'string' ? JSON.parse(data.platform_details) : (data.platform_details || {});
+        if (pObj.selected_platforms && Array.isArray(pObj.selected_platforms)) {
+          setSelectedPlatforms(pObj.selected_platforms);
+          setPlatformDetails(pObj.details || {});
+        } else {
+          const platforms = Object.keys(pObj).filter(k => k !== "None");
+          setSelectedPlatforms(platforms.length > 0 ? platforms : ["None"]);
+          setPlatformDetails(pObj);
+        }
       } catch (e) {
+        setSelectedPlatforms(["None"]);
         setPlatformDetails({});
-        setThirdPartyPlatform("None");
       }
       
       setActiveTab("form");
@@ -1672,31 +1720,7 @@ export default function OnboardingForm({
                       </div>
                     </div>
 
-                    {/* RESTORED: Third-Party Platforms */}
-                    <div className="pt-6 border-t border-border/60">
-                      <h4 className="font-sans text-sm font-bold text-text-dim mb-4">Third-Party Platforms</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold text-text-muted">Select Platform</label>
-                          <select value={thirdPartyPlatform} onChange={(e) => setThirdPartyPlatform(e.target.value)} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary outline-none transition-all">
-                            <option value="None">None</option>
-                            <option value="Uber">Uber</option>
-                            <option value="Ola">Ola</option>
-                            <option value="Rapido">Rapido</option>
-                            <option value="Indrive">Indrive</option>
-                            <option value="BluSmart">BluSmart</option>
-                          </select>
-                        </div>
-                        
-                        {thirdPartyPlatform !== 'None' && (
-                          <div className="space-y-2">
-                            <label className="text-xs font-bold text-text-muted">{thirdPartyPlatform} User ID (If verified)</label>
-                            <input type="text" value={platformDetails[thirdPartyPlatform]?.id || ""} onChange={(e) => setPlatformDetails(prev => ({...prev, [thirdPartyPlatform]: { ...prev[thirdPartyPlatform], id: e.target.value }}))} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary outline-none transition-all" placeholder={`Enter verified ${thirdPartyPlatform} ID`} />
-                          </div>
-                        )}
-                      </div>
                     </div>
-                  </div>
 
                   {/* ======================================= */}
                   {/* STEP 2: DOCUMENTS & KYC                 */}
@@ -1767,8 +1791,24 @@ export default function OnboardingForm({
                           </div>
                         </div>
                       </div>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-6">
+                        <div className="flex flex-col gap-2 rounded-xl border border-dashed border-border bg-white p-3">
+                          <span className="font-sans text-[11px] font-bold text-slate-800 text-center">Selfie Photo *</span>
+                          {selfiePhoto ? (
+                            <div className="relative flex-grow flex items-center justify-center rounded-lg p-2">
+                              <img src={selfiePhoto} alt="Selfie Photo" className="max-h-20 object-contain rounded shadow-xs" />
+                              <button type="button" onClick={() => removePhoto("selfie")} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 transition-all cursor-pointer"><Trash2 className="h-3 w-3" /></button>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center flex-grow p-2 gap-2 border border-border/50 bg-slate-50 rounded-lg">
+                              <div className="flex gap-1.5 w-full">
+                                <button type="button" onClick={() => setCameraActiveField("selfie")} className="flex-1 flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-semibold py-1.5 hover:bg-primary-hover transition-colors cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
+                                <label className="flex-1 flex items-center justify-center gap-1 rounded border border-border bg-white text-text-muted text-[10px] font-semibold py-1.5 hover:bg-slate-100 transition-colors cursor-pointer"><Upload className="h-3 w-3" /> Upload<input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "selfie")} /></label>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
                         <div className="flex flex-col gap-2 rounded-xl border border-dashed border-border bg-white p-3">
                           <span className="font-sans text-[11px] font-bold text-text-muted text-center">PAN Card Photo</span>
                           {panCardPhoto ? (
@@ -1819,24 +1859,56 @@ export default function OnboardingForm({
                             </div>
                           )}
                         </div>
+                      </div>
 
-                        <div className="flex flex-col gap-2 rounded-xl border border-dashed border-border bg-white p-3">
-                          <span className="font-sans text-[11px] font-bold text-text-muted text-center">Local Address Proof (All Plans)</span>
-                          {localAddressProof ? (
-                            <div className="relative flex-grow flex items-center justify-center rounded-lg p-2">
-                              <img src={localAddressProof} alt="Local Address Proof" className="max-h-20 object-contain rounded shadow-xs" />
-                              <button type="button" onClick={() => removePhoto("local_address_proof")} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 transition-all cursor-pointer"><Trash2 className="h-3 w-3" /></button>
+                      {/* Aadhaar-PAN Linkage Status Toggle */}
+                      <div className="mt-4 p-4 bg-white border border-border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div>
+                          <span className="text-xs font-bold text-slate-800 block">Aadhaar &amp; PAN Linked for TDS Compliance? *</span>
+                          <span className="text-[11px] text-slate-500">Required to ensure valid tax deductions at source</span>
+                        </div>
+                        <div className="flex items-center gap-4 shrink-0">
+                          <label className="flex items-center gap-2 cursor-pointer font-bold text-xs">
+                            <input type="radio" name="panAadhaarLinked" value="Yes" checked={panAadhaarLinked === "Yes"} onChange={() => setPanAadhaarLinked("Yes")} className="accent-primary w-4 h-4" />
+                            <span className="text-slate-800">Yes</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer font-bold text-xs">
+                            <input type="radio" name="panAadhaarLinked" value="No" checked={panAadhaarLinked === "No"} onChange={() => setPanAadhaarLinked("No")} className="accent-primary w-4 h-4" />
+                            <span className="text-slate-800">No</span>
+                          </label>
+                        </div>
+                      </div>
+
+                      {/* Multi-Page Local Address Proof */}
+                      <div className="mt-4 flex flex-col gap-3 rounded-xl border border-dashed border-border bg-white p-4">
+                        <div className="flex items-center justify-between">
+                          <span className="font-sans text-xs font-bold text-slate-800">Local Address Proof (1 to 4 Pages/Files) *</span>
+                          <span className="text-[11px] font-semibold text-slate-500">{localAddressProofFiles.length} / 4 Files</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          {localAddressProofFiles.map((fileUrl, index) => (
+                            <div key={index} className="relative bg-slate-50 border border-slate-200 rounded-lg p-2 flex flex-col items-center">
+                              <img src={fileUrl} alt={`Address Proof ${index + 1}`} className="max-h-24 object-contain rounded shadow-xs" />
+                              <span className="text-[10px] font-bold text-slate-600 mt-1">Page {index + 1}</span>
+                              <button type="button" onClick={() => removeLocalAddressFile(index)} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 transition-all cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button>
                             </div>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center flex-grow p-2 gap-2 border border-border/50 bg-slate-50 rounded-lg">
+                          ))}
+
+                          {localAddressProofFiles.length < 4 && (
+                            <div className="flex flex-col items-center justify-center p-3 border border-dashed border-primary/40 bg-emerald-50/40 rounded-lg gap-2 text-center min-h-[100px]">
+                              <span className="text-[11px] font-semibold text-slate-700">Add Page {localAddressProofFiles.length + 1}</span>
                               <div className="flex gap-1.5 w-full">
-                                <button type="button" onClick={() => setCameraActiveField("local_address_proof")} className="flex-1 flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-semibold py-1.5 hover:bg-primary-hover transition-colors cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
-                                <label className="flex-1 flex items-center justify-center gap-1 rounded border border-border bg-white text-text-muted text-[10px] font-semibold py-1.5 hover:bg-slate-100 transition-colors cursor-pointer"><Upload className="h-3 w-3" /> Upload<input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "local_address_proof")} /></label>
+                                <button type="button" onClick={() => setCameraActiveField("local_address_proof")} className="flex-1 flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-bold py-1.5 hover:bg-primary-dark transition-colors cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
+                                <label className="flex-1 flex items-center justify-center gap-1 rounded border border-border bg-white text-slate-700 text-[10px] font-bold py-1.5 hover:bg-slate-100 transition-colors cursor-pointer">
+                                  <Upload className="h-3 w-3 text-primary" /> Upload
+                                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "local_address_proof")} />
+                                </label>
                               </div>
                             </div>
                           )}
                         </div>
-                      </div>
+                      </div>              </div>
                     </div>
 
                     <hr className="border-border/60" />
@@ -1919,7 +1991,7 @@ export default function OnboardingForm({
                   {/* ======================================= */}
                   <div className={`${currentStep === 3 ? 'block' : 'hidden'} space-y-6 animate-in fade-in slide-in-from-right-4 duration-500`}>
                     
-                    <h4 className="font-sans text-sm font-bold text-text-dim border-b border-border pb-2">Rental & LetzOwn Configuration</h4>
+                    <h4 className="font-sans text-sm font-bold text-text-dim border-b border-border pb-2">Rental &amp; Platform Configuration</h4>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-slate-50 border border-border p-5 rounded-xl">
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-slate-800">Select Rental Model *</label>
@@ -1946,6 +2018,76 @@ export default function OnboardingForm({
                             <option value="3">3 Cheques</option>
                             <option value="4">4 Cheques</option>
                           </select>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Section 3: Relocated Third-Party Platforms (Multi-Select: Uber, Ola, None) */}
+                    <div className="bg-slate-50 border border-border p-5 rounded-xl space-y-4">
+                      <div>
+                        <label className="text-xs font-bold text-slate-900 block mb-1">Third Party Platform Selection (Multi-Select) *</label>
+                        <p className="text-[11px] text-slate-500">Select platforms candidate will operate on (Uber, Ola, or None)</p>
+                      </div>
+
+                      <div className="flex flex-wrap gap-3">
+                        {["Uber", "Ola", "None"].map((plat) => {
+                          const isSelected = selectedPlatforms.includes(plat);
+                          return (
+                            <button
+                              key={plat}
+                              type="button"
+                              onClick={() => togglePlatform(plat)}
+                              className={`px-4 py-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-2 border shadow-2xs ${
+                                isSelected 
+                                  ? "bg-primary text-white border-primary ring-2 ring-primary/20" 
+                                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-100"
+                              }`}
+                            >
+                              <div className={`w-4 h-4 rounded flex items-center justify-center border text-[10px] ${
+                                isSelected ? "bg-white text-primary border-white" : "border-slate-300"
+                              }`}>
+                                {isSelected && "✓"}
+                              </div>
+                              {plat}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {/* Dynamic Driver IDs per Selected Platform */}
+                      {selectedPlatforms.filter(p => p !== "None").length > 0 && (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                          {selectedPlatforms.includes("Uber") && (
+                            <div className="space-y-1.5 bg-white p-3.5 rounded-xl border border-slate-200">
+                              <label className="text-xs font-bold text-slate-800">Uber Driver ID <span className="text-slate-400 font-normal">(Optional if verified)</span></label>
+                              <input
+                                type="text"
+                                placeholder="e.g. UBER-12345"
+                                value={platformDetails["Uber"]?.id || ""}
+                                onChange={(e) => setPlatformDetails(prev => ({
+                                  ...prev,
+                                  Uber: { ...prev["Uber"], id: e.target.value }
+                                }))}
+                                className="w-full h-10 px-3 border border-border rounded-lg text-xs outline-none focus:border-primary font-mono"
+                              />
+                            </div>
+                          )}
+
+                          {selectedPlatforms.includes("Ola") && (
+                            <div className="space-y-1.5 bg-white p-3.5 rounded-xl border border-slate-200">
+                              <label className="text-xs font-bold text-slate-800">Ola Driver ID <span className="text-slate-400 font-normal">(Optional if verified)</span></label>
+                              <input
+                                type="text"
+                                placeholder="e.g. OLA-98765"
+                                value={platformDetails["Ola"]?.id || ""}
+                                onChange={(e) => setPlatformDetails(prev => ({
+                                  ...prev,
+                                  Ola: { ...prev["Ola"], id: e.target.value }
+                                }))}
+                                className="w-full h-10 px-3 border border-border rounded-lg text-xs outline-none focus:border-primary font-mono"
+                              />
+                            </div>
+                          )}
                         </div>
                       )}
                     </div>
