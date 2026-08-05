@@ -3030,6 +3030,7 @@ def get_walkin(walkin_id: str):
 class WalkinData(BaseModel):
     record_type: Optional[str] = 'new'
     visitor_type: Optional[str] = 'Driver'
+    interested_position: Optional[str] = 'Driver'
     event_date: Optional[str] = None
     enquiry_time: Optional[str] = None
     city: Optional[str] = 'Hyderabad'

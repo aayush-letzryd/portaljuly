@@ -505,7 +505,10 @@ export default function WalkInForm({
         body: JSON.stringify(payload)
       });
 
-      if (!res.ok) throw new Error("Failed to save record");
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.detail || errData.message || "Failed to save record");
+      }
 
       resetForm();
       if (isDraft) {
