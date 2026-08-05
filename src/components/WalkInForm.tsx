@@ -858,11 +858,23 @@ export default function WalkInForm({
                         onChange={(e) => setVisitingReason(e.target.value)}
                         className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-medium cursor-pointer"
                       >
-                        <option value="Onboarding Inquiry">Onboarding Inquiry</option>
-                        <option value="Complaint">Complaint</option>
-                        <option value="Driver Manager (DM) Meet">Driver Manager (DM) Meet</option>
-                        <option value="Maintenance Related Issue">Maintenance Issue</option>
-                        <option value="Others">Others</option>
+                        {isExistingPartner ? (
+                          <>
+                            <option value="" disabled>Select Visiting Reason / Tag...</option>
+                            {(PRESET_TAGS[partnerType] || PRESET_TAGS["Driver"]).map((tag) => (
+                              <option key={tag} value={tag}>{tag}</option>
+                            ))}
+                            <option value="Others">Others</option>
+                          </>
+                        ) : (
+                          <>
+                            <option value="Onboarding Inquiry">Onboarding Inquiry</option>
+                            <option value="Complaint">Complaint</option>
+                            <option value="Driver Manager (DM) Meet">Driver Manager (DM) Meet</option>
+                            <option value="Maintenance Related Issue">Maintenance Issue</option>
+                            <option value="Others">Others</option>
+                          </>
+                        )}
                       </select>
                     </div>
 
@@ -877,120 +889,21 @@ export default function WalkInForm({
                     </div>
                   </div>
 
-                  {/* ONLY SHOW DETAILED VISIT LOGGING (Tags, Notes, Outcome) WHEN CANDIDATE IS FETCHED */}
+                  {/* Visit Notes & Summary for Existing Partners */}
                   {isExistingPartner && (
-                    <div className="flex flex-col gap-5 pt-3 border-t border-slate-200">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                        <div className="flex flex-col gap-1.5">
-                          <label className="font-sans text-xs font-semibold text-slate-700">Visit Outcome Status *</label>
-                          <select required value={joinedStatus} onChange={(e) => setJoinedStatus(e.target.value as OnboardingOutcome)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer">
-                              <option value="Onboarding Process Initiated">Onboarding Process Initiated</option>
-                              <option value="Successfully Onboarded">Successfully Onboarded</option>
-                              <option value="Follow Up Required">Follow Up Required</option>
-                              <option value="No Follow Up Required / Closed">No Follow Up Required / Closed</option>
-                              <option value="Others">Others</option>
-                          </select>
-                        </div>
-
-                        {/* Category Tags Dropdown & Pills */}
-                        <div className="flex flex-col gap-2.5 p-4 bg-white border border-border rounded-xl">
-                          <label className="text-xs font-bold text-slate-800 flex items-center justify-between">
-                            <span>Category Tags</span>
-                            <span className="text-[10px] text-emerald-700 font-extrabold bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                              {selectedTags.length} Selected
-                            </span>
-                          </label>
-
-                          <select
-                            value=""
-                            onChange={(e) => {
-                              const val = e.target.value;
-                              if (val === "__OTHERS__") {
-                                setShowCustomTagInput(true);
-                              } else if (val && !selectedTags.includes(val)) {
-                                setSelectedTags([...selectedTags, val]);
-                              }
-                            }}
-                            className="h-11 rounded-lg border border-border px-3 text-xs bg-white outline-none focus:border-primary font-semibold text-slate-700 cursor-pointer"
-                          >
-                            <option value="" disabled>+ Add {partnerType} Category Tag...</option>
-                            {(PRESET_TAGS[partnerType] || PRESET_TAGS["Driver"]).map((tag) => (
-                              <option key={tag} value={tag} disabled={selectedTags.includes(tag)}>
-                                {selectedTags.includes(tag) ? `✓ ${tag} (Selected)` : tag}
-                              </option>
-                            ))}
-                            <option value="__OTHERS__">＋ Others (Enter Custom Tag...)</option>
-                          </select>
-
-                          {showCustomTagInput && (
-                            <div className="flex gap-2 p-2 bg-slate-50 rounded-lg border border-slate-200">
-                              <input
-                                type="text"
-                                placeholder="Type custom tag name..."
-                                value={customTagInput}
-                                onChange={(e) => setCustomTagInput(e.target.value)}
-                                onKeyDown={(e) => {
-                                  if (e.key === "Enter") {
-                                    e.preventDefault();
-                                    handleAddCustomTag();
-                                  }
-                                }}
-                                className="h-9 flex-1 rounded-lg border border-border px-3 text-xs bg-white outline-none focus:border-primary"
-                              />
-                              <button
-                                type="button"
-                                onClick={handleAddCustomTag}
-                                className="h-9 px-3 bg-primary hover:bg-primary-hover text-white text-xs font-bold rounded-lg cursor-pointer transition-colors"
-                              >
-                                Add Tag
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => setShowCustomTagInput(false)}
-                                className="h-9 px-2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer"
-                              >
-                                ✕
-                              </button>
-                            </div>
-                          )}
-
-                          {selectedTags.length > 0 && (
-                            <div className="flex flex-wrap gap-1.5 mt-1 max-h-28 overflow-y-auto">
-                              {selectedTags.map((tag) => (
-                                <span
-                                  key={tag}
-                                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-900 border border-emerald-300 shadow-2xs"
-                                >
-                                  <span>{tag}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setSelectedTags(selectedTags.filter(t => t !== tag))}
-                                    className="hover:text-red-600 focus:outline-none cursor-pointer text-emerald-700"
-                                  >
-                                    <X className="w-3.5 h-3.5" />
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Visit Notes & Summary */}
-                      <div className="flex flex-col gap-1.5">
-                        <label className="font-sans text-xs font-semibold text-slate-700 flex justify-between">
-                          <span>Visit Notes & Executive Summary (Max ~300 words) *</span>
-                          <span className="text-[10px] text-slate-400">{visitNotes.length} / 1500 chars</span>
-                        </label>
-                        <textarea
-                          rows={3}
-                          maxLength={1500}
-                          placeholder="Record detailed notes of discussion, complaint description, or resolution provided during this visit..."
-                          value={visitNotes}
-                          onChange={(e) => setVisitNotes(e.target.value)}
-                          className="w-full rounded-xl border border-border p-3 text-xs bg-white outline-none focus:border-primary font-sans leading-relaxed"
-                        />
-                      </div>
+                    <div className="flex flex-col gap-1.5 pt-3 border-t border-slate-200">
+                      <label className="font-sans text-xs font-semibold text-slate-700 flex justify-between">
+                        <span>Visit Notes & Executive Summary (Max ~300 words) *</span>
+                        <span className="text-[10px] text-slate-400">{visitNotes.length} / 1500 chars</span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        maxLength={1500}
+                        placeholder="Record detailed notes of discussion, complaint description, or resolution provided during this visit..."
+                        value={visitNotes}
+                        onChange={(e) => setVisitNotes(e.target.value)}
+                        className="w-full rounded-xl border border-border p-3 text-xs bg-white outline-none focus:border-primary font-sans leading-relaxed"
+                      />
                     </div>
                   )}
                 </div>
