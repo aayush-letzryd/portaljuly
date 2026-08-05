@@ -3965,7 +3965,9 @@ def get_onboarding(id: int):
                 aadhaar_card_front, aadhaar_card_back, driver_email, local_address_proof,
                 ref1_name, ref1_phone, ref1_address,
                 ref2_name, ref2_phone, ref2_address,
-                ref3_name, ref3_phone, ref3_address
+                ref3_name, ref3_phone, ref3_address,
+                COALESCE(approval_status, 'Draft') AS approval_status,
+                created_at, updated_at
             FROM july_form_onboarding
             WHERE id = %s;
         """, (id,))
@@ -3994,7 +3996,10 @@ def get_onboarding(id: int):
                 "aadhaar_card_front": r[48], "aadhaar_card_back": r[49], "driver_email": r[50], "local_address_proof": r[51],
                 "ref1_name": r[52], "ref1_phone": r[53], "ref1_address": r[54],
                 "ref2_name": r[55], "ref2_phone": r[56], "ref2_address": r[57],
-                "ref3_name": r[58], "ref3_phone": r[59], "ref3_address": r[60]
+                "ref3_name": r[58], "ref3_phone": r[59], "ref3_address": r[60],
+                "approval_status": r[61],
+                "created_at": to_ist_iso(r[62]),
+                "updated_at": to_ist_iso(r[63] or r[62])
             }
             if r[29] == "Operator" and r[17]:
                 cur.execute("""
