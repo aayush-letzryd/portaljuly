@@ -4790,12 +4790,12 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
                 old_vehicle_number, dropoff_odometer, dropoff_remarks, dropoff_photo,
                 dropoff_location, duplicate_key_status,
                 fastag_balance_amount, fastag_balance_proof,
-                status, created_by, created_at
+                status, approval_status, created_by, created_at
             ) VALUES (
                 %s,%s,%s,%s, %s,%s,%s, %s,%s,%s, %s,%s,
                 %s,%s, %s,%s,%s,%s,
                 %s,%s,%s,%s, %s,%s, %s,%s,
-                %s, %s, NOW()
+                %s, %s, %s, NOW()
             ) RETURNING id;
         """, (
             data.allocation_date, data.allocation_type, data.sub_type, data.city_name,
@@ -4811,6 +4811,7 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
             data.dropoff_location, data.duplicate_key_status,
             float(data.fastag_balance_amount) if data.fastag_balance_amount else None,
             extract_image(data.fastag_balance_proof),
+            data.status or "Submitted",
             data.status or "Submitted",
             data.created_by or uid
         ))
@@ -4984,7 +4985,7 @@ def update_allocation_record(id: int, data: AllocationData, authorization: Optio
                 old_vehicle_number=%s, dropoff_odometer=%s, dropoff_remarks=%s, dropoff_photo=%s,
                 dropoff_location=%s, duplicate_key_status=%s,
                 fastag_balance_amount=%s, fastag_balance_proof=%s,
-                status=%s, updated_by=%s, updated_at=NOW()
+                status=%s, approval_status=%s, updated_by=%s, updated_at=NOW()
             WHERE id=%s RETURNING id;
         """, (
             data.allocation_date, data.allocation_type, data.sub_type, data.city_name,
@@ -5000,6 +5001,7 @@ def update_allocation_record(id: int, data: AllocationData, authorization: Optio
             data.dropoff_location, data.duplicate_key_status,
             float(data.fastag_balance_amount) if data.fastag_balance_amount else None,
             extract_image(data.fastag_balance_proof),
+            data.status or "Submitted",
             data.status or "Submitted",
             uid, id
         ))

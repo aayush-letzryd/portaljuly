@@ -440,11 +440,11 @@ export default function AllocationForm({
         throw new Error(errorText || "Failed to submit allocation record");
       }
 
-      alert(editingId ? "Vehicle Allocation Record Updated Successfully!" : "Vehicle Allocation Saved Successfully!");
+      alert(isDraft ? (editingId ? "Draft Allocation Updated Successfully!" : "Draft Allocation Saved Successfully!") : (editingId ? "Vehicle Allocation Record Updated Successfully!" : "Vehicle Allocation Saved Successfully!"));
       resetForm();
       fetchStats();
       fetchRecords();
-      setActiveTab("registry");
+      setActiveTab(isDraft ? "drafts" : "registry");
     } catch (err: any) {
       alert(err.message);
     }
@@ -1185,19 +1185,19 @@ export default function AllocationForm({
         {activeTab === "drafts" && (
           <div className="space-y-6">
             {/* Drafts List Table */}
-            <div className="bg-surface rounded-2xl shadow-sm border border-border/60 overflow-hidden relative">
-              <div className="bg-white p-6 border-b border-border/40 flex justify-between items-center">
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+              <div className="border-b border-slate-200 p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                 <div>
-                  <h2 className="font-display text-xl font-bold text-primary flex items-center gap-2">
-                    <Clock className="h-6 w-6 text-amber-600" />
+                  <h3 className="font-sans text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-amber-600" />
                     Saved Draft Records
-                  </h2>
-                  <p className="font-sans text-sm text-text-muted mt-1">Unsent vehicle allocations. Click 'Edit Draft' to complete and save entry.</p>
+                  </h3>
+                  <p className="font-sans text-xs text-slate-500 mt-1">Audit log of all unsent vehicle allocation drafts. Click 'Edit Draft' to complete.</p>
                 </div>
                 <button
                   type="button"
                   onClick={() => { resetForm(); setActiveTab("form"); }}
-                  className="flex h-9 items-center justify-center gap-1.5 rounded-lg bg-green hover:bg-green/95 px-4 font-sans text-xs font-bold text-white transition-colors cursor-pointer shadow-xs"
+                  className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 font-sans text-xs font-semibold text-white transition-colors cursor-pointer shadow-xs"
                 >
                   <Plus className="h-4 w-4" /> New Allocation Entry
                 </button>
@@ -1205,18 +1205,18 @@ export default function AllocationForm({
 
               <div className="overflow-x-auto">
                 <table className="w-full text-left whitespace-nowrap border-collapse">
-                  <thead className="bg-slate-50 border-b border-slate-200">
-                    <tr>
-                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Draft ID</th>
-                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Driver Name</th>
-                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Phone Number</th>
-                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Driver ID</th>
-                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Vehicle Number</th>
-                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">City</th>
-                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Transaction Type</th>
-                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Rental Plan</th>
-                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">Last Saved</th>
-                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-center">Actions</th>
+                  <thead>
+                    <tr className="bg-slate-50 border-b border-slate-200">
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">DRAFT ID</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">DRIVER NAME</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">DRIVER ID</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">PHONE NUMBER</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">CAR ALLOCATED</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">CITY</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">TRANSACTION TYPE</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">RENTAL PLAN</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">LAST SAVED</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-center">ACTION</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
@@ -1246,29 +1246,31 @@ export default function AllocationForm({
                         }) : "—";
 
                         return (
-                          <tr key={r.id} className="hover:bg-amber-50/30 transition-colors">
+                          <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
                             <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-700">
                               #{r.id}
                             </td>
-                            <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-900">
+                            <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">
                               {r.driver_name || "—"}
+                            </td>
+                            <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-600">
+                              {r.driver_id || "—"}
                             </td>
                             <td className="px-4 py-3.5 font-sans text-xs text-slate-600">
                               {r.driver_phone || "—"}
                             </td>
-                            <td className="px-4 py-3.5 font-sans text-xs text-slate-600">
-                              {r.driver_id || "—"}
-                            </td>
                             <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">
                               {r.vehicle_number || "—"}
                             </td>
-                            <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-800">
+                            <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-800">
                               {displayCity}
                             </td>
                             <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-700">
-                              {displayTxType}
+                              <span className="px-2.5 py-1 rounded-lg bg-amber-50 text-amber-800 border border-amber-200/60 font-semibold text-[11px]">
+                                {displayTxType}
+                              </span>
                             </td>
-                            <td className="px-4 py-3.5 font-sans text-xs text-slate-700">
+                            <td className="px-4 py-3.5 font-sans text-xs text-slate-700 font-medium">
                               {displayPlan}
                             </td>
                             <td className="px-4 py-3.5 font-sans text-xs text-slate-600">
@@ -1278,14 +1280,14 @@ export default function AllocationForm({
                               <div className="flex items-center justify-center gap-2">
                                 <button 
                                   onClick={() => loadRecordForEdit(r.id)}
-                                  className="px-3 py-1.5 border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 font-medium text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+                                  className="px-3 py-1.5 border border-amber-300 bg-amber-50 hover:bg-amber-100 text-amber-900 font-semibold text-xs rounded-xl transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
                                   title="Edit / Open Draft"
                                 >
                                   <Edit className="w-3.5 h-3.5 text-amber-700" /> Edit Draft
                                 </button>
                                 <button 
                                   onClick={() => handleDelete(r.id, r.driver_name)}
-                                  className="h-8 w-8 rounded-xl flex items-center justify-center text-rose-500 hover:bg-rose-50 transition-colors cursor-pointer"
+                                  className="h-8 w-8 rounded-xl flex items-center justify-center text-rose-500 hover:bg-rose-50 border border-rose-200/60 transition-colors cursor-pointer"
                                   title="Delete Draft"
                                 >
                                   <Trash2 className="h-4 w-4" />
