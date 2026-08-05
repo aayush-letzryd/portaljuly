@@ -389,6 +389,12 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
     }
   };
 
+  const formatDateTime = (dateStr?: string): string => {
+    const { date, time } = formatDateTimeComponents(dateStr);
+    if (!time || time === "") return date;
+    return `${date} ${time}`;
+  };
+
   const getStatusBadge = (statusStr: string) => {
     const s = (statusStr || "").toLowerCase();
     if (s.includes("approved") || s.includes("completed")) {
