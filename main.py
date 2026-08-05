@@ -6776,7 +6776,7 @@ def to_ist_iso(dt):
     if isinstance(dt, (dt_module.datetime, dt_module.date)):
         if isinstance(dt, dt_module.datetime):
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=dt_module.timezone.utc)
+                dt = dt.replace(tzinfo=ist_tz)
             return dt.astimezone(ist_tz).isoformat()
         return dt.isoformat()
     return str(dt)
