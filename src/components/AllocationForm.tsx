@@ -847,7 +847,7 @@ export default function AllocationForm({
                     <div className="space-y-4">
                       {/* Vehicle Autocomplete Field */}
                       <div className="relative">
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Vehicle Number (Search &amp; Select) <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Vehicle Number <span className="text-red-500">*</span></label>
                         <input 
                           type="text" 
                           placeholder="Type vehicle number e.g. TS09..."
