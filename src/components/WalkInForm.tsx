@@ -46,22 +46,23 @@ const normalizeCity = (cityVal: string): string => {
 
 const PRESET_TAGS: Record<string, string[]> = {
   Driver: [
-    "Payment / Payout Issue",
-    "Plan Inquiry",
-    "Vehicle Swap & Issue",
-    "App & Login Issue",
-    "Fastag & Toll Query",
-    "Penalty & Fine Waiver",
-    "Shift Timing Change",
-    "Document Resubmission"
+    "Payout & Earnings Inquiry",
+    "Vehicle Servicing & Repair",
+    "Vehicle Return / Replacement",
+    "Driver App & Device Support",
+    "Fastag & Toll Balance Issue",
+    "Challan & Penalty Dispute",
+    "Document Resubmission / Renewal",
+    "Shift / Location Transfer"
   ],
   Operator: [
-    "Vehicle Remittance",
-    "Fleet Expansion",
-    "Sub-Driver Swap",
-    "Commission Payout",
-    "Hisaab Settlement",
-    "GPS & Fleet Issue"
+    "Fleet Commission & Payout",
+    "Adding New Vehicles to Fleet",
+    "Vehicle Offboarding / Return",
+    "Sub-Driver Assignment & Change",
+    "GPS Tracker & Device Issue",
+    "Scheduled Fleet Maintenance",
+    "Account & Contract Settlement"
   ]
 };
 
