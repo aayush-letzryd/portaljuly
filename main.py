@@ -6823,9 +6823,9 @@ def get_pending_approvals(authorization: Optional[str] = Header(None)):
             where_v_cond = "WHERE (v.approval_status LIKE 'Pending%%' OR v.approval_status = 'Submitted')"
             where_t_cond = "WHERE (t.approval_status LIKE 'Pending%%' OR t.approval_status = 'Submitted')"
         elif is_city_manager:
-            where_cond = f"WHERE (o.current_approver_id = {uid} OR o.current_approver_id IS NULL OR LOWER(COALESCE(o.city, '')) = '{user_city}') AND (o.approval_status LIKE 'Pending%%' OR o.approval_status = 'Submitted')"
-            where_v_cond = f"WHERE (v.current_approver_id = {uid} OR v.current_approver_id IS NULL OR LOWER(COALESCE(v.city, '')) = '{user_city}') AND (v.approval_status LIKE 'Pending%%' OR v.approval_status = 'Submitted')"
-            where_t_cond = f"WHERE (t.current_approver_id = {uid} OR t.current_approver_id IS NULL OR LOWER(COALESCE(t.city, '')) = '{user_city}') AND (t.approval_status LIKE 'Pending%%' OR t.approval_status = 'Submitted')"
+            where_cond = f"WHERE (o.current_approver_id = {uid} OR (o.current_approver_id IS NULL AND LOWER(COALESCE(o.city, '')) = '{user_city}')) AND (o.approval_status LIKE 'Pending%%' OR o.approval_status = 'Submitted')"
+            where_v_cond = f"WHERE (v.current_approver_id = {uid} OR (v.current_approver_id IS NULL AND LOWER(COALESCE(v.city, '')) = '{user_city}')) AND (v.approval_status LIKE 'Pending%%' OR v.approval_status = 'Submitted')"
+            where_t_cond = f"WHERE (t.current_approver_id = {uid} OR (t.current_approver_id IS NULL AND LOWER(COALESCE(t.city, '')) = '{user_city}')) AND (t.approval_status LIKE 'Pending%%' OR t.approval_status = 'Submitted')"
         else:
             where_cond = f"WHERE (o.current_approver_id = {uid} OR (o.current_approver_id IS NULL AND LOWER(COALESCE(o.city, '')) = '{user_city}')) AND (o.approval_status LIKE 'Pending%%' OR o.approval_status = 'Submitted')"
             where_v_cond = f"WHERE (v.current_approver_id = {uid} OR (v.current_approver_id IS NULL AND LOWER(COALESCE(v.city, '')) = '{user_city}')) AND (v.approval_status LIKE 'Pending%%' OR v.approval_status = 'Submitted')"
