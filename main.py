@@ -2621,6 +2621,7 @@ def get_all_walkins(
     city: Optional[str] = "all",
     visitor_type: Optional[str] = "all",
     status: Optional[str] = "all",
+    record_type: Optional[str] = "all",
     time_period: Optional[str] = "all",
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
@@ -2752,8 +2753,15 @@ def get_all_walkins(
             legacy_query += " AND (w.partner_type = %s OR w.visitor_type = %s)"
             legacy_params.extend([visitor_type, visitor_type])
 
-        union_query = f"({new_query}) UNION ALL ({existing_query}) UNION ALL ({legacy_query})"
-        union_params = new_params + existing_params + legacy_params
+        if record_type == "new":
+            union_query = f"({new_query})"
+            union_params = new_params
+        elif record_type == "existing":
+            union_query = f"({existing_query}) UNION ALL ({legacy_query} AND w.is_existing_partner = true)"
+            union_params = existing_params + legacy_params
+        else:
+            union_query = f"({new_query}) UNION ALL ({existing_query}) UNION ALL ({legacy_query})"
+            union_params = new_params + existing_params + legacy_params
 
         count_q = f"SELECT COUNT(*) FROM ({union_query}) AS cnt"
         cur.execute(count_q, union_params)

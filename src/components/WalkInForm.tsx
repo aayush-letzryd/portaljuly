@@ -240,6 +240,7 @@ export default function WalkInForm({
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCity, setFilterCity] = useState("all");
   const [filterType, setFilterType] = useState("all");
+  const [filterRecordType, setFilterRecordType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterTimePeriod, setFilterTimePeriod] = useState("all");
   const [customStartDate, setCustomStartDate] = useState("");
@@ -335,6 +336,7 @@ export default function WalkInForm({
       if (searchQuery) queryParams.append("search", searchQuery);
       if (filterCity !== "all") queryParams.append("city", filterCity);
       if (filterType !== "all") queryParams.append("visitor_type", filterType);
+      if (filterRecordType !== "all") queryParams.append("record_type", filterRecordType);
       if (filterStatus !== "all") queryParams.append("status", filterStatus);
       if (filterTimePeriod !== "all") queryParams.append("time_period", filterTimePeriod);
       if (filterTimePeriod === "custom") {
@@ -393,7 +395,7 @@ export default function WalkInForm({
 
   useEffect(() => {
     fetchData(page);
-  }, [searchQuery, filterCity, filterType, filterStatus, filterTimePeriod, customStartDate, customEndDate, page]);
+  }, [searchQuery, filterCity, filterType, filterRecordType, filterStatus, filterTimePeriod, customStartDate, customEndDate, page]);
 
   useEffect(() => {
     if (debouncedRetrieveQuery.trim().length > 1 && !isReadOnly) {
@@ -1221,7 +1223,7 @@ export default function WalkInForm({
 
             {/* Filter Toolbars */}
             <div className="bg-white rounded-xl shadow-xs border border-border p-4 grid grid-cols-1 gap-3 sm:grid-cols-5 items-center">
-              <div className="relative col-span-2">
+              <div className="relative col-span-1 sm:col-span-2">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-dim" />
                 <input
                   type="text"
@@ -1230,6 +1232,18 @@ export default function WalkInForm({
                   onChange={(e) => {setSearchQuery(e.target.value); setPage(1);}}
                   className="h-10 w-full rounded-lg border border-border pl-9 pr-4 font-sans text-xs text-text bg-white outline-none focus:border-primary transition-colors"
                 />
+              </div>
+
+              <div className="relative">
+                <select 
+                  value={filterRecordType} 
+                  onChange={(e) => {setFilterRecordType(e.target.value); setPage(1);}} 
+                  className="h-10 w-full rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer font-semibold"
+                >
+                  <option value="all">All Walk-Ins</option>
+                  <option value="new">New Candidate Walk-Ins</option>
+                  <option value="existing">Existing Partner Visits</option>
+                </select>
               </div>
 
               <div className="relative">
@@ -1313,21 +1327,14 @@ export default function WalkInForm({
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Date & Time Created</th>
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Last Edited At</th>
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Last Edited By</th>
-                      <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Outcome Status</th>
                       <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/40">
                     {records.length === 0 ? (
-                      <tr><td colSpan={11} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50 text-[11px]">No records found.</td></tr>
+                      <tr><td colSpan={10} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50 text-[11px]">No records found.</td></tr>
                     ) : (
                       records.map((r) => {
-                        const displayStatus = r.joined_status || "Onboarding Process Initiated";
-                        let statusColor = "bg-blue-50 text-blue-700 border-blue-200";
-                        if (displayStatus === "Successfully Onboarded" || displayStatus === "Joined" || displayStatus === "Onboarded") statusColor = "bg-green-50 border-green-200 text-primary";
-                        else if (displayStatus === "Follow Up Required" || displayStatus === "Pending") statusColor = "bg-amber-50 text-amber-700 border-amber-200";
-                        else if (displayStatus === "No Follow Up Required / Closed" || displayStatus === "Not Interested") statusColor = "bg-red-50 border-red-100 text-red-600";
-
                         const createdDate = r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : (r.event_date || "—");
                         const createdTime = r.created_at ? new Date(r.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }) : (r.enquiry_time || "—");
                         
@@ -1365,7 +1372,6 @@ export default function WalkInForm({
                             <td className="px-4 py-3 font-bold text-slate-800">
                               {r.updated_by_name || r.executive_name || '—'}
                             </td>
-                            <td className="px-4 py-3"><span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-bold ${statusColor}`}>{displayStatus}</span></td>
                             <td className="px-4 py-3 text-center">
                               <div className="inline-flex gap-1.5 justify-center">
                                 <button type="button" onClick={() => viewRecordInline(r)} className="rounded-lg p-1 border border-border bg-white text-slate-600 hover:text-primary hover:bg-slate-50 transition-all cursor-pointer" title="View Full Details"><Eye className="h-3.5 w-3.5" /></button>
