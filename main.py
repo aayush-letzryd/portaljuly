@@ -3045,6 +3045,32 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
             return {"success": True, "walkin_id": f"E-{new_id}", "record_type": "existing"}
 
         else:
+            # For non-partner candidates: enforce single entry rule per phone number
+            if data.person_number:
+                cur.execute("SELECT id FROM july_new_walkins WHERE person_number = %s LIMIT 1;", (str(data.person_number),))
+                existing_row = cur.fetchone()
+                if existing_row:
+                    existing_id = existing_row[0]
+                    cur.execute("""
+                        UPDATE july_new_walkins SET
+                            first_name=%s, last_name=%s, person_name=%s, city=%s, operating_place=%s,
+                            interested_position=%s, visiting_reason=%s, event_date=%s, enquiry_time=%s,
+                            dl_number=%s, aadhaar_number=%s, lead_channel=%s, lead_channel_details=%s,
+                            joined_status=%s, remarks=%s, updated_at=NOW(), updated_by=%s
+                        WHERE id=%s;
+                    """, (
+                        f_name, l_name, full_n, str(data.city) if data.city else 'Hyderabad',
+                        data.operating_place or '', data.visitor_type or data.partner_type or 'Driver',
+                        data.visiting_reason or 'Onboarding Inquiry',
+                        data.event_date or datetime.now().strftime("%Y-%m-%d"),
+                        data.enquiry_time or '10:30', data.dl_number or '', data.aadhaar_number or '',
+                        data.lead_channel or 'Direct Walk-in', data.lead_channel_details or '',
+                        data.joined_status or 'Onboarding Process Initiated', data.remarks or '',
+                        user_p_id, existing_id
+                    ))
+                    conn.commit()
+                    return {"success": True, "walkin_id": f"N-{existing_id}", "record_type": "new", "updated_existing": True}
+
             cur.execute("""
                 INSERT INTO july_new_walkins
                   (first_name, last_name, person_name, person_number, city, operating_place,

@@ -170,6 +170,13 @@ export default function WalkInForm({
     setIsExistingPartner(isOnboardedOrExisting);
     if (match.partner_type || match.visitor_type) setPartnerType((match.partner_type || match.visitor_type).includes("Operator") ? "Operator" : "Driver");
 
+    // For non-partner candidates, load existing record ID for inline edit (1 record rule)
+    if (!isOnboardedOrExisting && match.id && (match.id.startsWith?.("N-") || typeof match.id === "number")) {
+      setEditingId(match.id);
+    } else {
+      setEditingId(null);
+    }
+
     setFoundWalkinRecord(match);
     setAutoFillApplied(true);
   };
