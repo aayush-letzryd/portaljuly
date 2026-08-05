@@ -107,7 +107,9 @@ export default function FormSelector({ user, onSelectForm, onLogout }: FormSelec
           {CARDS.filter(({ key }) => {
             const role = (user.role || "").toLowerCase();
             const roleCode = (user.role_code || "").toUpperCase();
-            const isAdmin = role.includes("admin") || role.includes("founder") || role.includes("ceo") || roleCode === "SA";
+            const username = (user.username || "").toLowerCase();
+            const name = (user.name || "").toLowerCase();
+            const isAdmin = role.includes("admin") || role.includes("founder") || role.includes("ceo") || roleCode === "SA" || username === "admin" || name.includes("admin");
             const isOnboardingExec = role.includes("onboarding") || roleCode === "OB";
             
             // Hide Vehicle Onboarding & Drop-Off Form from Onboarding Executives
