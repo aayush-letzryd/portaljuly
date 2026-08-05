@@ -733,7 +733,13 @@ export default function OnboardingForm({
       return;
     }
 
-    const cleanPhone = phoneNumber.trim();
+    let cleanPhone = phoneNumber.replace(/\D/g, "");
+    if (cleanPhone.length > 10 && cleanPhone.startsWith("91")) {
+      cleanPhone = cleanPhone.slice(-10);
+    } else if (cleanPhone.length > 10) {
+      cleanPhone = cleanPhone.slice(0, 10);
+    }
+
     if (!/^[6-9][0-9]{9}$/.test(cleanPhone)) {
       alert("Please enter a valid 10-digit Indian phone number.");
       return;
