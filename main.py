@@ -3401,7 +3401,8 @@ def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None,
                 COALESCE(f.candidate_role, f.vendor_type, 'Driver') AS candidate_role,
                 COALESCE(NULLIF(TRIM(CONCAT(e1.first_name, ' ', e1.last_name)), ''), u1.username, 'Admin') AS executive_name,
                 COALESCE(NULLIF(TRIM(CONCAT(e2.first_name, ' ', e2.last_name)), ''), u2.username, u1.username, 'Admin') AS updated_by_name,
-                COALESCE(NULLIF(TRIM(CONCAT(e3.first_name, ' ', e3.last_name)), ''), u3.username, 'City Manager 1') AS approver_name
+                COALESCE(NULLIF(TRIM(CONCAT(e3.first_name, ' ', e3.last_name)), ''), u3.username, 'Driver Manager 1') AS approver_name,
+                COALESCE(NULLIF(TRIM(CONCAT(e4.first_name, ' ', e4.last_name)), ''), u4.username, 'Admin') AS approved_by_name
             FROM july_form_onboarding f
             LEFT JOIN july_portal_users u1 ON u1.portal_user_id = f.created_by
             LEFT JOIN july_employees e1 ON e1.employee_id = u1.employee_id
@@ -3409,6 +3410,8 @@ def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None,
             LEFT JOIN july_employees e2 ON e2.employee_id = u2.employee_id
             LEFT JOIN july_portal_users u3 ON u3.portal_user_id = COALESCE(f.current_approver_id, f.approval_requested_to)
             LEFT JOIN july_employees e3 ON e3.employee_id = u3.employee_id
+            LEFT JOIN july_portal_users u4 ON u4.portal_user_id = f.approved_by
+            LEFT JOIN july_employees e4 ON e4.employee_id = u4.employee_id
             WHERE 1=1
         """
         params = []
@@ -3936,10 +3939,10 @@ def get_onboarding(id: int):
                 account_number, ifsc_code, upi_id,
                 selfie_photo, dl_front, dl_back, pan_card_photo,
                 vendor_type, driver_id, custom_rent_amount,
-                walkin_id, emergency_relationship, platform_details, documents_verified,
+                walkin_id, emergency_relationship, platform_details, COALESCE(documents_verified, TRUE) AS documents_verified,
                 custom_rental_plan, cancelled_cheque_photo, NULL AS cheque2_photo, NULL AS cheque3_photo, signature_photo,
                 account_name, account_type,
-                candidate_role, rental_model, security_deposit, letzown_cheques, is_spring_verified,
+                candidate_role, rental_model, security_deposit, letzown_cheques, COALESCE(is_spring_verified, TRUE) AS is_spring_verified,
                 aadhaar_card_front, aadhaar_card_back, driver_email, local_address_proof,
                 ref1_name, ref1_phone, ref1_address,
                 ref2_name, ref2_phone, ref2_address,

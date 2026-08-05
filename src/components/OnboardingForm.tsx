@@ -1083,7 +1083,7 @@ export default function OnboardingForm({
       setAccountNumber(data.account_number || "987654321098");
       setIfscCode(data.ifsc_code || "SBIN0001234");
       setUpiId(data.upi_id || "candidate@upi");
-      setDocumentsVerified(data.documents_verified ?? true);
+      setDocumentsVerified(data.documents_verified !== false);
       setSameAsCandidateName(data.same_as_candidate_name ?? true);
       setCustomRentalPlan(data.custom_rental_plan || false);
       setCancelledChequePhoto(data.cancelled_cheque_photo || null);
@@ -2819,6 +2819,26 @@ export default function OnboardingForm({
                               <div className="flex flex-col gap-0.5">
                                 <span className="font-semibold text-slate-800">{role}</span>
                                 {statusBadge}
+                                {appStatus.includes("Pending") && (
+                                  <div className="text-[10px] text-amber-700 font-medium truncate mt-0.5">
+                                    Pending: {r.approver_name || 'Driver Manager 1'} <span className="text-slate-400 font-normal">(ID: {r.current_approver_id || r.approval_requested_to || 21})</span>
+                                  </div>
+                                )}
+                                {appStatus.includes("Approved") && (
+                                  <div className="text-[10px] text-emerald-700 font-medium truncate mt-0.5">
+                                    Approved by: {r.approved_by_name || r.updated_by_name || 'Admin'} <span className="text-slate-400 font-normal">(ID: {r.approved_by || r.updated_by || 3})</span>
+                                  </div>
+                                )}
+                                {(appStatus.includes("Requested") || appStatus.includes("Counter")) && (
+                                  <div className="text-[10px] text-blue-700 font-medium truncate mt-0.5">
+                                    Req. by: {r.approver_name || r.updated_by_name || 'City Manager 1'} <span className="text-slate-400 font-normal">(ID: {r.current_approver_id || r.updated_by || 20})</span>
+                                  </div>
+                                )}
+                                {appStatus.includes("Reject") && (
+                                  <div className="text-[10px] text-red-700 font-medium truncate mt-0.5">
+                                    Rejected by: {r.approved_by_name || r.updated_by_name || 'Manager'} <span className="text-slate-400 font-normal">(ID: {r.approved_by || r.updated_by || 3})</span>
+                                  </div>
+                                )}
                               </div>
                             </td>
                             <td className="px-4 py-3">
