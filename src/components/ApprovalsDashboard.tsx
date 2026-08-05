@@ -363,15 +363,26 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
     }
   };
 
+  const ensureISOUTC = (dateStr?: string): string | undefined => {
+    if (!dateStr) return undefined;
+    let str = dateStr.trim();
+    if ((str.includes("T") || str.includes(" ")) && !str.endsWith("Z") && !/[+-]\d{2}:?\d{2}$/.test(str)) {
+      str = str.replace(" ", "T") + "Z";
+    }
+    return str;
+  };
+
   const formatDateTimeComponents = (dateStr?: string) => {
-    if (!dateStr) return { date: "—", time: "" };
+    const isoStr = ensureISOUTC(dateStr);
+    if (!isoStr) return { date: "—", time: "" };
     try {
-      const d = new Date(dateStr);
-      const date = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
-      const time = d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }).toLowerCase();
+      const d = new Date(isoStr);
+      if (isNaN(d.getTime())) return { date: dateStr || "—", time: "" };
+      const date = d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+      const time = d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }).toLowerCase();
       return { date, time };
     } catch {
-      return { date: dateStr, time: "" };
+      return { date: dateStr || "—", time: "" };
     }
   };
 
@@ -1624,7 +1635,7 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
                     <p className="text-xs text-slate-500 flex justify-between"><span>City:</span> <strong className="text-slate-800">{selectedRecord.city}</strong></p>
                     <p className="text-xs text-slate-500 flex justify-between"><span>Status:</span> <strong className="text-slate-800">{selectedRecord.approval_status}</strong></p>
                     <p className="text-xs text-slate-500 flex justify-between"><span>Submitted By:</span> <strong className="text-slate-800">{selectedRecord.submitted_by_name}</strong></p>
-                    <p className="text-xs text-slate-500 flex justify-between"><span>Created At:</span> <strong className="text-slate-800">{selectedRecord.created_at ? new Date(selectedRecord.created_at).toLocaleString("en-IN") : "—"}</strong></p>
+                    <p className="text-xs text-slate-500 flex justify-between"><span>Created At:</span> <strong className="text-slate-800">{formatDateTimeComponents(selectedRecord.created_at).date} {formatDateTimeComponents(selectedRecord.created_at).time}</strong></p>
                   </div>
 
                   {/* History timeline */}
@@ -1638,18 +1649,21 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
                       <p className="text-xs text-slate-400 italic">No timeline history recorded.</p>
                     ) : (
                       <div className="space-y-2">
-                        {approvalLogs.map((log, i) => (
-                          <div key={i} className="bg-white p-3 rounded-xl border border-slate-200/60 text-xs shadow-xs">
-                            <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
-                              <span className="font-bold uppercase tracking-wider">{log.action}</span>
-                              <span>{log.action_at ? new Date(log.action_at).toLocaleDateString("en-IN") : ""}</span>
+                        {approvalLogs.map((log, i) => {
+                          const { date: lDate, time: lTime } = formatDateTimeComponents(log.action_at);
+                          return (
+                            <div key={i} className="bg-white p-3 rounded-xl border border-slate-200/60 text-xs shadow-xs">
+                              <div className="flex items-center justify-between text-[10px] text-slate-400 mb-1">
+                                <span className="font-bold uppercase tracking-wider">{log.action}</span>
+                                <span>{lDate} {lTime}</span>
+                              </div>
+                              <p className="font-semibold text-slate-800">
+                                {log.from_name || "System"} {log.action.toLowerCase()} {log.to_name && `to ${log.to_name}`}
+                              </p>
+                              {log.remarks && <p className="text-[11px] text-slate-500 italic mt-1 font-medium">"{log.remarks}"</p>}
                             </div>
-                            <p className="font-semibold text-slate-800">
-                              {log.from_name || "System"} {log.action.toLowerCase()} {log.to_name && `to ${log.to_name}`}
-                            </p>
-                            {log.remarks && <p className="text-[11px] text-slate-500 italic mt-1 font-medium">"{log.remarks}"</p>}
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

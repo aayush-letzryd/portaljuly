@@ -6768,6 +6768,19 @@ def get_approvers(authorization: Optional[str] = Header(None)):
         postgreSQL_pool.putconn(conn)
 
 
+import datetime as dt_module
+ist_tz = dt_module.timezone(dt_module.timedelta(hours=5, minutes=30))
+
+def to_ist_iso(dt):
+    if not dt: return None
+    if isinstance(dt, (dt_module.datetime, dt_module.date)):
+        if isinstance(dt, dt_module.datetime):
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=dt_module.timezone.utc)
+            return dt.astimezone(ist_tz).isoformat()
+        return dt.isoformat()
+    return str(dt)
+
 @app.get("/api/july/pending-approvals")
 def get_pending_approvals(authorization: Optional[str] = Header(None)):
     """Get pending approvals assigned specifically to the current user (Strict Personal Inbox for ALL roles)."""
@@ -6796,8 +6809,6 @@ def get_pending_approvals(authorization: Optional[str] = Header(None)):
             where_v_cond = f"WHERE (v.current_approver_id = {uid} OR (v.current_approver_id IS NULL AND LOWER(COALESCE(v.city, '')) = '{user_city}')) AND (v.approval_status LIKE 'Pending%%' OR v.approval_status = 'Submitted')"
             where_t_cond = f"WHERE (t.current_approver_id = {uid} OR (t.current_approver_id IS NULL AND LOWER(COALESCE(t.city, '')) = '{user_city}')) AND (t.approval_status LIKE 'Pending%%' OR t.approval_status = 'Submitted')"
 
-
-
         # Onboarding pending
         cur.execute(f"""
             SELECT o.onboarding_id, 
@@ -6823,7 +6834,7 @@ def get_pending_approvals(authorization: Optional[str] = Header(None)):
             mod_lbl = "Partner / Operator Onboarding" if mod == "operator_onboarding" else "Driver Onboarding"
             pending.append({"id": r[0], "module": mod, "module_label": mod_lbl,
                             "title": r[2], "city": r[3], "subtitle": r[4],
-                            "approval_status": r[5], "created_at": r[6].isoformat() if r[6] else None,
+                            "approval_status": r[5], "created_at": to_ist_iso(r[6]),
                             "submitted_by": r[7], "submitted_by_name": r[8].strip(),
                             "current_approver": r[9], "current_approver_name": r[10].strip(),
                             "daily_rent": float(r[11]) if r[11] is not None else 850.0,
@@ -6851,7 +6862,7 @@ def get_pending_approvals(authorization: Optional[str] = Header(None)):
         for r in cur.fetchall():
             pending.append({"id": r[0], "module": r[1], "module_label": "Vehicle Onboarding",
                             "title": r[2], "city": r[3], "subtitle": r[4],
-                            "approval_status": r[5], "created_at": r[6].isoformat() if r[6] else None,
+                            "approval_status": r[5], "created_at": to_ist_iso(r[6]),
                             "submitted_by": r[7], "submitted_by_name": r[8].strip(),
                             "current_approver": r[9], "current_approver_name": r[10].strip(),
                             "daily_rent": 0.0,
@@ -6878,7 +6889,7 @@ def get_pending_approvals(authorization: Optional[str] = Header(None)):
         for r in cur.fetchall():
             pending.append({"id": r[0], "module": r[1], "module_label": "Tickets Desk",
                             "title": r[2], "city": r[3], "subtitle": r[4],
-                            "approval_status": r[5], "created_at": r[6].isoformat() if r[6] else None,
+                            "approval_status": r[5], "created_at": to_ist_iso(r[6]),
                             "submitted_by": r[7], "submitted_by_name": r[8].strip(),
                             "current_approver": r[9], "current_approver_name": r[10].strip(),
                             "daily_rent": 0.0, "security_deposit": 0.0})
@@ -6922,7 +6933,7 @@ def get_my_submissions(authorization: Optional[str] = Header(None)):
             submissions.append({"id": r[0], "module": r[1], "module_label": r[2],
                                 "title": r[3], "city": r[4], "subtitle": r[5],
                                 "approval_status": r[6],
-                                "created_at": r[7].isoformat() if r[7] else None,
+                                "created_at": to_ist_iso(r[7]),
                                 "current_approver": r[8], "current_approver_name": r[9].strip() if r[9] else "City Manager 1 (City Manager — Hyderabad)",
                                 "approval_remarks": r[10],
                                 "submitted_by": r[11], "submitted_by_name": r[12].strip() if r[12] else "Onboarding Executive 1 (Onboarding Executive — Hyderabad)",
@@ -7126,7 +7137,7 @@ def get_approval_logs(module: str, record_id: int, authorization: Optional[str] 
                 logs.append({
                     "action": "SUBMITTED",
                     "remarks": "Submitted for onboarding review & approval",
-                    "action_at": rec[0].isoformat() if rec[0] else None,
+                    "action_at": to_ist_iso(rec[0]),
                     "from_name": rec[2].strip() if rec[2] else "Neha Singh",
                     "from_user": rec[3],
                     "to_name": rec[4].strip() if rec[4] else "Mohan Kumar",
@@ -7150,7 +7161,7 @@ def get_approval_logs(module: str, record_id: int, authorization: Optional[str] 
             logs.append({
                 "action": r[0],
                 "remarks": r[1],
-                "action_at": r[2].isoformat() if r[2] else None,
+                "action_at": to_ist_iso(r[2]),
                 "from_name": r[3].strip() if r[3] else r[4],
                 "from_user": r[4],
                 "to_name": r[5].strip() if r[5] else r[6],
