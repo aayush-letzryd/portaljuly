@@ -161,7 +161,12 @@ export default function WalkInForm({
     if (match.dl_image) setDlImage(match.dl_image);
     if (match.visitor_type) setInterestedPosition(match.visitor_type);
     
-    const isOnboardedOrExisting = match.joined_status === "Successfully Onboarded" || match.is_existing_partner || Boolean(match.dl_number);
+    const isOnboardedOrExisting = Boolean(
+      match.is_existing_partner ||
+      match.record_type === 'existing' ||
+      match.id?.startsWith('O-') ||
+      match.joined_status === "Successfully Onboarded"
+    );
     setIsExistingPartner(isOnboardedOrExisting);
     if (match.partner_type || match.visitor_type) setPartnerType((match.partner_type || match.visitor_type).includes("Operator") ? "Operator" : "Driver");
 
@@ -188,15 +193,23 @@ export default function WalkInForm({
       if (res.ok) {
         const data = await res.json();
         if (data && data.length > 0) {
-          const match = data[0]; // Most recent visit record
+          const match = data[0];
+          const priorVisits = data.filter((r: any) => r.id && !r.id.startsWith("O-"));
           applyRecordAutoFill(match);
-          setCandidateHistory(data);
-          setFetchBannerMsg(`Found: ${match.person_name || 'Driver'} (${data.length} prior visit${data.length > 1 ? 's' : ''})`);
+          setCandidateHistory(priorVisits);
+
+          const isEx = Boolean(match.is_existing_partner || match.record_type === "existing" || match.id?.startsWith("O-"));
+          const name = match.person_name || "Partner";
+          if (isEx) {
+            setFetchBannerMsg(priorVisits.length > 0 ? `Found Onboarded Partner: ${name} (${priorVisits.length} prior visit${priorVisits.length > 1 ? 's' : ''})` : `Found Onboarded Partner: ${name}`);
+          } else {
+            setFetchBannerMsg(priorVisits.length > 0 ? `Found Candidate: ${name} (${priorVisits.length} prior visit${priorVisits.length > 1 ? 's' : ''})` : `Found Candidate: ${name}`);
+          }
           setIsDuplicate(false);
           setDuplicateMsg("");
         } else {
           setCandidateHistory([]);
-          setFetchBannerMsg(`No prior visits found for ${cleanPhone}`);
+          setFetchBannerMsg(`No prior records found for ${cleanPhone}`);
           setIsDuplicate(false);
           setDuplicateMsg("");
         }
@@ -264,9 +277,17 @@ export default function WalkInForm({
             const data = await res.json();
             if (data && data.length > 0) {
               const match = data[0]; 
+              const priorVisits = data.filter((r: any) => r.id && !r.id.startsWith("O-"));
               applyRecordAutoFill(match);
-              setCandidateHistory(data);
-              setFetchBannerMsg(`Found: ${match.person_name || 'Driver'} (${data.length} prior visit${data.length > 1 ? 's' : ''})`);
+              setCandidateHistory(priorVisits);
+
+              const isEx = Boolean(match.is_existing_partner || match.record_type === "existing" || match.id?.startsWith("O-"));
+              const name = match.person_name || "Partner";
+              if (isEx) {
+                setFetchBannerMsg(priorVisits.length > 0 ? `Found Onboarded Partner: ${name} (${priorVisits.length} prior visit${priorVisits.length > 1 ? 's' : ''})` : `Found Onboarded Partner: ${name}`);
+              } else {
+                setFetchBannerMsg(priorVisits.length > 0 ? `Found Candidate: ${name} (${priorVisits.length} prior visit${priorVisits.length > 1 ? 's' : ''})` : `Found Candidate: ${name}`);
+              }
               setIsDuplicate(false);
               setDuplicateMsg("");
             } else {
