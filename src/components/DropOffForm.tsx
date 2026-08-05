@@ -79,8 +79,9 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCity, setFilterCity] = useState("all");
 
-  const initials = user.full_name
-    ? user.full_name.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
+  const displayName = user.name || user.username || "Executive";
+  const initials = displayName
+    ? displayName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
     : "EX";
 
   const fetchDropoffRecords = async () => {
@@ -302,7 +303,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                 {initials}
               </div>
               <div className="flex flex-col">
-                <span className="font-sans text-xs font-semibold text-text">{user.full_name}</span>
+                <span className="font-sans text-xs font-semibold text-text">{displayName}</span>
                 {user.executive_id && <span className="font-mono text-[9px] text-text-muted">ID: {user.executive_id}</span>}
               </div>
             </div>
@@ -802,6 +803,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
       {/* CAMERA CAPTURE MODAL */}
       {cameraActive && activeCameraTarget && (
         <CameraCapture 
+          title="Capture Drop-Off Photo"
           onCapture={(dataUrl) => {
             if (activeCameraTarget === "odometer") setOdometerPhoto(dataUrl);
             if (activeCameraTarget === "battery") setBatteryPhoto(dataUrl);

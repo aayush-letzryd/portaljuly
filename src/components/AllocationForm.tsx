@@ -264,28 +264,7 @@ export default function AllocationForm({
       
       setEditingId(data.id);
       setAllocationDate(data.allocation_date || "");
-      
-      let mainType = data.allocation_type || "Allocation";
-      let subType = data.sub_type || "";
-
-      if (mainType === "New allocation" || mainType === "New Allocation" || mainType === "Allocation") {
-        mainType = "Allocation";
-        if (!subType) subType = "New Allocation";
-      } else if (mainType === "Reallocation" || mainType === "Rejoining") {
-        mainType = "Allocation";
-        subType = "Rejoining";
-      } else if (mainType === "Swap") {
-        mainType = "Allocation";
-        subType = "Swap";
-      } else if (mainType === "Dropoff" || mainType === "Drop-Off") {
-        mainType = "Drop-Off";
-        if (!subType) subType = "Driver Attrition";
-      }
-
-      setAllocationMainType(mainType as any);
-      setAllocationSubType(subType as any);
-      setAllocationType(mainType === "Allocation" ? (subType === "Swap" ? "Swap" : "New allocation") : "Dropoff");
-
+      setTransactionType(data.allocation_type || "New Allocation");
       setCityName(data.city_name || "Hyderabad");
       setDriverId(data.driver_id || "");
       setDriverName(data.driver_name || "");
@@ -294,12 +273,9 @@ export default function AllocationForm({
       setTypeOfPlan(data.type_of_plan || "");
       setCarModel(data.car_model || "");
       setVehicleNumber(data.vehicle_number || "");
-      
-      setOldVehicleNumber(data.old_vehicle_number || "");
-      setDropoffOdometer(data.dropoff_odometer || "");
-      setDropoffRemarks(data.dropoff_remarks || "");
-      setDropoffPhoto(data.dropoff_photo || null);
-
+      setOdometerReading(data.odometer_reading ? String(data.odometer_reading) : "");
+      setOdometerPhoto(data.odometer_photo || null);
+      setBatteryPhoto(data.battery_photo || null);
       setOlaNegativeBalance(data.ola_negative_balance || "");
       setOlaNegativeBalanceProof(data.ola_negative_balance_proof || null);
       setGpsActive(data.gps_active || "Yes");
@@ -307,18 +283,6 @@ export default function AllocationForm({
       setPhotoRhSide(data.photo_rh_side || null);
       setPhotoFrontSide(data.photo_front_side || null);
       setPhotoBackSide(data.photo_back_side || null);
-
-      setDuplicateKeyStatus(data.duplicate_key_status || "Yes");
-      setFastagBalanceAmount(data.fastag_balance_amount || "");
-      setFastagBalanceProof(data.fastag_balance_proof || null);
-      setDropoffLocation(data.dropoff_location || "Hub");
-
-      if (data.vehicle_number) {
-        fetchLastInspectionForGiven(data.vehicle_number);
-      }
-      if (data.old_vehicle_number) {
-        fetchLastInspectionForOld(data.old_vehicle_number);
-      }
       
       setActiveTab("form");
       setRetrieveIdInput("");
@@ -336,7 +300,7 @@ export default function AllocationForm({
   const resetForm = () => {
     setEditingId(null);
     setAllocationDate(new Date().toISOString().split("T")[0]);
-    setAllocationType("New allocation");
+    setTransactionType("New Allocation");
     setCityName("Hyderabad");
     setDriverId("");
     setDriverName("");
@@ -345,13 +309,9 @@ export default function AllocationForm({
     setTypeOfPlan("");
     setCarModel("");
     setVehicleNumber("");
-    setOldVehicleNumber("");
-    setDropoffOdometer("");
-    setDropoffRemarks("");
-    setDropoffPhoto(null);
-
-    setAllocationMainType("Allocation");
-    setAllocationSubType("New Allocation");
+    setOdometerReading("");
+    setOdometerPhoto(null);
+    setBatteryPhoto(null);
     setOlaNegativeBalance("");
     setOlaNegativeBalanceProof(null);
     setGpsActive("Yes");
@@ -359,12 +319,8 @@ export default function AllocationForm({
     setPhotoRhSide(null);
     setPhotoFrontSide(null);
     setPhotoBackSide(null);
-    setDuplicateKeyStatus("Yes");
-    setFastagBalanceAmount("");
-    setFastagBalanceProof(null);
-    setDropoffLocation("Hub");
 
-    // Given Vehicle Inspection States Reset
+    // Vehicle Inspection States Reset
     setJack("Available");
     setJackRod("Available");
     setSpanner("Available");
@@ -374,17 +330,8 @@ export default function AllocationForm({
     setFloorCarpet("Available");
     setMusicSystem("Available");
     setInspectionRemarks("");
-
-    // Returned Vehicle Inspection States Reset
-    setOldJack("Available");
-    setOldJackRod("Available");
-    setOldSpanner("Available");
-    setOldParkingTriangle("Available");
-    setOldFireExtinguishers("Available");
-    setOldSeatCover("Available");
-    setOldFloorCarpet("Available");
-    setOldMusicSystem("Available");
-    setOldInspectionRemarks("");
+    setDriverLookupStatus("");
+    setShowVehicleDropdown(false);
   };
 
   const handleSubmit = async (e: React.FormEvent, targetStatus: "Draft" | "Submitted" = "Submitted") => {
@@ -400,45 +347,22 @@ export default function AllocationForm({
         return alert("Please enter a valid 10-digit Indian mobile number.");
       }
 
-      // Allocation fields check
-      if (allocationMainType === "Allocation") {
-        if (!vehicleNumber.trim()) return alert("Vehicle Number is required");
-        const cleanVeh = vehicleNumber.trim().toUpperCase().replace(/\s+/g, "");
-        if (cleanVeh.length < 6) return alert("Please enter a valid Vehicle Registration Number (e.g. TS09FA1234).");
-      }
+      if (!vehicleNumber.trim()) return alert("Vehicle Number is required");
+      if (!odometerReading.trim()) return alert("Odometer Reading is required");
 
-      // Mandatory Car Condition Photos check for new allocation or swap
-      if (!editingId && (allocationMainType === "Allocation" || allocationSubType === "Swap")) {
-        if (!photoLhSide) return alert("Left-Hand (LH) Side photo is required to record vehicle condition");
-        if (!photoRhSide) return alert("Right-Hand (RH) Side photo is required to record vehicle condition");
-        if (!photoFrontSide) return alert("Front Side photo is required to record vehicle condition");
-        if (!photoBackSide) return alert("Back Side photo is required to record vehicle condition");
-      }
-
-      // Drop-Off fields check
-      if (allocationMainType === "Drop-Off" || allocationSubType === "Swap") {
-        if (!oldVehicleNumber.trim()) return alert("Returned Vehicle Number is required");
-        const cleanOldVeh = oldVehicleNumber.trim().toUpperCase().replace(/\s+/g, "");
-        if (cleanOldVeh.length < 6) return alert("Please enter a valid Returned Vehicle Registration Number (e.g. TS09FA1234).");
-
-        if (!dropoffOdometer.trim()) return alert("Dropoff Odometer reading is required");
-        if (isNaN(Number(dropoffOdometer)) || Number(dropoffOdometer) < 0) return alert("Please enter a valid positive numeric Odometer reading.");
-        
-        if (!dropoffLocation) return alert("Drop-off Location is required");
-        
-        // Photo is mandatory for Attraction drop-off
-        if (allocationMainType === "Drop-Off" && allocationSubType === "Attraction" && !dropoffPhoto) {
-          return alert("Vehicle photo is required for Attraction Drop-off");
-        }
+      if (!editingId) {
+        if (!photoLhSide) return alert("Left-Hand (LH) Side photo is required");
+        if (!photoRhSide) return alert("Right-Hand (RH) Side photo is required");
+        if (!photoFrontSide) return alert("Front Side photo is required");
+        if (!photoBackSide) return alert("Back Side photo is required");
       }
     }
 
     const token = localStorage.getItem("lr_token");
 
     try {
-      // 1. Submit Inspection for Allocated Vehicle (if allocated and not draft)
-      if (allocationMainType === "Allocation" && !isDraft) {
-        const inspRes = await fetch("/api/inspection", {
+      if (!isDraft) {
+        await fetch("/api/inspection", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -447,7 +371,7 @@ export default function AllocationForm({
           body: JSON.stringify({
             vehicle_number: vehicleNumber.trim().toUpperCase(),
             inspection_date: allocationDate,
-            odometer_reading: dropoffOdometer || "0",
+            odometer_reading: odometerReading || "0",
             jack,
             jack_rod: jackRod,
             spanner,
@@ -459,33 +383,6 @@ export default function AllocationForm({
             remarks: inspectionRemarks
           })
         });
-        if (!inspRes.ok) throw new Error("Failed to log Allocated Vehicle inspection checklist");
-      }
-
-      // 2. Submit Inspection for Returned Vehicle (if dropped off/swapped and not draft)
-      if ((allocationMainType === "Drop-Off" || allocationSubType === "Swap") && !isDraft) {
-        const inspRes = await fetch("/api/inspection", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
-          },
-          body: JSON.stringify({
-            vehicle_number: oldVehicleNumber.trim().toUpperCase(),
-            inspection_date: allocationDate,
-            odometer_reading: dropoffOdometer,
-            jack: oldJack,
-            jack_rod: oldJackRod,
-            spanner: oldSpanner,
-            parking_triangle: oldParkingTriangle,
-            fire_extinguishers: oldFireExtinguishers,
-            seat_cover: oldSeatCover,
-            floor_carpet: oldFloorCarpet,
-            music_system: oldMusicSystem,
-            remarks: oldInspectionRemarks
-          })
-        });
-        if (!inspRes.ok) throw new Error("Failed to log Returned Vehicle inspection checklist");
       }
 
       // Submit Allocation Payload
@@ -531,7 +428,7 @@ export default function AllocationForm({
         throw new Error(errorText || "Failed to submit allocation record");
       }
 
-      alert(editingId ? "Allocation Record & Inspections Updated Successfully!" : "Allocation Record & Inspections Saved Successfully!");
+      alert(editingId ? "Vehicle Allocation Record Updated Successfully!" : "Vehicle Allocation Saved Successfully!");
       resetForm();
       fetchStats();
       fetchRecords();
@@ -1082,177 +979,173 @@ export default function AllocationForm({
                   </div>
                 </div>
 
-                {/* 5. CAR CONDITION PHOTOS (At Allocation) */}
-                {allocationMainType === "Allocation" && (
-                  <div className="border-t border-border pt-10 space-y-6">
-                    <div className="border-b border-border pb-3">
-                      <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">5</span>
-                        Car Condition Photos (At Handover) <span className="text-red-500">*</span>
-                      </h3>
-                      <p className="font-sans text-xs text-text-muted mt-1">Upload mandatory photos recording the vehicle's condition prior to handover.</p>
-                    </div>
+                {/* 4. CAR CONDITION PHOTOS (At Allocation) */}
+                <div className="border-t border-border pt-10 space-y-6">
+                  <div className="border-b border-border pb-3">
+                    <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">4</span>
+                      Car Condition Photos (At Handover) <span className="text-red-500">*</span>
+                    </h3>
+                    <p className="font-sans text-xs text-text-muted mt-1">Upload mandatory photos recording the vehicle's condition prior to handover.</p>
+                  </div>
 
-                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
-                      {[
-                        { label: "Left-Hand (LH) Side", state: photoLhSide, setState: setPhotoLhSide, target: "lhSide" },
-                        { label: "Right-Hand (RH) Side", state: photoRhSide, setState: setPhotoRhSide, target: "rhSide" },
-                        { label: "Front Side", state: photoFrontSide, setState: setPhotoFrontSide, target: "frontSide" },
-                        { label: "Back Side", state: photoBackSide, setState: setPhotoBackSide, target: "backSide" }
-                      ].map((ph) => (
-                        <div key={ph.label} className="space-y-2">
-                          <span className="block font-sans text-xs font-bold text-text-muted">{ph.label} <span className="text-red-500">*</span></span>
-                          <div className="w-full rounded-2xl border border-dashed border-border bg-bg/30 p-4 text-center hover:bg-bg/50 transition-all shadow-2xs">
-                            {ph.state ? (
-                              <div className="relative inline-block">
-                                <img 
-                                  src={ph.state} 
-                                  alt={ph.label} 
-                                  className="h-28 w-auto object-cover rounded-xl border border-border shadow-xs"
-                                />
-                                <button 
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
+                    {[
+                      { label: "Left-Hand (LH) Side", state: photoLhSide, setState: setPhotoLhSide, target: "lhSide" },
+                      { label: "Right-Hand (RH) Side", state: photoRhSide, setState: setPhotoRhSide, target: "rhSide" },
+                      { label: "Front Side", state: photoFrontSide, setState: setPhotoFrontSide, target: "frontSide" },
+                      { label: "Back Side", state: photoBackSide, setState: setPhotoBackSide, target: "backSide" }
+                    ].map((ph) => (
+                      <div key={ph.label} className="space-y-2">
+                        <span className="block font-sans text-xs font-bold text-text-muted">{ph.label} <span className="text-red-500">*</span></span>
+                        <div className="w-full rounded-2xl border border-dashed border-border bg-bg/30 p-4 text-center hover:bg-bg/50 transition-all shadow-2xs">
+                          {ph.state ? (
+                            <div className="relative inline-block">
+                              <img 
+                                src={ph.state} 
+                                alt={ph.label} 
+                                className="h-28 w-auto object-cover rounded-xl border border-border shadow-xs"
+                              />
+                              <button 
+                                type="button"
+                                onClick={() => ph.setState(null)}
+                                className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white border border-white hover:bg-red-700 shadow-xs cursor-pointer"
+                              >
+                                <X className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="space-y-3 py-2">
+                              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                <Upload className="h-4 w-4" />
+                              </div>
+                              <div className="flex flex-col gap-2 justify-center items-center">
+                                <button
                                   type="button"
-                                  onClick={() => ph.setState(null)}
-                                  className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white border border-white hover:bg-red-700 shadow-xs cursor-pointer"
+                                  onClick={() => setActiveCameraTarget(ph.target as any)}
+                                  className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 font-sans text-[10px] font-bold text-white hover:bg-primary-hover shadow-xs cursor-pointer"
                                 >
-                                  <X className="h-3 w-3" />
+                                  <Camera className="h-3 w-3" />
+                                  Capture
                                 </button>
+                                <label className="flex items-center gap-1 rounded-lg border border-border bg-white px-2.5 py-1 font-sans text-[10px] font-bold text-text-muted hover:bg-bg cursor-pointer transition-colors shadow-2xs">
+                                  <Upload className="h-3 w-3" />
+                                  Upload
+                                  <input 
+                                    type="file" 
+                                    accept="image/*" 
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        const r = new FileReader();
+                                        r.onloadend = () => { if (typeof r.result === "string") ph.setState(r.result); };
+                                        r.readAsDataURL(file);
+                                      }
+                                    }} 
+                                    className="hidden" 
+                                  />
+                                </label>
                               </div>
-                            ) : (
-                              <div className="space-y-3 py-2">
-                                <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                  <Upload className="h-4 w-4" />
-                                </div>
-                                <div className="flex flex-col gap-2 justify-center items-center">
-                                  <button
-                                    type="button"
-                                    onClick={() => setActiveCameraTarget(ph.target as any)}
-                                    className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 font-sans text-[10px] font-bold text-white hover:bg-primary-hover shadow-xs cursor-pointer"
-                                  >
-                                    <Camera className="h-3 w-3" />
-                                    Capture
-                                  </button>
-                                  <label className="flex items-center gap-1 rounded-lg border border-border bg-white px-2.5 py-1 font-sans text-[10px] font-bold text-text-muted hover:bg-bg cursor-pointer transition-colors shadow-2xs">
-                                    <Upload className="h-3 w-3" />
-                                    Upload
-                                    <input 
-                                      type="file" 
-                                      accept="image/*" 
-                                      onChange={(e) => {
-                                        const file = e.target.files?.[0];
-                                        if (file) {
-                                          const r = new FileReader();
-                                          r.onloadend = () => { if (typeof r.result === "string") ph.setState(r.result); };
-                                          r.readAsDataURL(file);
-                                        }
-                                      }} 
-                                      className="hidden" 
-                                    />
-                                  </label>
-                                </div>
-                              </div>
-                            )}
-                          </div>
+                            </div>
+                          )}
                         </div>
-                      ))}
-                    </div>
+                      </div>
+                    ))}
                   </div>
-                )}
+                </div>
 
-                {/* 6. GIVEN VEHICLE INSPECTION CHECKLIST */}
-                {allocationMainType === "Allocation" && (
-                  <div className="border-t border-border pt-10 space-y-6">
-                    <div className="border-b border-border pb-3">
-                      <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">6</span>
-                        Inspection Checklist: Allocated Car ({vehicleNumber || "No vehicle entered"})
-                      </h3>
-                    </div>
+                {/* 5. GIVEN VEHICLE INSPECTION CHECKLIST */}
+                <div className="border-t border-border pt-10 space-y-6">
+                  <div className="border-b border-border pb-3">
+                    <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">5</span>
+                      Inspection Checklist: Allocated Car ({vehicleNumber || "No vehicle entered"})
+                    </h3>
+                  </div>
 
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                      <div className="space-y-3.5">
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                          <span className="font-sans text-xs font-bold text-text">Jack</span>
-                          <div className="flex gap-2">
-                            {["Available", "Not Available"].map((opt) => (
-                              <button key={opt} type="button" onClick={() => setJack(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${jack === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                          <span className="font-sans text-xs font-bold text-text">Jack Rod</span>
-                          <div className="flex gap-2">
-                            {["Available", "Not Available"].map((opt) => (
-                              <button key={opt} type="button" onClick={() => setJackRod(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${jackRod === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                          <span className="font-sans text-xs font-bold text-text">Spanner</span>
-                          <div className="flex gap-2">
-                            {["Available", "Not Available"].map((opt) => (
-                              <button key={opt} type="button" onClick={() => setSpanner(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${spanner === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                          <span className="font-sans text-xs font-bold text-text">Parking Triangle</span>
-                          <div className="flex gap-2">
-                            {["Available", "Not Available"].map((opt) => (
-                              <button key={opt} type="button" onClick={() => setParkingTriangle(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${parkingTriangle === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
-                            ))}
-                          </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="space-y-3.5">
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
+                        <span className="font-sans text-xs font-bold text-text">Jack</span>
+                        <div className="flex gap-2">
+                          {["Available", "Not Available"].map((opt) => (
+                            <button key={opt} type="button" onClick={() => setJack(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${jack === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
+                          ))}
                         </div>
                       </div>
 
-                      <div className="space-y-3.5">
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                          <span className="font-sans text-xs font-bold text-text">Fire Extinguisher</span>
-                          <div className="flex gap-2">
-                            {["Available", "Not Available"].map((opt) => (
-                              <button key={opt} type="button" onClick={() => setFireExtinguishers(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${fireExtinguishers === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
-                            ))}
-                          </div>
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
+                        <span className="font-sans text-xs font-bold text-text">Jack Rod</span>
+                        <div className="flex gap-2">
+                          {["Available", "Not Available"].map((opt) => (
+                            <button key={opt} type="button" onClick={() => setJackRod(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${jackRod === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
+                          ))}
                         </div>
+                      </div>
 
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                          <span className="font-sans text-xs font-bold text-text">Seat Covers</span>
-                          <div className="flex gap-2">
-                            {["Available", "Not Available"].map((opt) => (
-                              <button key={opt} type="button" onClick={() => setSeatCover(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${seatCover === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
-                            ))}
-                          </div>
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
+                        <span className="font-sans text-xs font-bold text-text">Spanner</span>
+                        <div className="flex gap-2">
+                          {["Available", "Not Available"].map((opt) => (
+                            <button key={opt} type="button" onClick={() => setSpanner(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${spanner === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
+                          ))}
                         </div>
+                      </div>
 
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                          <span className="font-sans text-xs font-bold text-text">Floor Carpets</span>
-                          <div className="flex gap-2">
-                            {["Available", "Not Available"].map((opt) => (
-                              <button key={opt} type="button" onClick={() => setFloorCarpet(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${floorCarpet === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
-                          <span className="font-sans text-xs font-bold text-text">Music System</span>
-                          <div className="flex gap-2">
-                            {["Available", "Not Available"].map((opt) => (
-                              <button key={opt} type="button" onClick={() => setMusicSystem(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${musicSystem === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
-                            ))}
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block font-sans text-[10px] font-bold text-text-muted mb-1">Inspection Remarks (Allocated Car)</label>
-                          <input type="text" value={inspectionRemarks} onChange={(e) => setInspectionRemarks(e.target.value)} placeholder="Condition details..." className="w-full rounded-xl border border-border bg-white px-3 py-2 text-xs focus:outline-none focus:border-primary font-semibold" />
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
+                        <span className="font-sans text-xs font-bold text-text">Parking Triangle</span>
+                        <div className="flex gap-2">
+                          {["Available", "Not Available"].map((opt) => (
+                            <button key={opt} type="button" onClick={() => setParkingTriangle(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${parkingTriangle === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
+                          ))}
                         </div>
                       </div>
                     </div>
+
+                    <div className="space-y-3.5">
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
+                        <span className="font-sans text-xs font-bold text-text">Fire Extinguisher</span>
+                        <div className="flex gap-2">
+                          {["Available", "Not Available"].map((opt) => (
+                            <button key={opt} type="button" onClick={() => setFireExtinguishers(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${fireExtinguishers === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
+                        <span className="font-sans text-xs font-bold text-text">Seat Covers</span>
+                        <div className="flex gap-2">
+                          {["Available", "Not Available"].map((opt) => (
+                            <button key={opt} type="button" onClick={() => setSeatCover(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${seatCover === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
+                        <span className="font-sans text-xs font-bold text-text">Floor Carpets</span>
+                        <div className="flex gap-2">
+                          {["Available", "Not Available"].map((opt) => (
+                            <button key={opt} type="button" onClick={() => setFloorCarpet(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${floorCarpet === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-border bg-slate-50/50">
+                        <span className="font-sans text-xs font-bold text-text">Music System</span>
+                        <div className="flex gap-2">
+                          {["Available", "Not Available"].map((opt) => (
+                            <button key={opt} type="button" onClick={() => setMusicSystem(opt)} className={`px-3 py-1 rounded-lg text-[10px] font-bold border transition-all cursor-pointer ${musicSystem === opt ? "bg-green-light border-green/30 text-green" : "bg-white border-border text-text-muted"}`}>{opt}</button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block font-sans text-[10px] font-bold text-text-muted mb-1">Inspection Remarks (Allocated Car)</label>
+                        <input type="text" value={inspectionRemarks} onChange={(e) => setInspectionRemarks(e.target.value)} placeholder="Condition details..." className="w-full rounded-xl border border-border bg-white px-3 py-2 text-xs focus:outline-none focus:border-primary font-semibold" />
+                      </div>
+                    </div>
                   </div>
-                )}
+                </div>
 
 
 
@@ -1566,7 +1459,7 @@ export default function AllocationForm({
                       <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-muted text-left">Driver Details</th>
                       <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-muted text-left">Allocation Details</th>
                       <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-muted text-left">Plan & Vehicle</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-muted text-left">Dropoff Details</th>
+                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-muted text-left">Odometer Details</th>
                       <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-muted text-right w-24">Actions</th>
                     </tr>
                   </thead>
@@ -1588,7 +1481,7 @@ export default function AllocationForm({
                             </td>
                             <td className="px-6 py-4">
                               <div className="font-sans text-xs font-bold text-text">{r.city_name}</div>
-                              <span className={`inline-block rounded-md px-1.5 py-0.5 font-mono text-[9px] font-bold mt-1 ${ (r.allocation_type === "New allocation" || r.allocation_type === "New Allocation") ? "bg-green-light text-green" : r.allocation_type === "Reallocation" ? "bg-indigo-50 text-indigo-600 border border-indigo-100" : (r.allocation_type === "Swap" || r.allocation_type === "Car Swap") ? "bg-yellow-light text-amber-600 border border-yellow-100" : "bg-red-50 text-red-600 border border-red-100" }`}>
+                              <span className={`inline-block rounded-md px-1.5 py-0.5 font-mono text-[9px] font-bold mt-1 ${ (r.allocation_type === "New allocation" || r.allocation_type === "New Allocation") ? "bg-green-light text-green" : r.allocation_type === "Reallocation" ? "bg-indigo-50 text-indigo-600 border border-indigo-100" : (r.allocation_type === "Swap" || r.allocation_type === "Car Swap") ? "bg-yellow-light text-amber-600 border border-yellow-100" : "bg-emerald-50 text-emerald-600 border border-emerald-100" }`}>
                                 {r.allocation_type}
                               </span>
                               <div className="font-sans text-[9px] text-text-muted mt-1">{r.allocation_date}</div>
@@ -1603,15 +1496,9 @@ export default function AllocationForm({
                               )}
                             </td>
                             <td className="px-6 py-4">
-                              {r.old_vehicle_number ? (
-                                <div className="space-y-1">
-                                  <div className="font-mono text-[10px] text-text">Old: <span className="font-semibold">{r.old_vehicle_number}</span></div>
-                                  <div className="font-mono text-[10px] text-text-muted">Odometer: {r.dropoff_odometer} KM</div>
-                                  {r.dropoff_remarks && <div className="font-sans text-[9px] text-text-muted italic">"{r.dropoff_remarks}"</div>}
-                                </div>
-                              ) : (
-                                <span className="font-sans text-[10px] text-text-muted">-</span>
-                              )}
+                              <div className="font-mono text-xs font-bold text-slate-800">
+                                {r.odometer_reading ? `${r.odometer_reading} KM` : "-"}
+                              </div>
                             </td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex items-center justify-end gap-1.5">
@@ -1655,12 +1542,12 @@ export default function AllocationForm({
           title="Capture Photo"
           onCapture={(base64) => {
             if (activeCameraTarget === "olaProof") setOlaNegativeBalanceProof(base64);
-            else if (activeCameraTarget === "fastagProof") setFastagBalanceProof(base64);
+            else if (activeCameraTarget === "odometer") setOdometerPhoto(base64);
+            else if (activeCameraTarget === "battery") setBatteryPhoto(base64);
             else if (activeCameraTarget === "lhSide") setPhotoLhSide(base64);
             else if (activeCameraTarget === "rhSide") setPhotoRhSide(base64);
             else if (activeCameraTarget === "frontSide") setPhotoFrontSide(base64);
             else if (activeCameraTarget === "backSide") setPhotoBackSide(base64);
-            else setDropoffPhoto(base64);
             
             setCameraActive(false);
             setActiveCameraTarget(null);
