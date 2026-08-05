@@ -740,31 +740,25 @@ export default function WalkInForm({
                   <div className="flex items-center gap-3 mb-2">
                     <img src="https://letzryd.com/replica-assets/letzryd-long-png-logo-Aq2o3DNOw1i2kBMB-7ab04eaa76.png" className="h-7 brightness-0 invert" alt="LetzRyd" referrerPolicy="no-referrer" />
                     <span className="px-2 py-0.5 rounded border border-white/30 bg-white/20 text-white text-[10px] font-bold tracking-widest backdrop-blur-sm">
-                      LetzRyd Desk
+                      {isFormReadOnly ? "View Only" : "LetzRyd Desk"}
                     </span>
                   </div>
-                  <h1 className="font-sans text-2xl font-bold tracking-tight text-white">{isFormReadOnly ? `View Walk-In Entry #${editingId}` : editingId ? `Edit Walk-in #${editingId}` : "Walk-In Form"}</h1>
+                  <h1 className="font-sans text-2xl font-bold tracking-tight text-white">{isFormReadOnly ? `Walk-In Entry #${editingId}` : editingId ? `Edit Walk-in #${editingId}` : "Walk-In Form"}</h1>
                 </div>
+
+                {isFormReadOnly && (
+                  <button
+                    type="button"
+                    onClick={() => { resetForm(); setActiveTab("registry"); }}
+                    className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white border border-white/30 rounded-xl text-xs font-bold transition-all cursor-pointer backdrop-blur-xs flex items-center gap-1.5 shadow-2xs"
+                  >
+                    ← Back to Registry
+                  </button>
+                )}
               </div>
             </div>
 
-            {isFormReadOnly && (
-              <div className="flex items-center justify-between gap-3 px-5 py-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-semibold">
-                <div className="flex items-center gap-2">
-                  <Eye className="w-4 h-4 text-amber-700" />
-                  <span>Viewing Walk-In Entry #{editingId} in Read-Only Mode. Preserving original form layout.</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => { resetForm(); setActiveTab("registry"); }}
-                  className="px-3 py-1.5 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 rounded-lg text-xs font-bold transition-all cursor-pointer shadow-2xs"
-                >
-                  ← Back to Registry
-                </button>
-              </div>
-            )}
-
-            <form onSubmit={handleFormSubmit} className="rounded-2xl border border-border bg-white p-6 shadow-xs md:p-8 flex flex-col gap-8">
+            <form onSubmit={handleFormSubmit} className={`rounded-2xl border border-border bg-white p-6 shadow-xs md:p-8 flex flex-col gap-8 ${isFormReadOnly ? "opacity-90 bg-slate-50/40" : ""}`}>
               <fieldset disabled={isFormReadOnly || isReadOnly} className="contents">
               
               {/* 1. Candidate Information (Top Section) */}
