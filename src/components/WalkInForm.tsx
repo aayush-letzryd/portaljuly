@@ -1089,16 +1089,7 @@ export default function WalkInForm({
                    
                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                      <div className="flex flex-col gap-4">
-                        <div className="grid grid-cols-2 gap-4">
-                          <div className="flex flex-col gap-1.5">
-                            <label className="font-sans text-xs font-semibold text-slate-700">Interested Position</label>
-                            <select value={interestedPosition} onChange={(e) => setInterestedPosition(e.target.value)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer">
-                              <option value="Driver">Driver</option>
-                              <option value="Operator">Operator</option>
-                              <option value="Enquiry">Enquiry</option>
-                            </select>
-                          </div>
-                          
+                        <div className="grid grid-cols-1 sm:grid-cols-1 gap-4">
                           <div className="flex flex-col gap-1.5">
                             <label className="font-sans text-xs font-semibold text-slate-700">Lead Channel *</label>
                             <select
