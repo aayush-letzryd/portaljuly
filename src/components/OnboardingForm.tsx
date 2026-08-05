@@ -24,10 +24,20 @@ const maskSensitiveID = (idString: string | null | undefined) => {
   return "*".repeat(cleanStr.length - 4) + cleanStr.slice(-4);
 };
 
+const ensureISOUTC = (dateStr?: string): string | undefined => {
+  if (!dateStr) return undefined;
+  let str = dateStr.trim();
+  if ((str.includes("T") || str.includes(" ")) && !str.endsWith("Z") && !/[+-]\d{2}:?\d{2}$/.test(str)) {
+    str = str.replace(" ", "T") + "Z";
+  }
+  return str;
+};
+
 const formatDisplayDate = (createdAt?: string, fallbackDate?: string): string => {
-  if (createdAt) {
+  const isoStr = ensureISOUTC(createdAt);
+  if (isoStr) {
     try {
-      const d = new Date(createdAt);
+      const d = new Date(isoStr);
       if (!isNaN(d.getTime())) {
         return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
       }
@@ -39,7 +49,7 @@ const formatDisplayDate = (createdAt?: string, fallbackDate?: string): string =>
       const parts = cleanDate.split("-");
       if (parts.length === 3) {
         const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
-        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
       }
     } catch (e) {}
     return fallbackDate;
@@ -48,18 +58,19 @@ const formatDisplayDate = (createdAt?: string, fallbackDate?: string): string =>
 };
 
 const formatDisplayTime = (createdAt?: string, fallbackTime?: string): string => {
-  if (createdAt) {
+  const isoStr = ensureISOUTC(createdAt);
+  if (isoStr) {
     try {
-      const d = new Date(createdAt);
+      const d = new Date(isoStr);
       if (!isNaN(d.getTime())) {
-        return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" });
+        return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }).toLowerCase();
       }
     } catch (e) {}
   }
   if (fallbackTime) {
     const cleaned = fallbackTime.trim();
     if (/^(0?[1-9]|1[0-2]):[0-5][0-9]\s*(AM|PM)?$/i.test(cleaned)) {
-      return cleaned.toUpperCase();
+      return cleaned.toLowerCase();
     }
     const match = cleaned.match(/^(\d{1,2}):(\d{2})/);
     if (match) {
