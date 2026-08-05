@@ -46,6 +46,8 @@ const normalizeCity = (cityVal: string): string => {
 
 const PRESET_TAGS: Record<string, string[]> = {
   Driver: [
+    "Driver Manager (DM) Meet",
+    "Complaint",
     "Payout & Earnings",
     "Vehicle Issue & Repair",
     "Vehicle Return / Swap",
@@ -56,6 +58,8 @@ const PRESET_TAGS: Record<string, string[]> = {
     "Shift / Hub Transfer"
   ],
   Operator: [
+    "Driver Manager (DM) Meet",
+    "Complaint",
     "Hisaab & Payout",
     "Adding New Vehicle to Fleet",
     "Vehicle Offboarding / Return",
@@ -958,6 +962,8 @@ export default function WalkInForm({
                         {isExistingPartner ? (
                           <>
                             <option value="" disabled>Select Visiting Reason / Tag...</option>
+                            <option value="Driver Manager (DM) Meet">Driver Manager (DM) Meet</option>
+                            <option value="Complaint">Complaint</option>
                             {(PRESET_TAGS[partnerType] || PRESET_TAGS["Driver"]).map((tag) => (
                               <option key={tag} value={tag}>{tag}</option>
                             ))}
