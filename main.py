@@ -1,6 +1,6 @@
 import psycopg2
 from psycopg2 import pool
-from fastapi import FastAPI, HTTPException, Header, Request
+from fastapi import FastAPI, HTTPException, Header, Request, Depends
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -2707,8 +2707,12 @@ def get_all_walkins(
     from_date: Optional[str] = None,
     to_date: Optional[str] = None,
     page: Optional[int] = 1,
-    limit: Optional[int] = 10
+    limit: Optional[int] = 10,
+    current_user: dict = Depends(get_current_user)
 ):
+    page = max(1, page) if page and page > 0 else 1
+    limit = max(1, min(10000, limit)) if limit and limit > 0 else 10
+
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
