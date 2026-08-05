@@ -402,30 +402,29 @@ export default function WalkInForm({
     let cleanPhone = personNumber ? personNumber.trim() : "";
     
     if (!isDraft) {
-      if (!leadChannel) {
-        alert("Please select a Lead Channel.");
-        return;
-      }
-      if (!leadChannelDetails || !leadChannelDetails.trim()) {
-        alert("Please enter Lead Channel Name / Details.");
-        return;
+      // Only validate Lead Channel & docs for NEW candidates, not existing partners
+      if (!isExistingPartner) {
+        if (!leadChannel) {
+          alert("Please select a Lead Channel.");
+          return;
+        }
+        if (!leadChannelDetails || !leadChannelDetails.trim()) {
+          alert("Please enter Lead Channel Name / Details.");
+          return;
+        }
       }
 
-      if (visitingReason === "Onboarding" || cleanPhone) {
-          if (!/^[6-9][0-9]{9}$/.test(cleanPhone)) {
-              alert("Please enter a valid 10-digit Indian phone number.");
-              return;
-          }
+      if (!/^[6-9][0-9]{9}$/.test(cleanPhone)) {
+        alert("Please enter a valid 10-digit Indian phone number.");
+        return;
       }
     }
 
     let cleanAadhaar = aadhaarNumber ? aadhaarNumber.replace(/\s/g, "") : "";
-    if (!isDraft) {
-      if (visitingReason === "Onboarding" && cleanAadhaar) {
-          if (!/^[0-9]{12}$/.test(cleanAadhaar)) {
-              alert("Aadhaar Card must be exactly 12 digits.");
-              return;
-          }
+    if (!isDraft && !isExistingPartner) {
+      if (cleanAadhaar && !/^[0-9]{12}$/.test(cleanAadhaar)) {
+        alert("Aadhaar Card must be exactly 12 digits.");
+        return;
       }
     }
 
@@ -550,10 +549,14 @@ export default function WalkInForm({
       if (res.ok) {
         const fullData = await res.json();
         loadRecordIntoForm(fullData, r.id);
+        const name = fullData.first_name ? `${fullData.first_name} ${fullData.last_name}`.trim() : fullData.person_name;
+        setFetchBannerMsg(`Viewing record: ${name}`);
         return;
       }
     } catch (e) {}
     loadRecordIntoForm(r, r.id);
+    const name = r.first_name ? `${r.first_name} ${r.last_name}`.trim() : r.person_name;
+    setFetchBannerMsg(`Viewing record: ${name}`);
   };
 
   const formatTimeForInput = (timeStr: string) => {
@@ -823,7 +826,7 @@ export default function WalkInForm({
                     <div className="relative flex items-center">
                       <input type="tel" placeholder="Enter 10-digit number" required value={personNumber} onChange={(e) => setPersonNumber(e.target.value.replace(/\D/g, '').slice(0, 10))} className="w-full h-11 rounded-lg border border-border pl-3 pr-32 text-xs bg-white outline-none focus:border-primary text-slate-800" />
                       <div className="absolute right-1.5 top-1.5 bottom-1.5 flex items-center gap-1">
-                        {personNumber && (
+                        {personNumber && !isFormReadOnly && (
                           <button
                             type="button"
                             onClick={() => resetForm()}
@@ -834,14 +837,16 @@ export default function WalkInForm({
                             Clear
                           </button>
                         )}
-                        <button
-                          type="button"
-                          onClick={handleFetchByPhone}
-                          className="px-3 h-full bg-primary hover:bg-primary-dark text-white text-xs font-semibold rounded-md transition-all flex items-center gap-1 cursor-pointer shadow-xs"
-                        >
-                          <Search className="w-3.5 h-3.5" />
-                          Fetch
-                        </button>
+                        {!isFormReadOnly && (
+                          <button
+                            type="button"
+                            onClick={handleFetchByPhone}
+                            className="px-3 h-full bg-primary hover:bg-primary-dark text-white text-xs font-semibold rounded-md transition-all flex items-center gap-1 cursor-pointer shadow-xs"
+                          >
+                            <Search className="w-3.5 h-3.5" />
+                            Fetch
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -871,7 +876,7 @@ export default function WalkInForm({
                       <span className="h-2 w-2 rounded-full bg-emerald-500 shrink-0" />
                       <span className="font-semibold text-slate-800">{fetchBannerMsg}</span>
                     </div>
-                    {candidateHistory.length > 0 && (
+                    {candidateHistory.length > 0 && !isFormReadOnly && (
                       <button
                         type="button"
                         onClick={() => setShowHistoryModal(true)}
