@@ -2635,7 +2635,7 @@ def get_all_walkins(
 
         new_query = """
             SELECT
-                'N-' || n.id::text AS id,
+                'N' || n.id::text AS id,
                 'new' AS record_type,
                 n.interested_position AS visitor_type,
                 n.event_date,
@@ -2665,7 +2665,7 @@ def get_all_walkins(
 
         existing_query = """
             SELECT
-                'E-' || ex.id::text AS id,
+                'E' || ex.id::text AS id,
                 'existing' AS record_type,
                 ex.partner_type AS visitor_type,
                 ex.event_date,
@@ -2805,15 +2805,15 @@ def search_walkins(q: str):
         cur = conn.cursor()
         sp = f"%{q}%"
         cur.execute("""
-            SELECT 'N-' || id::text AS id, 'new' AS record_type, first_name, last_name, person_name, person_number, city, interested_position AS visitor_type, visiting_reason, event_date::text, false AS is_existing_partner
+            SELECT 'N' || id::text AS id, 'new' AS record_type, first_name, last_name, person_name, person_number, city, interested_position AS visitor_type, visiting_reason, event_date::text, false AS is_existing_partner
             FROM july_new_walkins
             WHERE person_number ILIKE %s OR person_name ILIKE %s OR first_name ILIKE %s
             UNION ALL
-            SELECT 'E-' || id::text AS id, 'existing' AS record_type, first_name, last_name, person_name, person_number, city, partner_type AS visitor_type, visiting_reason, event_date::text, true AS is_existing_partner
+            SELECT 'E' || id::text AS id, 'existing' AS record_type, first_name, last_name, person_name, person_number, city, partner_type AS visitor_type, visiting_reason, event_date::text, true AS is_existing_partner
             FROM july_existing_walkins
             WHERE person_number ILIKE %s OR person_name ILIKE %s OR first_name ILIKE %s
             UNION ALL
-            SELECT 'O-' || id::text AS id, 'existing' AS record_type, '' AS first_name, '' AS last_name, driver_name AS person_name, phone_number AS person_number, city, COALESCE(candidate_role, 'Driver') AS visitor_type, 'Partner Visit' AS visiting_reason, created_at::text AS event_date, true AS is_existing_partner
+            SELECT 'O' || id::text AS id, 'existing' AS record_type, '' AS first_name, '' AS last_name, driver_name AS person_name, phone_number AS person_number, city, COALESCE(candidate_role, 'Driver') AS visitor_type, 'Partner Visit' AS visiting_reason, created_at::text AS event_date, true AS is_existing_partner
             FROM july_form_onboarding
             WHERE phone_number ILIKE %s OR driver_name ILIKE %s
             LIMIT 10;
@@ -2861,11 +2861,15 @@ def get_preset_visit_tags():
 # ─────────────────────────────────────────────────────────
 @app.get("/api/walkins/{walkin_id}")
 def get_walkin(walkin_id: str):
+    import re
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        if str(walkin_id).startswith("E-"):
-            raw_id = int(walkin_id[2:])
+        clean_id_str = str(walkin_id).upper()
+        digits = re.sub(r'\D', '', clean_id_str)
+        raw_id = int(digits) if digits else 0
+
+        if clean_id_str.startswith("E"):
             cur.execute("""
                 SELECT id, first_name, last_name, person_name, person_number,
                        city, partner_type, visiting_reason, event_date, enquiry_time,
@@ -2876,7 +2880,7 @@ def get_walkin(walkin_id: str):
             if r:
                 return {
                     "record_type": "existing",
-                    "id": f"E-{r[0]}",
+                    "id": f"E{r[0]}",
                     "raw_id": r[0],
                     "first_name": r[1], "last_name": r[2], "person_name": r[3],
                     "person_number": r[4], "city": r[5],
@@ -2890,8 +2894,7 @@ def get_walkin(walkin_id: str):
                 }
             raise HTTPException(status_code=404, detail="Existing walkin not found")
 
-        elif str(walkin_id).startswith("N-"):
-            raw_id = int(walkin_id[2:])
+        elif clean_id_str.startswith("N"):
             cur.execute("""
                 SELECT id, first_name, last_name, person_name, person_number,
                        city, operating_place, interested_position, visiting_reason,
@@ -2904,7 +2907,7 @@ def get_walkin(walkin_id: str):
             if r:
                 return {
                     "record_type": "new",
-                    "id": f"N-{r[0]}",
+                    "id": f"N{r[0]}",
                     "raw_id": r[0],
                     "first_name": r[1], "last_name": r[2], "person_name": r[3],
                     "person_number": r[4], "city": r[5], "operating_place": r[6],
@@ -2923,7 +2926,6 @@ def get_walkin(walkin_id: str):
             raise HTTPException(status_code=404, detail="New walkin not found")
 
         else:
-            raw_id = int(walkin_id)
             cur.execute("""
                 SELECT w.visitor_type, w.event_date, w.city, w.operating_place, w.executive_id,
                        w.person_name, w.person_number, w.aadhaar_number, w.dl_number,
@@ -2997,7 +2999,6 @@ class WalkinData(BaseModel):
 def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None)):
     user = get_current_user(authorization)
     user_p_id = user.get("portal_user_id")
-    user_name = user.get("name") or user.get("username") or "Unknown"
 
     conn = postgreSQL_pool.getconn()
     try:
@@ -3042,7 +3043,7 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
             ))
             new_id = cur.fetchone()[0]
             conn.commit()
-            return {"success": True, "walkin_id": f"E-{new_id}", "record_type": "existing"}
+            return {"success": True, "walkin_id": f"E{new_id}", "record_type": "existing"}
 
         else:
             # For non-partner candidates: enforce single entry rule per phone number
@@ -3069,7 +3070,7 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
                         user_p_id, existing_id
                     ))
                     conn.commit()
-                    return {"success": True, "walkin_id": f"N-{existing_id}", "record_type": "new", "updated_existing": True}
+                    return {"success": True, "walkin_id": f"N{existing_id}", "record_type": "new", "updated_existing": True}
 
             cur.execute("""
                 INSERT INTO july_new_walkins
@@ -3104,7 +3105,7 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
             ))
             new_id = cur.fetchone()[0]
             conn.commit()
-            return {"success": True, "walkin_id": f"N-{new_id}", "record_type": "new"}
+            return {"success": True, "walkin_id": f"N{new_id}", "record_type": "new"}
 
     finally:
         postgreSQL_pool.putconn(conn)
@@ -3120,12 +3121,15 @@ def update_walkin(walkin_id: str, data: WalkinData, authorization: Optional[str]
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
+        clean_id_str = str(walkin_id).upper()
+        digits = re.sub(r'\D', '', clean_id_str)
+        raw_id = int(digits) if digits else 0
+
         f_name = (data.first_name or "").strip()
         l_name = (data.last_name or "").strip()
         full_n = (data.person_name or f"{f_name} {l_name}").strip()
 
-        if str(walkin_id).startswith("E-"):
-            raw_id = int(walkin_id[2:])
+        if clean_id_str.startswith("E"):
             cur.execute("""
                 UPDATE july_existing_walkins SET
                     first_name=%s, last_name=%s, person_name=%s, person_number=%s,
@@ -3134,8 +3138,7 @@ def update_walkin(walkin_id: str, data: WalkinData, authorization: Optional[str]
                 WHERE id=%s;
             """, (f_name, l_name, full_n, data.person_number, data.city, data.partner_type, data.visiting_reason, data.event_date, data.enquiry_time, data.visit_notes, user_p_id, raw_id))
 
-        elif str(walkin_id).startswith("N-"):
-            raw_id = int(walkin_id[2:])
+        elif clean_id_str.startswith("N"):
             cur.execute("""
                 UPDATE july_new_walkins SET
                     first_name=%s, last_name=%s, person_name=%s, person_number=%s,
@@ -3147,7 +3150,6 @@ def update_walkin(walkin_id: str, data: WalkinData, authorization: Optional[str]
             """, (f_name, l_name, full_n, data.person_number, data.city, data.operating_place, data.visitor_type, data.visiting_reason, data.event_date, data.enquiry_time, data.dl_number, data.aadhaar_number, data.lead_channel, data.lead_channel_details, data.joined_status, data.remarks, user_p_id, raw_id))
 
         else:
-            raw_id = int(walkin_id)
             cur.execute("""
                 UPDATE july_walkins SET
                     first_name=%s, last_name=%s, person_name=%s, person_number=%s,
@@ -3169,14 +3171,15 @@ def delete_walkin(walkin_id: str, authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        if str(walkin_id).startswith("E-"):
-            raw_id = int(walkin_id[2:])
+        clean_id_str = str(walkin_id).upper()
+        digits = re.sub(r'\D', '', clean_id_str)
+        raw_id = int(digits) if digits else 0
+
+        if clean_id_str.startswith("E"):
             cur.execute("DELETE FROM july_existing_walkins WHERE id = %s;", (raw_id,))
-        elif str(walkin_id).startswith("N-"):
-            raw_id = int(walkin_id[2:])
+        elif clean_id_str.startswith("N"):
             cur.execute("DELETE FROM july_new_walkins WHERE id = %s;", (raw_id,))
         else:
-            raw_id = int(walkin_id)
             cur.execute("DELETE FROM july_walkins WHERE id = %s;", (raw_id,))
         conn.commit()
         return {"success": True}

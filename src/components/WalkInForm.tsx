@@ -171,7 +171,7 @@ export default function WalkInForm({
     if (match.partner_type || match.visitor_type) setPartnerType((match.partner_type || match.visitor_type).includes("Operator") ? "Operator" : "Driver");
 
     // For non-partner candidates, load existing record ID for inline edit (1 record rule)
-    if (!isOnboardedOrExisting && match.id && (match.id.startsWith?.("N-") || typeof match.id === "number")) {
+    if (!isOnboardedOrExisting && match.id && (match.id.startsWith?.("N") || typeof match.id === "number")) {
       setEditingId(match.id);
     } else {
       setEditingId(null);
@@ -1336,7 +1336,7 @@ export default function WalkInForm({
 
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/50 transition-colors text-[11px] font-sans">
-                            <td className="px-4 py-3 font-mono font-bold text-slate-900">{r.id.startsWith?.('N-') || r.id.startsWith?.('E-') ? r.id : `#${r.id}`}</td>
+                            <td className="px-4 py-3 font-mono font-bold text-slate-900">{r.id}</td>
                             <td className="px-4 py-3 font-bold text-slate-900">
                               {r.first_name ? `${r.first_name} ${r.last_name}`.trim() : (r.person_name || 'N/A')}
                             </td>
@@ -1425,7 +1425,7 @@ export default function WalkInForm({
                   <div className="flex items-center justify-between border-b border-slate-200/80 pb-2">
                     <div className="flex items-center gap-2">
                       <span className="font-sans text-xs font-bold text-slate-900">Visit #{candidateHistory.length - idx}</span>
-                      <span className="text-xs font-mono font-bold text-slate-600">(ID: {v.id.startsWith?.('N-') || v.id.startsWith?.('E-') ? v.id : `#${v.id}`})</span>
+                      <span className="text-xs font-mono font-bold text-slate-600">(ID: {v.id})</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${
