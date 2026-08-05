@@ -750,7 +750,7 @@ export default function AllocationForm({
                             onChange={(e) => setDriverPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
                             onBlur={() => driverPhone.length === 10 && handleFetchDriver(driverPhone)}
                             required
-                            className="flex-1 h-10 rounded-xl border border-slate-200 bg-white px-3 font-mono text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
+                            className="flex-1 h-10 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
                           />
                           <button
                             type="button"
@@ -772,7 +772,7 @@ export default function AllocationForm({
                             onChange={(e) => setDriverId(e.target.value)}
                             onBlur={() => driverId.trim().length >= 3 && handleFetchDriver(driverId)}
                             required
-                            className="flex-1 h-10 rounded-xl border border-slate-200 bg-white px-3 font-mono text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
+                            className="flex-1 h-10 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
                           />
                           <button
                             type="button"
@@ -884,7 +884,7 @@ export default function AllocationForm({
                           onChange={(e) => handleVehicleInputChange(e.target.value.toUpperCase())}
                           onFocus={() => vehicleNumber.trim().length >= 1 && handleVehicleInputChange(vehicleNumber)}
                           required
-                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-mono text-xs font-medium uppercase text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium uppercase text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
                         />
 
                         {/* Autocomplete Dropdown Suggestions */}
@@ -902,7 +902,7 @@ export default function AllocationForm({
                                 className="w-full px-4 py-2.5 text-left hover:bg-slate-50 flex items-center justify-between transition-colors cursor-pointer"
                               >
                                 <div>
-                                  <span className="font-mono font-bold text-xs text-slate-900 block">{v.vehicle_number}</span>
+                                  <span className="font-sans font-bold text-xs text-slate-900 block">{v.vehicle_number}</span>
                                   <span className="text-[10px] text-slate-500 font-medium">{v.car_model} · {v.city_name}</span>
                                 </div>
                                 <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
@@ -927,7 +927,7 @@ export default function AllocationForm({
                           value={odometerReading}
                           onChange={(e) => setOdometerReading(e.target.value)}
                           required
-                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-mono text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
                         />
                       </div>
 
@@ -1265,7 +1265,7 @@ export default function AllocationForm({
 
                         return (
                           <tr key={r.id} className="hover:bg-amber-50/20 transition-colors group">
-                            <td className="px-6 py-4 font-mono text-xs font-bold text-slate-900">
+                            <td className="px-6 py-4 font-sans text-xs font-bold text-slate-900">
                               #{r.id}
                             </td>
                             <td className="px-6 py-4 font-sans text-sm font-bold text-slate-900">
