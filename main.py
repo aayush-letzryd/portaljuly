@@ -4163,7 +4163,7 @@ def get_onboarding_stats():
         cur.execute("SELECT COUNT(*) FROM july_onboarding WHERE created_at >= NOW() - INTERVAL '7 days';")
         last_7_days_count = cur.fetchone()[0]
 
-        cur.execute("SELECT COUNT(*) FROM july_onboarding WHERE approval_status ILIKE '%%Pending%%';")
+        cur.execute("SELECT COUNT(*) FROM july_onboarding WHERE (approval_status ILIKE '%%Pending%%' OR approval_status = 'Submitted');")
         pending_approvals_count = cur.fetchone()[0]
             
         return {
@@ -7204,6 +7204,8 @@ def process_batch_approval(body: BatchApprovalAction, authorization: Optional[st
     try:
         cur = conn.cursor()
         uid = user["portal_user_id"]
+        is_admin_or_cm = (user.get("role_code") in ["SA", "BH", "CM", "FL", "FE", "AU"] or 
+                          any(r in (user.get("role") or "") for r in ["Super Admin", "Admin", "Business Head", "City Manager"]))
         processed_count = 0
         for item in body.items:
             mod = item.get("module")
@@ -7212,11 +7214,18 @@ def process_batch_approval(body: BatchApprovalAction, authorization: Optional[st
                 table, pk = MODULE_TABLE_MAP[mod]
                 cur.execute(f"""
                     UPDATE {table} SET approval_status = 'Approved',
-                        current_approver_id = NULL, approved_by = %s, approval_remarks = %s
-                    WHERE {pk} = %s AND current_approver_id = %s RETURNING {pk};
-                """, (uid, body.remarks, rec_id, uid))
+                        current_approver_id = NULL, approved_by = %s, approval_remarks = %s, updated_at = (NOW() AT TIME ZONE 'Asia/Kolkata')
+                    WHERE {pk} = %s AND (current_approver_id = %s OR current_approver_id IS NULL OR %s = True) RETURNING {pk};
+                """, (uid, body.remarks, rec_id, uid, is_admin_or_cm))
                 if cur.fetchone():
                     processed_count += 1
+                    if table == "july_onboarding":
+                        cur.execute("""
+                            UPDATE july_form_onboarding
+                            SET approval_status = 'Approved', current_approver_id = NULL, approved_by = %s, approval_note = %s, updated_by = %s, updated_at = (NOW() AT TIME ZONE 'Asia/Kolkata')
+                            WHERE id = %s;
+                        """, (uid, body.remarks, uid, rec_id))
+
                     cur.execute("""
                         INSERT INTO july_approval_chain_logs (module_name, record_id, from_user_id, to_user_id, action, remarks)
                         VALUES (%s, %s, %s, NULL, 'APPROVED', %s);
