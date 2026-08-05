@@ -3688,9 +3688,9 @@ def send_onboarding_for_approval(
         approver_id = (body.approver_id if body and body.approver_id else None)
         if not approver_id or approver_id == submitter_id:
             cur.execute("""
-                SELECT id FROM july_portal_users
-                WHERE city = %s AND (role ILIKE '%%city manager%%' OR role ILIKE '%%driver manager%%' OR role ILIKE '%%general manager%%' OR role ILIKE '%%admin%%') AND id != %s
-                ORDER BY id LIMIT 1;
+                SELECT portal_user_id FROM july_portal_users
+                WHERE city = %s AND (role ILIKE '%%city manager%%' OR role ILIKE '%%driver manager%%' OR role ILIKE '%%general manager%%' OR role ILIKE '%%admin%%') AND portal_user_id != %s
+                ORDER BY portal_user_id LIMIT 1;
             """, (city, submitter_id))
             cm_row = cur.fetchone()
             if cm_row:
@@ -7027,7 +7027,7 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
         if body.action == "APPROVE":
             cur.execute(f"""
                 UPDATE {table} SET approval_status = 'Approved',
-                    current_approver_id = NULL, approved_by = %s, approval_remarks = %s, updated_at = NOW()
+                    current_approver_id = NULL, approved_by = %s, approval_remarks = %s, updated_at = (NOW() AT TIME ZONE 'Asia/Kolkata')
                 WHERE {pk} = %s AND (current_approver_id = %s OR current_approver_id IS NULL OR %s = True) RETURNING {pk};
             """, (uid, body.remarks, record_id, uid, is_admin_or_cm))
             if not cur.fetchone():
@@ -7036,7 +7036,7 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
             if table == "july_onboarding":
                 cur.execute("""
                     UPDATE july_form_onboarding
-                    SET approval_status = 'Approved', current_approver_id = NULL, approved_by = %s, approval_note = %s, updated_by = %s, updated_at = NOW()
+                    SET approval_status = 'Approved', current_approver_id = NULL, approved_by = %s, approval_note = %s, updated_by = %s, updated_at = (NOW() AT TIME ZONE 'Asia/Kolkata')
                     WHERE id = %s;
                 """, (uid, body.remarks, uid, record_id))
 
@@ -7048,7 +7048,7 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
         elif body.action == "REJECT":
             cur.execute(f"""
                 UPDATE {table} SET approval_status = 'Rejected',
-                    current_approver_id = NULL, approved_by = %s, approval_remarks = %s, updated_at = NOW()
+                    current_approver_id = NULL, approved_by = %s, approval_remarks = %s, updated_at = (NOW() AT TIME ZONE 'Asia/Kolkata')
                 WHERE {pk} = %s AND (current_approver_id = %s OR current_approver_id IS NULL OR %s = True) RETURNING {pk};
             """, (uid, body.remarks, record_id, uid, is_admin_or_cm))
             if not cur.fetchone():
@@ -7057,7 +7057,7 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
             if table == "july_onboarding":
                 cur.execute("""
                     UPDATE july_form_onboarding
-                    SET approval_status = 'Rejected', current_approver_id = NULL, approved_by = %s, approval_note = %s, updated_by = %s, updated_at = NOW()
+                    SET approval_status = 'Rejected', current_approver_id = NULL, approved_by = %s, approval_note = %s, updated_by = %s, updated_at = (NOW() AT TIME ZONE 'Asia/Kolkata')
                     WHERE id = %s;
                 """, (uid, body.remarks, uid, record_id))
 
@@ -7070,7 +7070,7 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
             if not body.forward_to_user_id:
                 raise HTTPException(status_code=400, detail="forward_to_user_id is required")
             cur.execute(f"""
-                UPDATE {table} SET current_approver_id = %s, approval_remarks = %s, updated_at = NOW()
+                UPDATE {table} SET current_approver_id = %s, approval_remarks = %s, updated_at = (NOW() AT TIME ZONE 'Asia/Kolkata')
                 WHERE {pk} = %s AND (current_approver_id = %s OR current_approver_id IS NULL OR %s = True) RETURNING {pk};
             """, (body.forward_to_user_id, body.remarks, record_id, uid, is_admin_or_cm))
             if not cur.fetchone():
@@ -7079,7 +7079,7 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
             if table == "july_onboarding":
                 cur.execute("""
                     UPDATE july_form_onboarding
-                    SET current_approver_id = %s, approval_requested_to = %s, approval_note = %s, updated_by = %s, updated_at = NOW()
+                    SET current_approver_id = %s, approval_requested_to = %s, approval_note = %s, updated_by = %s, updated_at = (NOW() AT TIME ZONE 'Asia/Kolkata')
                     WHERE id = %s;
                 """, (body.forward_to_user_id, body.forward_to_user_id, body.remarks, uid, record_id))
 
@@ -7091,7 +7091,7 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
         elif body.action == "SEND_BACK":
             cur.execute(f"""
                 UPDATE {table} SET approval_status = 'Changes Requested',
-                    current_approver_id = created_by, approval_remarks = %s, updated_at = NOW()
+                    current_approver_id = created_by, approval_remarks = %s, updated_at = (NOW() AT TIME ZONE 'Asia/Kolkata')
                 WHERE {pk} = %s AND (current_approver_id = %s OR current_approver_id IS NULL OR %s = True) RETURNING {pk};
             """, (body.remarks, record_id, uid, is_admin_or_cm))
             if not cur.fetchone():
@@ -7100,7 +7100,7 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
             if table == "july_onboarding":
                 cur.execute("""
                     UPDATE july_form_onboarding
-                    SET approval_status = 'Changes Requested', current_approver_id = created_by, approval_note = %s, updated_by = %s, updated_at = NOW()
+                    SET approval_status = 'Changes Requested', current_approver_id = created_by, approval_note = %s, updated_by = %s, updated_at = (NOW() AT TIME ZONE 'Asia/Kolkata')
                     WHERE id = %s;
                 """, (body.remarks, uid, record_id))
 
