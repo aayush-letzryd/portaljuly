@@ -4466,9 +4466,9 @@ def get_allocations(
     try:
         cur = conn.cursor()
         base_query = """
-            SELECT a.*, COALESCE(u.full_name, u.username, 'Onboarding Executive 1') AS executive_name
+            SELECT a.*, COALESCE(u.username, 'Onboarding Executive 1') AS executive_name
             FROM july_allocation_form a
-            LEFT JOIN portal_users u ON a.created_by = u.id
+            LEFT JOIN july_portal_users u ON a.created_by = u.portal_user_id
             WHERE 1=1
         """
         params = []
@@ -4503,7 +4503,14 @@ def get_allocations(
             for df in ["allocation_date", "created_at", "updated_at"]:
                 if rec.get(df) and hasattr(rec[df], "isoformat"):
                     rec[df] = rec[df].isoformat()
-            rec["allocated_by"] = rec.get("executive_name") or "Onboarding Executive 1"
+            
+            # Format clean user-friendly allocated_by
+            raw_exec = rec.get("executive_name") or "Onboarding Executive 1"
+            if raw_exec == "onboarding_executive" or raw_exec == "26":
+                raw_exec = "Onboarding Executive 1"
+            elif raw_exec == "city_manager" or raw_exec == "20":
+                raw_exec = "City Manager 1"
+            rec["allocated_by"] = raw_exec
             result.append(rec)
         return result
     finally:
