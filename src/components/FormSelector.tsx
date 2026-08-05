@@ -12,26 +12,26 @@ const WRITE_ACCESS_ROLES = ["SA", "BH", "CM", "DM", "OB"];
 const ALL_ROLES = ["SA", "BH", "CM", "DM", "OB", "SP"];
 
 const CARDS = [
-  { key: "walkin",              label: "Walkin & Leads Form",   sub: "Log walk-ins & partner visit logs", icon: ClipboardList, iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: ALL_ROLES, isCompleted: true },
-  { key: "onboarding",          label: "Partner Onboarding",     sub: "Onboard driver and operator",         icon: UserCheck,     iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: WRITE_ACCESS_ROLES, isCompleted: true },
-  { key: "vehicle_onboarding",  label: "Vehicle Onboarding",     sub: "Add new vehicles to fleet",           icon: Truck,         iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: WRITE_ACCESS_ROLES, isCompleted: true },
-  { key: "allocation",          label: "Vehicle Allocation Form", sub: "Assign vehicle & handover details for onboarded drivers", icon: Key, iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: ALL_ROLES, isCompleted: true },
-  { key: "dropoff",             label: "Vehicle Drop-Off Form",   sub: "Record vehicle returns, meter photos & settlements", icon: Truck, iconBg: "bg-amber-600 text-white", iconColor: "text-white", hover: "hover:border-amber-500", allowedRoles: ALL_ROLES, isCompleted: true },
-  { key: "adjustment",          label: "Adjustment Form",        sub: "Credit / debit wallet adjustments",   icon: Settings,      iconBg: "bg-yellow-light",iconColor: "text-amber-600",   hover: "hover:border-amber-500",   allowedRoles: ALL_ROLES },
+  { key: "walkin",              label: "Walkin & Leads Form",   sub: "Log walk-in visits",                  icon: ClipboardList, iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: ALL_ROLES, isCompleted: true },
+  { key: "onboarding",          label: "Partner Onboarding",     sub: "Onboard driver & operator",           icon: UserCheck,     iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: WRITE_ACCESS_ROLES, isCompleted: true },
+  { key: "vehicle_onboarding",  label: "Vehicle Onboarding",     sub: "Add vehicles to fleet",               icon: Truck,         iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: WRITE_ACCESS_ROLES, isCompleted: true },
+  { key: "allocation",          label: "Vehicle Allocation Form", sub: "Assign vehicle to driver",           icon: Key,           iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: ALL_ROLES, isCompleted: true },
+  { key: "dropoff",             label: "Vehicle Drop-Off Form",   sub: "Record vehicle returns",              icon: Truck,         iconBg: "bg-amber-600 text-white", iconColor: "text-white", hover: "hover:border-amber-500", allowedRoles: ALL_ROLES, isCompleted: true },
+  { key: "adjustment",          label: "Adjustment Form",        sub: "Wallet adjustments",                  icon: Settings,      iconBg: "bg-yellow-light",iconColor: "text-amber-600",   hover: "hover:border-amber-500",   allowedRoles: ALL_ROLES },
   { key: "expenses",            label: "Expenses Form",          sub: "Record operational expenses",         icon: ClipboardList, iconBg: "bg-red-50",     iconColor: "text-red-600",     hover: "hover:border-rose-500",    allowedRoles: ALL_ROLES },
-  { key: "workshops",           label: "Workshops Form",         sub: "Manage service vendors & garages",    icon: Wrench,        iconBg: "bg-green-light", iconColor: "text-green",       hover: "hover:border-green",       allowedRoles: ALL_ROLES },
-  { key: "hubs_parking",        label: "Hubs & Parking",         sub: "Track hub locations & parking slots", icon: MapPin,        iconBg: "bg-yellow-light",iconColor: "text-amber-600",   hover: "hover:border-amber-500",   allowedRoles: ALL_ROLES },
-  { key: "rents",               label: "Rent Plans",             sub: "Configure driver rent & payment plans",icon: IndianRupee,   iconBg: "bg-blue-50",    iconColor: "text-blue-600",    hover: "hover:border-blue-500",    allowedRoles: ALL_ROLES },
-  { key: "accident",            label: "Accidents Form",         sub: "Report & document vehicle accidents",  icon: AlertTriangle, iconBg: "bg-red-50",     iconColor: "text-red-600",     hover: "hover:border-red-500",     allowedRoles: ALL_ROLES },
-  { key: "inspection",          label: "Vehicle Inspection",     sub: "Conduct & log vehicle inspections",   icon: ClipboardList, iconBg: "bg-blue-50",    iconColor: "text-primary",     hover: "hover:border-primary",     allowedRoles: ALL_ROLES },
-  { key: "users",               label: "Portal Users",           sub: "Manage portal logins & credentials",  icon: Users,         iconBg: "bg-indigo-50",  iconColor: "text-indigo-600",  hover: "hover:border-indigo-500",  allowedRoles: ["SA"] },
-  { key: "employees",           label: "Employees Desk",         sub: "Manage internal LetzRyd team members", icon: UserCircle,    iconBg: "bg-violet-50",  iconColor: "text-violet-600",  hover: "hover:border-violet-500",  allowedRoles: ["SA", "BH"] },
-  { key: "vehicle_models",      label: "Vehicle Models Desk",    sub: "Fleet make, model & variant registry", icon: Truck,         iconBg: "bg-emerald-50", iconColor: "text-emerald-600", hover: "hover:border-emerald-500", allowedRoles: ALL_ROLES },
-  { key: "cities",              label: "Operating Cities",       sub: "Manage cities where LetzRyd operates", icon: MapPin,        iconBg: "bg-sky-50",     iconColor: "text-sky-600",     hover: "hover:border-sky-500",     allowedRoles: ["SA", "BH", "CM"] },
-  { key: "roles",               label: "Roles & Permissions",    sub: "Control form access by user role",    icon: ShieldCheck,   iconBg: "bg-indigo-50",  iconColor: "text-indigo-600",  hover: "hover:border-indigo-500",  allowedRoles: ["SA"] },
-  { key: "tickets",             label: "Tickets Desk",           sub: "Driver, Operator, Vendor & Internal issues", icon: TicketIcon, iconBg: "bg-rose-50",   iconColor: "text-rose-600",    hover: "hover:border-rose-500",    allowedRoles: ALL_ROLES },
-  { key: "maintenance",         label: "Maintenance Desk",       sub: "Log vehicle servicing & workshop lifecycles", icon: Wrench,     iconBg: "bg-indigo-50",  iconColor: "text-indigo-600",  hover: "hover:border-indigo-500",  allowedRoles: ALL_ROLES },
-  { key: "challans",            label: "Traffic Challans",       sub: "Log fines, check disputes & track driver recovery", icon: AlertTriangle, iconBg: "bg-red-50", iconColor: "text-red-600",   hover: "hover:border-red-500",     allowedRoles: ALL_ROLES },
+  { key: "workshops",           label: "Workshops Form",         sub: "Garages & service vendors",           icon: Wrench,        iconBg: "bg-green-light", iconColor: "text-green",       hover: "hover:border-green",       allowedRoles: ALL_ROLES },
+  { key: "hubs_parking",        label: "Hubs & Parking",         sub: "Hubs & parking slots",                icon: MapPin,        iconBg: "bg-yellow-light",iconColor: "text-amber-600",   hover: "hover:border-amber-500",   allowedRoles: ALL_ROLES },
+  { key: "rents",               label: "Rent Plans",             sub: "Driver rent plans",                   icon: IndianRupee,   iconBg: "bg-blue-50",    iconColor: "text-blue-600",    hover: "hover:border-blue-500",    allowedRoles: ALL_ROLES },
+  { key: "accident",            label: "Accidents Form",         sub: "Document vehicle accidents",          icon: AlertTriangle, iconBg: "bg-red-50",     iconColor: "text-red-600",     hover: "hover:border-red-500",     allowedRoles: ALL_ROLES },
+  { key: "inspection",          label: "Vehicle Inspection",     sub: "Log vehicle inspections",             icon: ClipboardList, iconBg: "bg-blue-50",    iconColor: "text-primary",     hover: "hover:border-primary",     allowedRoles: ALL_ROLES },
+  { key: "users",               label: "Portal Users",           sub: "Manage portal users",                 icon: Users,         iconBg: "bg-indigo-50",  iconColor: "text-indigo-600",  hover: "hover:border-indigo-500",  allowedRoles: ["SA"] },
+  { key: "employees",           label: "Employees Desk",         sub: "LetzRyd team members",                icon: UserCircle,    iconBg: "bg-violet-50",  iconColor: "text-violet-600",  hover: "hover:border-violet-500",  allowedRoles: ["SA", "BH"] },
+  { key: "vehicle_models",      label: "Vehicle Models Desk",    sub: "Vehicle models registry",             icon: Truck,         iconBg: "bg-emerald-50", iconColor: "text-emerald-600", hover: "hover:border-emerald-500", allowedRoles: ALL_ROLES },
+  { key: "cities",              label: "Operating Cities",       sub: "Manage operating cities",             icon: MapPin,        iconBg: "bg-sky-50",     iconColor: "text-sky-600",     hover: "hover:border-sky-500",     allowedRoles: ["SA", "BH", "CM"] },
+  { key: "roles",               label: "Roles & Permissions",    sub: "Role access control",                 icon: ShieldCheck,   iconBg: "bg-indigo-50",  iconColor: "text-indigo-600",  hover: "hover:border-indigo-500",  allowedRoles: ["SA"] },
+  { key: "tickets",             label: "Tickets Desk",           sub: "Driver & team issues",                icon: TicketIcon,    iconBg: "bg-rose-50",   iconColor: "text-rose-600",    hover: "hover:border-rose-500",    allowedRoles: ALL_ROLES },
+  { key: "maintenance",         label: "Maintenance Desk",       sub: "Service & maintenance",               icon: Wrench,        iconBg: "bg-indigo-50",  iconColor: "text-indigo-600",  hover: "hover:border-indigo-500",  allowedRoles: ALL_ROLES },
+  { key: "challans",            label: "Traffic Challans",       sub: "Log fines & challans",                icon: AlertTriangle, iconBg: "bg-red-50",     iconColor: "text-red-600",   hover: "hover:border-red-500",     allowedRoles: ALL_ROLES },
 ] as const;
 
 export default function FormSelector({ user, onSelectForm, onLogout }: FormSelectorProps) {
@@ -141,7 +141,7 @@ export default function FormSelector({ user, onSelectForm, onLogout }: FormSelec
                 </div>
                 <div className="flex-grow">
                   <h3 className="font-sans text-sm font-bold text-slate-900 mb-1 leading-tight">{label}</h3>
-                  <p className="font-sans text-xs text-slate-600 leading-snug line-clamp-1">{sub}</p>
+                  <p className="font-sans text-xs text-slate-500 leading-snug">{sub}</p>
                 </div>
                 <span className={`absolute top-4 right-4 rounded-md px-2.5 py-1 text-[10px] font-extrabold ${isCompleted ? 'bg-green text-white shadow-xs' : 'bg-green-light text-green'}`}>
                   Live
