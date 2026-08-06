@@ -112,9 +112,9 @@ export default function FormSelector({ user, onSelectForm, onLogout }: FormSelec
             const isAdmin = role.includes("admin") || role.includes("founder") || role.includes("ceo") || roleCode === "SA" || username === "admin" || name.includes("admin");
             const isOnboardingExec = roleCode === "OB" || roleCode === "OE" || role.includes("onboarding") || username.includes("onboarding");
 
-            // Onboarding Executives are strictly restricted to ONLY 3 core forms
+            // Onboarding Executives are allowed walkin, onboarding, allocation, and dropoff forms
             if (isOnboardingExec && !isAdmin) {
-              return ["walkin", "onboarding", "allocation"].includes(key);
+              return ["walkin", "onboarding", "allocation", "dropoff"].includes(key);
             }
 
             if (!isAdmin) {
