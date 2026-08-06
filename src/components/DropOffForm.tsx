@@ -405,83 +405,120 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
 
       {/* HEADER */}
       <header className="sticky top-0 z-50 border-b border-border bg-white shadow-xs">
-        <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <button type="button" onClick={onBackToSelector}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-slate-100 hover:text-primary transition-all cursor-pointer">
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-slate-100 hover:text-primary transition-all cursor-pointer"
+              title="Back to Form Selector">
               <ChevronLeft className="h-5 w-5" />
             </button>
-            <img src="/letzryd_icon.png" alt="LetzRyd logo" className="h-8 w-auto object-contain" />
+            <img
+              src="https://letzryd.com/replica-assets/letzryd-long-png-logo-Aq2o3DNOw1i2kBMB-7ab04eaa76.png"
+              alt="LetzRyd logo"
+              className="h-8 w-auto object-contain"
+            />
             <span className="hidden h-5 border-l border-border sm:inline-block" />
-            <span className="hidden font-sans text-xs font-semibold text-slate-700 sm:inline-block">Vehicle Drop-Off Desk</span>
+            <span className="hidden font-sans text-xs font-medium text-text-muted sm:inline-block">
+              Vehicle Drop-Off
+            </span>
           </div>
 
-          <nav className="flex gap-1">
-            {[
-              { key: "form", label: editingId ? "Edit Drop-Off" : "Drop-Off Form", icon: FileText },
-              { key: "drafts", label: `Drafts (${draftRecords.length})`, icon: Clock },
-              { key: "registry", label: `Registry (${records.length})`, icon: Database },
-            ].map(({ key, label, icon: Icon }) => (
-              <button key={key} onClick={() => { setActiveTab(key as any); if (key !== "form") fetchRecords(); }}
-                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition-all cursor-pointer ${activeTab === key ? "bg-primary text-white shadow-xs" : "text-text-muted hover:bg-slate-100"}`}>
-                <Icon className="h-3.5 w-3.5" />{label}
-              </button>
-            ))}
+          {/* Navigation Pills — exact same style as AllocationForm */}
+          <nav className="flex gap-2">
+            <button
+              onClick={() => setActiveTab("form")}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold tracking-wide transition-all cursor-pointer ${
+                activeTab === "form" ? "bg-primary text-white shadow-sm shadow-primary/20" : "text-text-muted hover:bg-slate-100 hover:text-primary"
+              }`}>
+              <FileText className="h-4 w-4" />
+              Vehicle Drop-Off Form
+            </button>
+            <button
+              onClick={() => { setActiveTab("drafts"); fetchRecords(); }}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold tracking-wide transition-all cursor-pointer ${
+                activeTab === "drafts" ? "bg-amber-600 text-white shadow-sm shadow-amber-600/20" : "text-text-muted hover:bg-slate-100 hover:text-amber-600"
+              }`}>
+              <Clock className="h-4 w-4" />
+              Saved Drafts
+              {draftRecords.length > 0 && (
+                <span className="ml-1 px-1.5 py-0.2 bg-amber-100 text-amber-800 rounded-full text-[10px] font-extrabold">
+                  {draftRecords.length}
+                </span>
+              )}
+            </button>
+            <button
+              onClick={() => { setActiveTab("registry"); fetchRecords(); }}
+              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold tracking-wide transition-all cursor-pointer ${
+                activeTab === "registry" ? "bg-primary text-white shadow-sm shadow-primary/20" : "text-text-muted hover:bg-slate-100 hover:text-primary"
+              }`}>
+              <Database className="h-4 w-4" />
+              Drop-Off Registry
+            </button>
           </nav>
 
+          {/* Clock & User Profile — exact same as AllocationForm */}
           <div className="hidden items-center gap-4 lg:flex">
             <div className="text-right">
-              <span className="block text-[9px] font-bold text-text-dim">IST</span>
+              <span className="block text-[9px] font-bold text-text-dim">Current Time (IST)</span>
               <span className="font-sans text-xs font-bold text-primary tracking-tight">{currentTime}</span>
             </div>
             <span className="h-5 border-l border-border" />
             <div className="flex items-center gap-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-xs font-bold text-white">{initials}</div>
               <div className="flex flex-col">
-                <span className="font-sans text-xs font-semibold text-text">{displayName}</span>
-                {user.executive_id && <span className="font-mono text-[9px] text-text-muted">ID: {user.executive_id}</span>}
+                <span className="font-sans text-xs font-semibold leading-none text-text">{displayName}</span>
+                {user.executive_id && <span className="font-mono text-[9px] text-text-muted mt-1 leading-none">ID: {user.executive_id}</span>}
               </div>
             </div>
+            <span className="h-5 border-l border-border" />
+            <button
+              onClick={onLogout}
+              className="flex h-8 items-center justify-center gap-1.5 rounded-lg border border-border bg-white px-2.5 font-sans text-xs font-medium text-text-muted hover:bg-red-50 hover:border-red-200 hover:text-red-600 transition-colors cursor-pointer">
+              Sign Out
+            </button>
           </div>
         </div>
       </header>
 
-      <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">
+      <main className="flex-grow max-w-[1400px] w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">
 
         {/* FORM TAB */}
         {activeTab === "form" && (
           <div className="rounded-2xl border border-border bg-white shadow-xl overflow-hidden mb-10">
-            <div className="bg-primary text-white px-8 py-6">
+            <div className="bg-primary text-white px-8 py-6 relative">
               <div className="flex items-center gap-3 mb-2">
-                <img src="/letzryd_icon.png" className="h-7 brightness-0 invert" alt="LetzRyd" />
-                <span className="px-2 py-0.5 rounded border border-white/30 bg-white/20 text-white text-[10px] font-bold tracking-widest">
+                <img src="https://letzryd.com/replica-assets/letzryd-long-png-logo-Aq2o3DNOw1i2kBMB-7ab04eaa76.png" className="h-8 brightness-0 invert" alt="LetzRyd" referrerPolicy="no-referrer" />
+                <span className="px-2 py-0.5 rounded border border-white/30 bg-white/20 text-white text-[10px] font-bold tracking-widest backdrop-blur-sm">
                   {editingId ? `Editing #${editingId}` : "Drop-Off Desk"}
                 </span>
               </div>
-              <h1 className="font-sans text-2xl font-extrabold tracking-tight text-white">Vehicle Drop-Off Form</h1>
-              <p className="text-white/80 text-xs mt-1">Record vehicle return details, meter readings, OLA balances & settlements.</p>
+              <h1 className="font-sans text-2xl font-bold tracking-tight text-white leading-tight">
+                {editingId ? `Edit Drop-Off Record #${editingId}` : "Vehicle Drop-Off Form"}
+              </h1>
+              <p className="text-white/80 text-xs mt-1">Record vehicle return details, meter readings, OLA balances &amp; settlements.</p>
             </div>
 
             <form onSubmit={(e) => handleSubmit(e, false)} className="p-8 space-y-10">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
 
                 {/* COL 1: Drop-Off Logistics */}
-                <div className="space-y-6">
-                  <div className="border-b border-border pb-3">
-                    <h3 className="font-sans text-sm font-bold text-slate-900 flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-800 text-xs font-bold">1</span>
+                <div className="space-y-5">
+                  <div className="border-b border-slate-200 pb-2.5">
+                    <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">1</span>
                       Drop-Off Logistics
                     </h3>
                   </div>
-                  <div className="space-y-4">
-                    {[
-                      { label: "Date of Drop-Off *", el: <input type="date" value={dropoffDate} onChange={(e) => setDropoffDate(e.target.value)} required className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold" /> },
-                    ].map(({ label, el }) => (
-                      <div key={label}><label className="block font-sans text-xs font-bold text-slate-800 mb-2">{label}</label>{el}</div>
-                    ))}
+                  <div className="space-y-3.5">
                     <div>
-                      <label className="block font-sans text-xs font-bold text-slate-800 mb-2">Drop-Off Reason *</label>
-                      <select value={dropoffReason} onChange={(e) => setDropoffReason(e.target.value)} required className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs cursor-pointer font-semibold">
+                      <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Date of Drop-Off <span className="text-red-500">*</span></label>
+                      <input type="date" value={dropoffDate} onChange={(e) => setDropoffDate(e.target.value)} required
+                        className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs cursor-pointer" />
+                    </div>
+                    <div>
+                      <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Drop-Off Reason <span className="text-red-500">*</span></label>
+                      <select value={dropoffReason} onChange={(e) => setDropoffReason(e.target.value)} required
+                        className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs cursor-pointer">
                         <option>Voluntary Return</option>
                         <option>Non-payment / Default</option>
                         <option>Vehicle Breakdown / Maintenance</option>
@@ -490,16 +527,18 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                       </select>
                     </div>
                     <div>
-                      <label className="block font-sans text-xs font-bold text-slate-800 mb-2">Drop-Off Location *</label>
-                      <select value={dropoffLocation} onChange={(e) => setDropoffLocation(e.target.value)} required className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs cursor-pointer font-semibold">
+                      <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Drop-Off Location <span className="text-red-500">*</span></label>
+                      <select value={dropoffLocation} onChange={(e) => setDropoffLocation(e.target.value)} required
+                        className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs cursor-pointer">
                         <option value="Hub">Hub Desk</option>
                         <option value="Service Station">Service Station</option>
                         <option value="Customer Address">Customer Address</option>
                       </select>
                     </div>
                     <div>
-                      <label className="block font-sans text-xs font-bold text-slate-800 mb-2">Operating City *</label>
-                      <select value={cityName} onChange={(e) => setCityName(e.target.value)} required className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs cursor-pointer font-semibold">
+                      <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Operating City <span className="text-red-500">*</span></label>
+                      <select value={cityName} onChange={(e) => setCityName(e.target.value)} required
+                        className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs cursor-pointer">
                         {CITIES.map((c) => <option key={c.value} value={c.value}>{c.text}</option>)}
                       </select>
                     </div>
@@ -507,11 +546,11 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                 </div>
 
                 {/* COL 2: Driver & Vehicle */}
-                <div className="space-y-6">
-                  <div className="border-b border-border pb-3">
-                    <h3 className="font-sans text-sm font-bold text-slate-900 flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-800 text-xs font-bold">2</span>
-                      Driver & Vehicle Info
+                <div className="space-y-5">
+                  <div className="border-b border-slate-200 pb-2.5">
+                    <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">2</span>
+                      Driver &amp; Vehicle Info
                     </h3>
                   </div>
                   <div className="space-y-4">
@@ -520,28 +559,25 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                         {isDriverLookupLoading ? "Searching..." : driverLookupStatus}
                       </div>
                     )}
-                    {[
-                      { label: "Driver Phone Number *", value: driverPhone, set: setDriverPhone, fetchKey: "phone", type: "tel", maxLen: 10, transform: (v: string) => v.replace(/\D/g, "").slice(0, 10) },
-                      { label: "Operator / Driver ID *", value: driverId, set: setDriverId, fetchKey: "id", type: "text", maxLen: undefined, transform: (v: string) => v },
-                    ].map(({ label, value, set, fetchKey, type, maxLen, transform }) => (
+                    {[{ label: "Driver Phone Number *", value: driverPhone, set: setDriverPhone, fetchKey: "phone", type: "tel", transform: (v: string) => v.replace(/\D/g, "").slice(0, 10) },
+                       { label: "Operator / Driver ID *", value: driverId, set: setDriverId, fetchKey: "id", type: "text", transform: (v: string) => v },
+                    ].map(({ label, value, set, fetchKey, type, transform }) => (
                       <div key={label}>
-                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">{label}</label>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">{label}</label>
                         <div className="flex gap-2">
-                          <input type={type} placeholder={fetchKey === "phone" ? "10-digit phone..." : "e.g. LR-4091..."} maxLength={maxLen} value={value}
+                          <input type={type} placeholder={fetchKey === "phone" ? "10-digit phone..." : "e.g. LR-4091..."} value={value}
                             onChange={(e) => set(transform(e.target.value))}
                             onBlur={() => { if (fetchKey === "phone" && value.length === 10) handleFetchDriver(value); if (fetchKey === "id" && value.trim().length >= 3) handleFetchDriver(value); }}
-                            className="flex-1 rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold" />
+                            className="flex-1 h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs" />
                           <button type="button" onClick={() => handleFetchDriver(value)}
-                            className="px-3 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold rounded-xl text-xs cursor-pointer transition-colors">
-                            Fetch
-                          </button>
+                            className="h-10 px-3 bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold rounded-xl text-xs cursor-pointer transition-colors">Fetch</button>
                         </div>
                       </div>
                     ))}
                     <div>
-                      <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Driver Name *</label>
+                      <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Driver Name <span className="text-red-500">*</span></label>
                       <input type="text" placeholder="Driver full name..." value={driverName} onChange={(e) => setDriverName(e.target.value)} required
-                        className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold" />
+                        className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs" />
                     </div>
                     <div className="relative">
                       <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Vehicle Number *</label>
@@ -592,18 +628,18 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                 </div>
 
                 {/* COL 3: Odometer */}
-                <div className="space-y-6">
-                  <div className="border-b border-border pb-3">
-                    <h3 className="font-sans text-sm font-bold text-slate-900 flex items-center gap-2">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-800 text-xs font-bold">3</span>
+                <div className="space-y-5">
+                  <div className="border-b border-slate-200 pb-2.5">
+                    <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">3</span>
                       Odometer Details
                     </h3>
                   </div>
-                  <div className="space-y-4">
+                  <div className="space-y-3.5">
                     <div>
-                      <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Odometer Reading (KM) *</label>
+                      <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Odometer Reading (KM) <span className="text-red-500">*</span></label>
                       <input type="number" placeholder="Current reading..." value={odometerReading} onChange={(e) => setOdometerReading(e.target.value)}
-                        className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold" />
+                        className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs" />
                     </div>
                     <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 space-y-3">
                       <span className="block font-sans text-xs font-bold text-slate-800 text-center">Odometer Photo *</span>
@@ -626,11 +662,11 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                 </div>
               </div>
 
-              {/* SECTION 4: Car Condition Photos */}
-              <div className="border-t border-border pt-8 space-y-6">
-                <div className="border-b border-border pb-3">
-                  <h3 className="font-sans text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-800 text-xs font-bold">4</span>
+              {/* SECTION 4 */}
+              <div className="border-t border-slate-200 pt-8 space-y-5">
+                <div className="border-b border-slate-200 pb-2.5">
+                  <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">4</span>
                     Car Condition Photos
                   </h3>
                 </div>
@@ -665,29 +701,29 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                 </div>
               </div>
 
-              {/* SECTION 5: Financial Settlement */}
-              <div className="border-t border-border pt-8 space-y-6">
-                <div className="border-b border-border pb-3">
-                  <h3 className="font-sans text-sm font-bold text-slate-900 flex items-center gap-2">
-                    <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-800 text-xs font-bold">5</span>
-                    Dues, Penalties & Refund Settlement
+              {/* SECTION 5 */}
+              <div className="border-t border-slate-200 pt-8 space-y-5">
+                <div className="border-b border-slate-200 pb-2.5">
+                  <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">5</span>
+                    Dues, Penalties &amp; Refund Settlement
                   </h3>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
                   <div>
-                    <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Pending Dues (₹)</label>
+                    <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Pending Dues (₹)</label>
                     <input type="number" placeholder="e.g. 1200..." value={pendingDues} onChange={(e) => setPendingDues(e.target.value)}
-                      className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold" />
+                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs" />
                   </div>
                   <div>
-                    <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Damage Penalty (₹)</label>
+                    <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Damage Penalty (₹)</label>
                     <input type="number" placeholder="e.g. 500..." value={damagePenalty} onChange={(e) => setDamagePenalty(e.target.value)}
-                      className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold" />
+                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs" />
                   </div>
                   <div>
-                    <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Deposit Refund Status</label>
+                    <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Deposit Refund Status</label>
                     <select value={depositRefundStatus} onChange={(e) => setDepositRefundStatus(e.target.value)}
-                      className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs cursor-pointer font-semibold">
+                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs cursor-pointer">
                       <option>Pending Assessment</option>
                       <option>Refund Approved</option>
                       <option>Deductions Applied</option>
@@ -696,9 +732,9 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                   </div>
                 </div>
                 <div>
-                  <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Hub Handover Notes / Vehicle Inspection Summary</label>
+                  <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Hub Handover Notes / Vehicle Inspection Summary</label>
                   <textarea placeholder="Remarks about damages, battery, driver reason..." value={dropoffNotes} onChange={(e) => setDropoffNotes(e.target.value)} rows={3}
-                    className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs resize-none font-semibold" />
+                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs resize-none" />
                 </div>
               </div>
 
