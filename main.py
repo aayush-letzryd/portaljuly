@@ -4914,11 +4914,11 @@ def get_dropoffs(status: Optional[str] = None, authorization: Optional[str] = He
                 a.fastag_balance_amount AS pending_dues,
                 a.status,
                 a.created_by,
-                COALESCE(u.name, '') AS created_by_name,
+                COALESCE(u.username, '') AS created_by_name,
                 a.created_at,
                 a.updated_at
             FROM july_allocation_form a
-            LEFT JOIN july_portal_users u ON u.id = a.created_by
+            LEFT JOIN july_portal_users u ON u.portal_user_id = a.created_by
             WHERE {where}
             ORDER BY COALESCE(a.updated_at, a.created_at) DESC, a.id DESC;
         """, params)
