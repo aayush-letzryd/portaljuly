@@ -4874,7 +4874,7 @@ class DropOffData(BaseModel):
     driver_name: str
     driver_phone: str
     vehicle_number: str
-    odometer_reading: float
+    odometer_reading: Optional[float] = None
     odometer_photo: Optional[str] = None
     battery_photo: Optional[str] = None
     photo_lh_side: Optional[str] = None
@@ -4887,35 +4887,57 @@ class DropOffData(BaseModel):
     damage_penalty: Optional[float] = None
     deposit_refund_status: Optional[str] = None
     dropoff_notes: Optional[str] = None
+    status: Optional[str] = "Submitted"
+
 
 @app.get("/api/dropoffs")
-def get_dropoffs(authorization: Optional[str] = Header(None)):
+def get_dropoffs(status: Optional[str] = None, authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("""
-            SELECT id, allocation_date AS dropoff_date, sub_type AS dropoff_reason, city_name,
-                   driver_id, driver_name, driver_phone, vehicle_number,
-                   dropoff_odometer AS odometer_reading, dropoff_remarks AS dropoff_notes,
-                   fastag_balance_amount AS pending_dues, status AS deposit_refund_status,
-                   created_at
-            FROM july_allocation_form
-            WHERE allocation_type = 'Drop-Off' OR sub_type = 'Drop-Off' OR sub_type = 'Voluntary Return' OR sub_type = 'Contract Completion' OR sub_type = 'Non-payment / Default'
-            ORDER BY id DESC;
-        """)
+        where = "(allocation_type = 'Drop-Off' OR sub_type IN ('Drop-Off','Voluntary Return','Contract Completion','Non-payment / Default','Vehicle Breakdown / Maintenance','Other'))"
+        params = []
+        if status:
+            where += " AND a.status = %s"
+            params.append(status)
+        else:
+            where += " AND a.status != 'Draft'"
+        cur.execute(f"""
+            SELECT
+                a.id,
+                a.allocation_date  AS dropoff_date,
+                a.sub_type         AS dropoff_reason,
+                a.city_name,
+                a.driver_id, a.driver_name, a.driver_phone, a.vehicle_number,
+                a.dropoff_odometer AS odometer_reading,
+                a.dropoff_remarks  AS dropoff_notes,
+                a.fastag_balance_amount AS pending_dues,
+                a.status,
+                a.created_by,
+                COALESCE(u.name, '') AS created_by_name,
+                a.created_at,
+                a.updated_at
+            FROM july_allocation_form a
+            LEFT JOIN july_portal_users u ON u.id = a.created_by
+            WHERE {where}
+            ORDER BY COALESCE(a.updated_at, a.created_at) DESC, a.id DESC;
+        """, params)
         rows = cur.fetchall()
         cols = [d[0] for d in cur.description]
         res = []
         for r in rows:
             rec = dict(zip(cols, r))
-            if rec.get("created_at") and hasattr(rec["created_at"], "isoformat"):
-                rec["created_at"] = rec["created_at"].isoformat()
-            res.append(rec)
+            for dt_field in ["created_at", "updated_at"]:
+                if rec.get(dt_field) and hasattr(rec[dt_field], "isoformat"):
+                    rec[dt_field] = rec[dt_field].isoformat()
+            res.append(_clean_dict_decimals(rec))
         return res
-    except Exception:
+    except Exception as e:
+        print(f"Error fetching dropoffs: {e}")
         return []
     finally:
         postgreSQL_pool.putconn(conn)
+
 
 @app.post("/api/dropoffs")
 def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None)):
@@ -4925,7 +4947,7 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
             user = get_july_user(authorization)
         except Exception:
             pass
-    uid   = user["portal_user_id"] if user else None
+    uid = user["portal_user_id"] if user else None
 
     conn = postgreSQL_pool.getconn()
     try:
@@ -4936,15 +4958,17 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
                 driver_id, driver_name, driver_phone,
                 vehicle_number, dropoff_odometer, dropoff_remarks,
                 photo_lh_side, photo_rh_side, photo_front_side, photo_back_side,
-                dropoff_photo, ola_negative_balance, ola_negative_balance_proof,
-                fastag_balance_amount, status, created_by, created_at
+                dropoff_photo, battery_photo, ola_negative_balance, ola_negative_balance_proof,
+                fastag_balance_amount, status, created_by,
+                created_at
             ) VALUES (
                 %s, 'Drop-Off', %s, %s,
                 %s, %s, %s,
                 %s, %s, %s,
                 %s, %s, %s, %s,
+                %s, %s, %s, %s,
                 %s, %s, %s,
-                %s, %s, %s, NOW()
+                NOW() AT TIME ZONE 'Asia/Kolkata'
             ) RETURNING id;
         """, (
             data.dropoff_date, data.dropoff_reason, data.city_name,
@@ -4952,14 +4976,71 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
             data.vehicle_number, data.odometer_reading, data.dropoff_notes,
             extract_image(data.photo_lh_side), extract_image(data.photo_rh_side),
             extract_image(data.photo_front_side), extract_image(data.photo_back_side),
-            extract_image(data.odometer_photo), data.ola_negative_balance,
-            extract_image(data.ola_negative_balance_proof),
-            data.pending_dues, data.deposit_refund_status or "Submitted",
-            uid
+            extract_image(data.odometer_photo), extract_image(data.battery_photo),
+            data.ola_negative_balance, extract_image(data.ola_negative_balance_proof),
+            data.pending_dues, data.status or "Submitted", uid
         ))
         new_id = cur.fetchone()[0]
         conn.commit()
         return {"success": True, "id": new_id}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+@app.put("/api/dropoffs/{id}")
+def update_dropoff(id: int, data: DropOffData, authorization: Optional[str] = Header(None)):
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE july_allocation_form SET
+                allocation_date=%s, sub_type=%s, city_name=%s,
+                driver_id=%s, driver_name=%s, driver_phone=%s,
+                vehicle_number=%s, dropoff_odometer=%s, dropoff_remarks=%s,
+                photo_lh_side=%s, photo_rh_side=%s, photo_front_side=%s, photo_back_side=%s,
+                dropoff_photo=%s, battery_photo=%s,
+                ola_negative_balance=%s, ola_negative_balance_proof=%s,
+                fastag_balance_amount=%s, status=%s,
+                updated_at=NOW() AT TIME ZONE 'Asia/Kolkata'
+            WHERE id=%s AND allocation_type='Drop-Off'
+            RETURNING id;
+        """, (
+            data.dropoff_date, data.dropoff_reason, data.city_name,
+            data.driver_id, data.driver_name, data.driver_phone,
+            data.vehicle_number, data.odometer_reading, data.dropoff_notes,
+            extract_image(data.photo_lh_side), extract_image(data.photo_rh_side),
+            extract_image(data.photo_front_side), extract_image(data.photo_back_side),
+            extract_image(data.odometer_photo), extract_image(data.battery_photo),
+            data.ola_negative_balance, extract_image(data.ola_negative_balance_proof),
+            data.pending_dues, data.status or "Submitted",
+            id
+        ))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Drop-off record not found")
+        conn.commit()
+        return {"success": True, "id": id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+@app.delete("/api/dropoffs/{id}")
+def delete_dropoff(id: int, authorization: Optional[str] = Header(None)):
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM july_allocation_form WHERE id=%s AND allocation_type='Drop-Off' RETURNING id;", (id,))
+        if not cur.fetchone():
+            raise HTTPException(status_code=404, detail="Drop-off record not found")
+        conn.commit()
+        return {"success": True}
+    except HTTPException:
+        raise
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))

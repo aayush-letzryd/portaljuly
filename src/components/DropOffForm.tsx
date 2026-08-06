@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from "react";
-import { 
-  Calendar, MapPin, User, Phone, FileText, CheckCircle, 
-  Clock, ArrowLeft, Download, Search, Trash2, Camera, 
-  Upload, X, RefreshCw, ChevronLeft, Database, ShieldAlert, AlertTriangle
+import {
+  Calendar, MapPin, User, Phone, FileText, CheckCircle,
+  Clock, ArrowLeft, Download, Search, Trash2, Camera, Edit,
+  Upload, X, RefreshCw, ChevronLeft, ChevronRight, Database,
+  Plus, AlertTriangle
 } from "lucide-react";
 import { User as UserSession, CITIES } from "../types";
 import CameraCapture from "./CameraCapture";
@@ -13,48 +14,42 @@ interface DropOffFormProps {
   onLogout: () => void;
 }
 
+const REASON_COLORS: Record<string, string> = {
+  "Voluntary Return": "bg-emerald-50 text-emerald-800 border-emerald-200/60",
+  "Contract Completion": "bg-blue-50 text-blue-800 border-blue-200/60",
+  "Non-payment / Default": "bg-red-50 text-red-800 border-red-200/60",
+  "Vehicle Breakdown / Maintenance": "bg-amber-50 text-amber-800 border-amber-200/60",
+  "Other": "bg-slate-100 text-slate-700 border-slate-200/60",
+};
+
 export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOffFormProps) {
-  const [activeTab, setActiveTab] = useState<"form" | "registry">("form");
+  const [activeTab, setActiveTab] = useState<"form" | "drafts" | "registry">("form");
 
   // Clock
-  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString("en-IN", {
-    timeZone: "Asia/Kolkata",
-    hour12: true
-  }));
-
+  const [currentTime, setCurrentTime] = useState(new Date().toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour12: true }));
   useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date().toLocaleTimeString("en-IN", {
-        timeZone: "Asia/Kolkata",
-        hour12: true
-      }));
-    }, 1000);
+    const timer = setInterval(() => setCurrentTime(new Date().toLocaleTimeString("en-IN", { timeZone: "Asia/Kolkata", hour12: true })), 1000);
     return () => clearInterval(timer);
   }, []);
+
+  // Edit mode
+  const [editingId, setEditingId] = useState<number | null>(null);
 
   // Form state
   const [dropoffDate, setDropoffDate] = useState(new Date().toISOString().split("T")[0]);
   const [dropoffReason, setDropoffReason] = useState("Voluntary Return");
-  const [cityName, setCityName] = useState("Hyderabad");
+  const [cityName, setCityName] = useState(user.city || "Hyderabad");
   const [dropoffLocation, setDropoffLocation] = useState("Hub");
-  
-  // Driver Details
   const [driverId, setDriverId] = useState("");
   const [driverName, setDriverName] = useState("");
   const [driverPhone, setDriverPhone] = useState("");
   const [driverLookupStatus, setDriverLookupStatus] = useState("");
   const [isDriverLookupLoading, setIsDriverLookupLoading] = useState(false);
-
-  // Vehicle Details
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [vehicleSuggestions, setVehicleSuggestions] = useState<any[]>([]);
   const [showVehicleDropdown, setShowVehicleDropdown] = useState(false);
-
-  // OLA Negative Balance
   const [olaNegativeBalance, setOlaNegativeBalance] = useState("");
   const [olaNegativeBalanceProof, setOlaNegativeBalanceProof] = useState<string | null>(null);
-
-  // Odometer & Photos
   const [odometerReading, setOdometerReading] = useState("");
   const [odometerPhoto, setOdometerPhoto] = useState<string | null>(null);
   const [batteryPhoto, setBatteryPhoto] = useState<string | null>(null);
@@ -62,8 +57,6 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
   const [photoRhSide, setPhotoRhSide] = useState<string | null>(null);
   const [photoFrontSide, setPhotoFrontSide] = useState<string | null>(null);
   const [photoBackSide, setPhotoBackSide] = useState<string | null>(null);
-
-  // Key, Dues & Settlement
   const [duplicateKeyStatus, setDuplicateKeyStatus] = useState("Yes");
   const [pendingDues, setPendingDues] = useState("");
   const [damagePenalty, setDamagePenalty] = useState("");
@@ -72,53 +65,53 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
   const [fastagBalanceProof, setFastagBalanceProof] = useState<string | null>(null);
   const [dropoffNotes, setDropoffNotes] = useState("");
 
-  // Camera Modal
+  // Camera
   const [cameraActive, setCameraActive] = useState(false);
   const [activeCameraTarget, setActiveCameraTarget] = useState<
     "odometer" | "battery" | "lhSide" | "rhSide" | "frontSide" | "backSide" | "fastag" | "ola" | null
   >(null);
 
-  // Drop-off Records
-  const [dropoffRecords, setDropoffRecords] = useState<any[]>([]);
+  // Records
+  const [records, setRecords] = useState<any[]>([]);
+  const [draftRecords, setDraftRecords] = useState<any[]>([]);
+
+  // Registry filters & pagination
   const [searchQuery, setSearchQuery] = useState("");
   const [filterCity, setFilterCity] = useState("all");
+  const [filterReason, setFilterReason] = useState("all");
+  const [filterTime, setFilterTime] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [draftPage, setDraftPage] = useState(1);
+  const PAGE_SIZE = 10;
 
   const displayName = user.name || user.username || "Executive";
-  const initials = displayName
-    ? displayName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2)
-    : "EX";
+  const initials = displayName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
 
-  const fetchDropoffRecords = async () => {
+  const fetchRecords = async () => {
     try {
       const token = localStorage.getItem("lr_token");
-      const res = await fetch("/api/dropoffs", {
-        headers: { "Authorization": `Bearer ${token}` }
-      });
-      if (res.ok) {
-        const data = await res.json();
-        setDropoffRecords(data || []);
-      }
+      const [resReg, resDraft] = await Promise.all([
+        fetch("/api/dropoffs", { headers: { Authorization: `Bearer ${token}` } }),
+        fetch("/api/dropoffs?status=Draft", { headers: { Authorization: `Bearer ${token}` } }),
+      ]);
+      if (resReg.ok) setRecords(await resReg.json());
+      if (resDraft.ok) setDraftRecords(await resDraft.json());
     } catch (err) {
       console.error(err);
     }
   };
 
-  useEffect(() => {
-    fetchDropoffRecords();
-  }, []);
+  useEffect(() => { fetchRecords(); }, []);
 
   const handleFetchDriver = async (searchVal?: string) => {
     const term = searchVal || driverPhone || driverId;
-    if (!term || !term.trim()) {
-      alert("Please enter a Driver Phone Number or Driver ID.");
-      return;
-    }
+    if (!term?.trim()) { alert("Please enter a Driver Phone Number or Driver ID."); return; }
     setIsDriverLookupLoading(true);
     setDriverLookupStatus("");
     try {
       const token = localStorage.getItem("lr_token");
       const res = await fetch(`/api/allocation/lookup-driver?query=${encodeURIComponent(term.trim())}`, {
-        headers: { "Authorization": `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.ok) {
         const data = await res.json();
@@ -128,12 +121,12 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
           if (d.driver_name) setDriverName(d.driver_name);
           if (d.driver_phone) setDriverPhone(d.driver_phone);
           if (d.city_name || d.city) setCityName(d.city_name || d.city);
-          setDriverLookupStatus(`Found driver: ${d.driver_name || "Driver"} (${d.driver_id || "ID"})`);
+          setDriverLookupStatus(`✓ Found: ${d.driver_name || "Driver"} (${d.driver_id || "ID"})`);
         } else {
-          setDriverLookupStatus("No matching onboarded driver found.");
+          setDriverLookupStatus("No matching driver found.");
         }
       }
-    } catch (err) {
+    } catch {
       setDriverLookupStatus("Lookup failed.");
     } finally {
       setIsDriverLookupLoading(false);
@@ -146,56 +139,67 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
       try {
         const token = localStorage.getItem("lr_token");
         const res = await fetch(`/api/allocation/lookup-vehicle?query=${encodeURIComponent(val.trim())}`, {
-          headers: { "Authorization": `Bearer ${token}` }
+          headers: { Authorization: `Bearer ${token}` },
         });
-        if (res.ok) {
-          const data = await res.json();
-          setVehicleSuggestions(data || []);
-          setShowVehicleDropdown(true);
-        }
-      } catch (e) {
-        console.error(e);
-      }
+        if (res.ok) { setVehicleSuggestions(await res.json()); setShowVehicleDropdown(true); }
+      } catch { /* ignore */ }
     } else {
       setShowVehicleDropdown(false);
     }
   };
 
   const resetForm = () => {
+    setEditingId(null);
     setDropoffDate(new Date().toISOString().split("T")[0]);
     setDropoffReason("Voluntary Return");
-    setCityName("Hyderabad");
+    setCityName(user.city || "Hyderabad");
     setDropoffLocation("Hub");
-    setDriverId("");
-    setDriverName("");
-    setDriverPhone("");
-    setVehicleNumber("");
-    setOdometerReading("");
-    setOdometerPhoto(null);
-    setBatteryPhoto(null);
-    setPhotoLhSide(null);
-    setPhotoRhSide(null);
-    setPhotoFrontSide(null);
-    setPhotoBackSide(null);
-    setOlaNegativeBalance("");
-    setOlaNegativeBalanceProof(null);
-    setDuplicateKeyStatus("Yes");
-    setPendingDues("");
-    setDamagePenalty("");
+    setDriverId(""); setDriverName(""); setDriverPhone("");
+    setVehicleNumber(""); setOdometerReading("");
+    setOdometerPhoto(null); setBatteryPhoto(null);
+    setPhotoLhSide(null); setPhotoRhSide(null); setPhotoFrontSide(null); setPhotoBackSide(null);
+    setOlaNegativeBalance(""); setOlaNegativeBalanceProof(null);
+    setPendingDues(""); setDamagePenalty("");
     setDepositRefundStatus("Pending Assessment");
-    setFastagBalanceAmount("");
-    setFastagBalanceProof(null);
-    setDropoffNotes("");
-    setDriverLookupStatus("");
+    setFastagBalanceAmount(""); setFastagBalanceProof(null);
+    setDropoffNotes(""); setDriverLookupStatus("");
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!vehicleNumber.trim()) return alert("Please specify the vehicle number.");
-    if (!driverPhone.trim() && !driverId.trim()) return alert("Please enter Driver ID or Phone Number.");
-    if (!odometerReading.trim()) return alert("Please enter Odometer Reading.");
-    if (!odometerPhoto) return alert("Please upload or capture Odometer Photo.");
+  const loadForEdit = async (id: number) => {
+    try {
+      const token = localStorage.getItem("lr_token");
+      // Fetch single record from all dropoffs
+      const res = await fetch("/api/dropoffs?status=all_including_draft", { headers: { Authorization: `Bearer ${token}` } });
+      const all = res.ok ? await res.json() : [...records, ...draftRecords];
+      const r = (all as any[]).find((x) => x.id === id) || [...records, ...draftRecords].find((x) => x.id === id);
+      if (!r) { alert("Could not load record."); return; }
+      setEditingId(id);
+      setDropoffDate(r.dropoff_date?.split("T")[0] || new Date().toISOString().split("T")[0]);
+      setDropoffReason(r.dropoff_reason || "Voluntary Return");
+      setCityName(r.city_name || "Hyderabad");
+      setDriverId(r.driver_id || "");
+      setDriverName(r.driver_name || "");
+      setDriverPhone(r.driver_phone || "");
+      setVehicleNumber(r.vehicle_number || "");
+      setOdometerReading(r.odometer_reading ? String(r.odometer_reading) : "");
+      setPendingDues(r.pending_dues ? String(r.pending_dues) : "");
+      setDropoffNotes(r.dropoff_notes || "");
+      setActiveTab("form");
+    } catch (err) {
+      alert("Failed to load record for editing.");
+    }
+  };
 
+  const handleSubmit = async (e: React.FormEvent, isDraft = false) => {
+    e.preventDefault();
+    if (!isDraft) {
+      if (!vehicleNumber.trim()) return alert("Please specify the vehicle number.");
+      if (!driverPhone.trim() && !driverId.trim()) return alert("Please enter Driver ID or Phone Number.");
+      if (!odometerReading.trim()) return alert("Please enter Odometer Reading.");
+      if (!odometerPhoto) return alert("Please upload or capture Odometer Photo.");
+    }
+
+    const targetStatus = isDraft ? "Draft" : "Submitted";
     try {
       const token = localStorage.getItem("lr_token");
       const payload = {
@@ -206,109 +210,233 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
         driver_name: driverName.trim(),
         driver_phone: driverPhone.trim(),
         vehicle_number: vehicleNumber.trim().toUpperCase(),
-        odometer_reading: parseFloat(odometerReading),
+        odometer_reading: odometerReading ? parseFloat(odometerReading) : null,
         odometer_photo: odometerPhoto,
         battery_photo: batteryPhoto,
         photo_lh_side: photoLhSide,
         photo_rh_side: photoRhSide,
         photo_front_side: photoFrontSide,
         photo_back_side: photoBackSide,
-        ola_negative_balance: olaNegativeBalance,
+        ola_negative_balance: olaNegativeBalance || null,
         ola_negative_balance_proof: olaNegativeBalanceProof,
-        pending_dues: pendingDues ? parseFloat(pendingDues) : 0,
-        damage_penalty: damagePenalty ? parseFloat(damagePenalty) : 0,
+        pending_dues: pendingDues ? parseFloat(pendingDues) : null,
+        damage_penalty: damagePenalty ? parseFloat(damagePenalty) : null,
         deposit_refund_status: depositRefundStatus,
-        dropoff_notes: dropoffNotes
+        dropoff_notes: dropoffNotes,
+        status: targetStatus,
       };
 
-      const res = await fetch("/api/dropoffs", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": `Bearer ${token}`
-        },
-        body: JSON.stringify(payload)
+      const url = editingId ? `/api/dropoffs/${editingId}` : "/api/dropoffs";
+      const method = editingId ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+        body: JSON.stringify(payload),
       });
+      if (!res.ok) { const t = await res.text(); throw new Error(t || "Failed to submit"); }
 
-      if (!res.ok) throw new Error("Failed to submit dropoff record");
-
-      alert("Vehicle Drop-Off Record Submitted Successfully!");
+      alert(isDraft
+        ? (editingId ? "Draft Updated Successfully!" : "Draft Saved Successfully!")
+        : (editingId ? "Drop-Off Record Updated!" : "Vehicle Drop-Off Submitted Successfully!"));
       resetForm();
-      fetchDropoffRecords();
-      setActiveTab("registry");
+      fetchRecords();
+      setActiveTab(isDraft ? "drafts" : "registry");
     } catch (err: any) {
       alert(err.message);
     }
   };
 
-  const filteredDropoffs = useMemo(() => {
-    return dropoffRecords.filter((r) => {
-      if (filterCity !== "all" && r.city_name !== filterCity) return false;
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        return (
-          (r.vehicle_number || "").toLowerCase().includes(q) ||
-          (r.driver_name || "").toLowerCase().includes(q) ||
-          (r.driver_id || "").toLowerCase().includes(q) ||
-          (r.driver_phone || "").includes(q)
-        );
-      }
-      return true;
-    });
-  }, [dropoffRecords, searchQuery, filterCity]);
+  const handleDelete = async (id: number, name: string) => {
+    if (!window.confirm(`Delete drop-off record for ${name}?`)) return;
+    try {
+      const token = localStorage.getItem("lr_token");
+      const res = await fetch(`/api/dropoffs/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
+      if (!res.ok) throw new Error("Delete failed");
+      alert("Record deleted.");
+      fetchRecords();
+    } catch (err: any) { alert(err.message); }
+  };
+
+  // Filtered & paginated registry
+  const filteredRecords = useMemo(() => {
+    const now = new Date();
+    return records
+      .filter((r) => {
+        if (filterCity !== "all" && (r.city_name || "").toLowerCase() !== filterCity.toLowerCase()) return false;
+        if (filterReason !== "all" && (r.dropoff_reason || "") !== filterReason) return false;
+        if (filterTime !== "all") {
+          const d = new Date(r.created_at || r.updated_at || 0);
+          if (filterTime === "today" && d.toDateString() !== now.toDateString()) return false;
+          if (filterTime === "week") { const w = new Date(now); w.setDate(now.getDate() - 7); if (d < w) return false; }
+          if (filterTime === "month") { const m = new Date(now); m.setMonth(now.getMonth() - 1); if (d < m) return false; }
+        }
+        if (searchQuery.trim()) {
+          const q = searchQuery.toLowerCase();
+          return (
+            (r.driver_name || "").toLowerCase().includes(q) ||
+            (r.driver_id || "").toLowerCase().includes(q) ||
+            (r.driver_phone || "").includes(q) ||
+            (r.vehicle_number || "").toLowerCase().includes(q) ||
+            String(r.id).includes(q)
+          );
+        }
+        return true;
+      })
+      .sort((a, b) => new Date(b.created_at || b.updated_at || 0).getTime() - new Date(a.created_at || a.updated_at || 0).getTime());
+  }, [records, searchQuery, filterCity, filterReason, filterTime]);
+
+  const totalPages = Math.ceil(filteredRecords.length / PAGE_SIZE) || 1;
+  const paginatedRecords = filteredRecords.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
+
+  const draftTotalPages = Math.ceil(draftRecords.length / PAGE_SIZE) || 1;
+  const paginatedDrafts = draftRecords.slice((draftPage - 1) * PAGE_SIZE, draftPage * PAGE_SIZE);
+
+  const handleExportCSV = () => {
+    if (filteredRecords.length === 0) return alert("No records to export");
+    const headers = ["ID", "Date", "Reason", "City", "Driver ID", "Driver Name", "Phone", "Vehicle No", "Odometer", "Notes", "Created At"];
+    const rows = filteredRecords.map((r) => [
+      r.id, r.dropoff_date, r.dropoff_reason, r.city_name, r.driver_id, r.driver_name,
+      r.driver_phone, r.vehicle_number, r.odometer_reading, `"${(r.dropoff_notes || "").replace(/"/g, '""')}"`, r.created_at,
+    ]);
+    const csv = [headers, ...rows].map((r) => r.join(",")).join("\n");
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" }));
+    a.download = `dropoff_registry_${new Date().toISOString().slice(0, 10)}.csv`; a.click();
+  };
+
+  const PaginationBar = ({ page, totalPgs, setPage, total }: { page: number; totalPgs: number; setPage: (p: number) => void; total: number }) => (
+    <div className="bg-slate-50 px-6 py-3 border-t border-slate-200 flex items-center justify-between font-sans text-xs text-slate-500">
+      <span>
+        Showing {total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)} of {total} records
+      </span>
+      <div className="flex items-center gap-1">
+        <button onClick={() => setPage(Math.max(1, page - 1))} disabled={page === 1}
+          className="h-8 px-3 rounded-lg border border-slate-200 bg-white disabled:opacity-40 flex items-center gap-1 cursor-pointer hover:bg-slate-100 transition-colors text-slate-600">
+          <ChevronLeft className="w-3 h-3" /> Prev
+        </button>
+        {Array.from({ length: totalPgs }, (_, i) => i + 1)
+          .filter((p) => p === 1 || p === totalPgs || Math.abs(p - page) <= 1)
+          .reduce<(number | string)[]>((acc, p, idx, arr) => {
+            if (idx > 0 && p - (arr[idx - 1] as number) > 1) acc.push("...");
+            acc.push(p); return acc;
+          }, [])
+          .map((p, i) =>
+            typeof p === "string" ? (
+              <span key={`e${i}`} className="px-1 text-slate-400">…</span>
+            ) : (
+              <button key={p} onClick={() => setPage(p)}
+                className={`h-8 w-8 rounded-lg border text-xs font-semibold transition-colors cursor-pointer ${page === p ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-200 bg-white text-slate-600 hover:bg-slate-100"}`}>
+                {p}
+              </button>
+            )
+          )}
+        <button onClick={() => setPage(Math.min(totalPgs, page + 1))} disabled={page === totalPgs || total === 0}
+          className="h-8 px-3 rounded-lg border border-slate-200 bg-white disabled:opacity-40 flex items-center gap-1 cursor-pointer hover:bg-slate-100 transition-colors text-slate-600">
+          Next <ChevronRight className="w-3 h-3" />
+        </button>
+      </div>
+    </div>
+  );
+
+  const RegistryTable = ({ rows, isLoading }: { rows: any[]; isLoading?: boolean }) => (
+    <div className="overflow-x-auto">
+      <table className="w-full text-left border-collapse whitespace-nowrap">
+        <thead>
+          <tr className="bg-slate-50 border-b border-slate-200">
+            {["ID", "DRIVER NAME", "DRIVER ID", "CONTACT", "CITY", "VEHICLE NO", "REASON", "RECORDED BY", "DATE & TIME", "ACTION"].map((h) => (
+              <th key={h} className={`px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 ${h === "ACTION" ? "text-center" : "text-left"}`}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-slate-100">
+          {rows.length === 0 ? (
+            <tr><td colSpan={10} className="px-6 py-12 text-center text-slate-500 font-sans bg-slate-50/50 text-xs">No records found.</td></tr>
+          ) : (
+            rows.map((r: any) => {
+              const rawDate = r.updated_at || r.created_at;
+              const datePart = rawDate ? new Date(rawDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
+              const timePart = rawDate ? new Date(rawDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }).toLowerCase() : "—";
+              const recBy = r.created_by_name || user.name || "Executive";
+              const reasonColor = REASON_COLORS[r.dropoff_reason] || REASON_COLORS["Other"];
+              return (
+                <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
+                  <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-700">#{r.id}</td>
+                  <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">{r.driver_name || "—"}</td>
+                  <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-600">{r.driver_id || "—"}</td>
+                  <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{r.driver_phone || "—"}</td>
+                  <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-800">{r.city_name || "—"}</td>
+                  <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">{r.vehicle_number || "—"}</td>
+                  <td className="px-4 py-3.5">
+                    <span className={`px-2.5 py-1 rounded-lg border font-semibold text-[11px] ${reasonColor}`}>
+                      {r.dropoff_reason || "Voluntary Return"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3.5 font-sans text-xs text-slate-800">
+                    <span className="font-bold text-slate-900 block">{recBy}</span>
+                    <span className="text-[10px] text-slate-400 font-medium block">ID: {r.created_by || "—"}</span>
+                  </td>
+                  <td className="px-4 py-3.5 font-sans text-xs text-slate-800">
+                    <span className="font-bold text-slate-900 block">{datePart}</span>
+                    <span className="text-[10px] text-slate-400 font-medium block">{timePart}</span>
+                  </td>
+                  <td className="px-4 py-3.5 text-center">
+                    <div className="flex items-center justify-center gap-1.5">
+                      <button onClick={() => loadForEdit(r.id)}
+                        className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200" title="Edit">
+                        <Edit className="h-3.5 w-3.5" />
+                      </button>
+                      <button onClick={() => handleDelete(r.id, r.driver_name)}
+                        className="h-7 w-7 rounded-lg flex items-center justify-center text-rose-400 hover:text-rose-600 hover:bg-rose-50 transition-colors cursor-pointer border border-rose-200/60" title="Delete">
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              );
+            })
+          )}
+        </tbody>
+      </table>
+    </div>
+  );
 
   return (
     <div className="min-h-screen flex flex-col bg-bg text-text">
-      
+
       {/* HEADER */}
       <header className="sticky top-0 z-50 border-b border-border bg-white shadow-xs">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
-            <button 
-              type="button"
-              onClick={onBackToSelector}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-slate-100 hover:text-primary transition-all cursor-pointer"
-            >
+            <button type="button" onClick={onBackToSelector}
+              className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-slate-100 hover:text-primary transition-all cursor-pointer">
               <ChevronLeft className="h-5 w-5" />
             </button>
-            <img 
-              src="/letzryd_icon.png" 
-              alt="LetzRyd logo" 
-              className="h-8 w-auto object-contain"
-            />
+            <img src="/letzryd_icon.png" alt="LetzRyd logo" className="h-8 w-auto object-contain" />
             <span className="hidden h-5 border-l border-border sm:inline-block" />
-            <span className="hidden font-sans text-xs font-semibold text-slate-700 sm:inline-block">
-              Vehicle Drop-Off Desk
-            </span>
+            <span className="hidden font-sans text-xs font-semibold text-slate-700 sm:inline-block">Vehicle Drop-Off Desk</span>
           </div>
 
-          <nav className="flex gap-2">
-            <button
-              onClick={() => setActiveTab("form")}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${ activeTab === "form" ? "bg-primary text-white shadow-xs" : "text-text-muted hover:bg-slate-100" }`}
-            >
-              <FileText className="h-4 w-4" />
-              Vehicle Drop-Off Form
-            </button>
-            <button
-              onClick={() => { setActiveTab("registry"); fetchDropoffRecords(); }}
-              className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${ activeTab === "registry" ? "bg-primary text-white shadow-xs" : "text-text-muted hover:bg-slate-100" }`}
-            >
-              <Database className="h-4 w-4" />
-              Drop-Off Registry ({dropoffRecords.length})
-            </button>
+          <nav className="flex gap-1">
+            {[
+              { key: "form", label: editingId ? "Edit Drop-Off" : "Drop-Off Form", icon: FileText },
+              { key: "drafts", label: `Drafts (${draftRecords.length})`, icon: Clock },
+              { key: "registry", label: `Registry (${records.length})`, icon: Database },
+            ].map(({ key, label, icon: Icon }) => (
+              <button key={key} onClick={() => { setActiveTab(key as any); if (key !== "form") fetchRecords(); }}
+                className={`flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold transition-all cursor-pointer ${activeTab === key ? "bg-primary text-white shadow-xs" : "text-text-muted hover:bg-slate-100"}`}>
+                <Icon className="h-3.5 w-3.5" />{label}
+              </button>
+            ))}
           </nav>
 
           <div className="hidden items-center gap-4 lg:flex">
             <div className="text-right">
-              <span className="block text-[9px] font-bold text-text-dim">Current Time (IST)</span>
+              <span className="block text-[9px] font-bold text-text-dim">IST</span>
               <span className="font-sans text-xs font-bold text-primary tracking-tight">{currentTime}</span>
             </div>
             <span className="h-5 border-l border-border" />
             <div className="flex items-center gap-3">
-              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-xs font-bold text-white">
-                {initials}
-              </div>
+              <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary text-xs font-bold text-white">{initials}</div>
               <div className="flex flex-col">
                 <span className="font-sans text-xs font-semibold text-text">{displayName}</span>
                 {user.executive_id && <span className="font-mono text-[9px] text-text-muted">ID: {user.executive_id}</span>}
@@ -318,32 +446,26 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
         </div>
       </header>
 
-      {/* MAIN CONTAINER */}
       <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-10">
-        
+
+        {/* FORM TAB */}
         {activeTab === "form" && (
           <div className="rounded-2xl border border-border bg-white shadow-xl overflow-hidden mb-10">
-            <div className="bg-primary text-white px-8 py-6 relative">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div>
-                  <div className="flex items-center gap-3 mb-2">
-                    <img src="/letzryd_icon.png" className="h-7 brightness-0 invert" alt="LetzRyd" />
-                    <span className="px-2 py-0.5 rounded border border-white/30 bg-white/20 text-white text-[10px] font-bold tracking-widest backdrop-blur-sm">
-                      Drop-Off Desk
-                    </span>
-                  </div>
-                  <h1 className="font-sans text-2xl font-extrabold tracking-tight text-white leading-tight">
-                    Vehicle Drop-Off Form
-                  </h1>
-                  <p className="text-white/90 text-xs mt-1 font-sans">Record vehicle return details, meter readings, OLA balances &amp; settlements prior to new allocation.</p>
-                </div>
+            <div className="bg-primary text-white px-8 py-6">
+              <div className="flex items-center gap-3 mb-2">
+                <img src="/letzryd_icon.png" className="h-7 brightness-0 invert" alt="LetzRyd" />
+                <span className="px-2 py-0.5 rounded border border-white/30 bg-white/20 text-white text-[10px] font-bold tracking-widest">
+                  {editingId ? `Editing #${editingId}` : "Drop-Off Desk"}
+                </span>
               </div>
+              <h1 className="font-sans text-2xl font-extrabold tracking-tight text-white">Vehicle Drop-Off Form</h1>
+              <p className="text-white/80 text-xs mt-1">Record vehicle return details, meter readings, OLA balances & settlements.</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="p-8 space-y-10">
+            <form onSubmit={(e) => handleSubmit(e, false)} className="p-8 space-y-10">
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-10">
-                
-                {/* COLUMN 1: DROP-OFF REASON & LOGISTICS */}
+
+                {/* COL 1: Drop-Off Logistics */}
                 <div className="space-y-6">
                   <div className="border-b border-border pb-3">
                     <h3 className="font-sans text-sm font-bold text-slate-900 flex items-center gap-2">
@@ -351,219 +473,125 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                       Drop-Off Logistics
                     </h3>
                   </div>
-
                   <div className="space-y-4">
+                    {[
+                      { label: "Date of Drop-Off *", el: <input type="date" value={dropoffDate} onChange={(e) => setDropoffDate(e.target.value)} required className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold" /> },
+                    ].map(({ label, el }) => (
+                      <div key={label}><label className="block font-sans text-xs font-bold text-slate-800 mb-2">{label}</label>{el}</div>
+                    ))}
                     <div>
-                      <label className="block font-sans text-xs font-bold text-slate-800 mb-2">Date of Drop-Off <span className="text-red-500">*</span></label>
-                      <input 
-                        type="date" 
-                        value={dropoffDate}
-                        onChange={(e) => setDropoffDate(e.target.value)}
-                        required
-                        className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold"
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block font-sans text-xs font-bold text-slate-800 mb-2">Drop-Off Reason <span className="text-red-500">*</span></label>
-                      <select
-                        value={dropoffReason}
-                        onChange={(e) => setDropoffReason(e.target.value)}
-                        required
-                        className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs cursor-pointer font-semibold"
-                      >
-                        <option value="Voluntary Return">Voluntary Return</option>
-                        <option value="Non-payment / Default">Non-payment / Default</option>
-                        <option value="Vehicle Breakdown / Maintenance">Vehicle Breakdown / Maintenance</option>
-                        <option value="Contract Completion">Contract Completion</option>
-                        <option value="Other">Other</option>
+                      <label className="block font-sans text-xs font-bold text-slate-800 mb-2">Drop-Off Reason *</label>
+                      <select value={dropoffReason} onChange={(e) => setDropoffReason(e.target.value)} required className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs cursor-pointer font-semibold">
+                        <option>Voluntary Return</option>
+                        <option>Non-payment / Default</option>
+                        <option>Vehicle Breakdown / Maintenance</option>
+                        <option>Contract Completion</option>
+                        <option>Other</option>
                       </select>
                     </div>
-
                     <div>
-                      <label className="block font-sans text-xs font-bold text-slate-800 mb-2">Drop-Off Location <span className="text-red-500">*</span></label>
-                      <select 
-                        value={dropoffLocation}
-                        onChange={(e) => setDropoffLocation(e.target.value)}
-                        required
-                        className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs cursor-pointer font-semibold"
-                      >
+                      <label className="block font-sans text-xs font-bold text-slate-800 mb-2">Drop-Off Location *</label>
+                      <select value={dropoffLocation} onChange={(e) => setDropoffLocation(e.target.value)} required className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs cursor-pointer font-semibold">
                         <option value="Hub">Hub Desk</option>
                         <option value="Service Station">Service Station</option>
                         <option value="Customer Address">Customer Address</option>
                       </select>
                     </div>
-
                     <div>
-                      <label className="block font-sans text-xs font-bold text-slate-800 mb-2">Operating City <span className="text-red-500">*</span></label>
-                      <select 
-                        value={cityName}
-                        onChange={(e) => setCityName(e.target.value)}
-                        required
-                        className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs cursor-pointer font-semibold"
-                      >
-                        {CITIES.map((c) => (
-                          <option key={c.value} value={c.value}>{c.text}</option>
-                        ))}
+                      <label className="block font-sans text-xs font-bold text-slate-800 mb-2">Operating City *</label>
+                      <select value={cityName} onChange={(e) => setCityName(e.target.value)} required className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs cursor-pointer font-semibold">
+                        {CITIES.map((c) => <option key={c.value} value={c.value}>{c.text}</option>)}
                       </select>
                     </div>
                   </div>
                 </div>
 
-                {/* COLUMN 2: DRIVER & VEHICLE IDENTIFICATION + OLA BALANCE */}
+                {/* COL 2: Driver & Vehicle */}
                 <div className="space-y-6">
                   <div className="border-b border-border pb-3">
                     <h3 className="font-sans text-sm font-bold text-slate-900 flex items-center gap-2">
                       <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-800 text-xs font-bold">2</span>
-                      Driver &amp; Vehicle Info
+                      Driver & Vehicle Info
                     </h3>
                   </div>
-
                   <div className="space-y-4">
                     {driverLookupStatus && (
-                      <div className={`p-2.5 rounded-lg text-xs font-semibold ${driverLookupStatus.includes("Found") ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-amber-50 text-amber-800 border border-amber-200"}`}>
-                        {driverLookupStatus}
+                      <div className={`p-2.5 rounded-lg text-xs font-semibold ${driverLookupStatus.startsWith("✓") ? "bg-emerald-50 text-emerald-800 border border-emerald-200" : "bg-amber-50 text-amber-800 border border-amber-200"}`}>
+                        {isDriverLookupLoading ? "Searching..." : driverLookupStatus}
                       </div>
                     )}
-
-                    <div>
-                      <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Driver Phone Number <span className="text-red-500">*</span></label>
-                      <div className="flex gap-2">
-                        <input 
-                          type="tel" 
-                          placeholder="10-digit phone number..."
-                          maxLength={10}
-                          value={driverPhone}
-                          onChange={(e) => setDriverPhone(e.target.value.replace(/\D/g, "").slice(0, 10))}
-                          onBlur={() => driverPhone.length === 10 && handleFetchDriver(driverPhone)}
-                          required
-                          className="flex-1 rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleFetchDriver(driverPhone)}
-                          className="px-3 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold rounded-xl text-xs cursor-pointer transition-colors"
-                        >
-                          Fetch
-                        </button>
+                    {[
+                      { label: "Driver Phone Number *", value: driverPhone, set: setDriverPhone, fetchKey: "phone", type: "tel", maxLen: 10, transform: (v: string) => v.replace(/\D/g, "").slice(0, 10) },
+                      { label: "Operator / Driver ID *", value: driverId, set: setDriverId, fetchKey: "id", type: "text", maxLen: undefined, transform: (v: string) => v },
+                    ].map(({ label, value, set, fetchKey, type, maxLen, transform }) => (
+                      <div key={label}>
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">{label}</label>
+                        <div className="flex gap-2">
+                          <input type={type} placeholder={fetchKey === "phone" ? "10-digit phone..." : "e.g. LR-4091..."} maxLength={maxLen} value={value}
+                            onChange={(e) => set(transform(e.target.value))}
+                            onBlur={() => { if (fetchKey === "phone" && value.length === 10) handleFetchDriver(value); if (fetchKey === "id" && value.trim().length >= 3) handleFetchDriver(value); }}
+                            className="flex-1 rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold" />
+                          <button type="button" onClick={() => handleFetchDriver(value)}
+                            className="px-3 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold rounded-xl text-xs cursor-pointer transition-colors">
+                            Fetch
+                          </button>
+                        </div>
                       </div>
-                    </div>
-
+                    ))}
                     <div>
-                      <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Operator / Driver ID <span className="text-red-500">*</span></label>
-                      <div className="flex gap-2">
-                        <input 
-                          type="text" 
-                          placeholder="e.g. LR-4091..."
-                          value={driverId}
-                          onChange={(e) => setDriverId(e.target.value)}
-                          onBlur={() => driverId.trim().length >= 3 && handleFetchDriver(driverId)}
-                          required
-                          className="flex-1 rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => handleFetchDriver(driverId)}
-                          className="px-3 bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold rounded-xl text-xs cursor-pointer transition-colors"
-                        >
-                          Fetch
-                        </button>
-                      </div>
+                      <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Driver Name *</label>
+                      <input type="text" placeholder="Driver full name..." value={driverName} onChange={(e) => setDriverName(e.target.value)} required
+                        className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold" />
                     </div>
-
-                    <div>
-                      <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Driver Name <span className="text-red-500">*</span></label>
-                      <input 
-                        type="text" 
-                        placeholder="Driver full name..."
-                        value={driverName}
-                        onChange={(e) => setDriverName(e.target.value)}
-                        required
-                        className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold"
-                      />
-                    </div>
-
                     <div className="relative">
-                      <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Vehicle Number <span className="text-red-500">*</span></label>
-                      <input 
-                        type="text" 
-                        placeholder="Search vehicle number e.g. TS09..."
-                        value={vehicleNumber}
-                        onChange={(e) => handleVehicleInputChange(e.target.value.toUpperCase())}
-                        required
-                        className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-bold uppercase"
-                      />
-
+                      <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Vehicle Number *</label>
+                      <input type="text" placeholder="e.g. TS09EV1234..." value={vehicleNumber}
+                        onChange={(e) => handleVehicleInputChange(e.target.value.toUpperCase())} required
+                        className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-bold uppercase" />
                       {showVehicleDropdown && vehicleSuggestions.length > 0 && (
                         <div className="absolute z-30 left-0 right-0 top-full mt-1 bg-white border border-slate-200 rounded-xl shadow-xl max-h-48 overflow-y-auto divide-y divide-slate-100">
                           {vehicleSuggestions.map((v) => (
-                            <button
-                              key={v.vehicle_number}
-                              type="button"
-                              onClick={() => {
-                                setVehicleNumber(v.vehicle_number);
-                                setShowVehicleDropdown(false);
-                              }}
-                              className="w-full px-4 py-2.5 text-left hover:bg-slate-50 flex items-center justify-between transition-colors cursor-pointer"
-                            >
+                            <button key={v.vehicle_number} type="button" onClick={() => { setVehicleNumber(v.vehicle_number); setShowVehicleDropdown(false); }}
+                              className="w-full px-4 py-2.5 text-left hover:bg-slate-50 flex items-center justify-between cursor-pointer">
                               <div>
                                 <span className="font-sans font-extrabold text-xs text-slate-900 block">{v.vehicle_number}</span>
-                                <span className="text-[10px] text-slate-500 font-medium">{v.car_model} · {v.city_name}</span>
+                                <span className="text-[10px] text-slate-500">{v.car_model} · {v.city_name}</span>
                               </div>
-                              <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-slate-100 text-slate-700">
-                                {v.status}
-                              </span>
+                              <span className="px-2 py-0.5 rounded text-[10px] font-extrabold bg-slate-100 text-slate-700">{v.status}</span>
                             </button>
                           ))}
                         </div>
                       )}
                     </div>
 
-                    {/* OLA NEGATIVE BALANCE & PROOF PHOTO */}
-                    <div className="border-t border-border/60 pt-4 mt-4 space-y-4">
+                    <div className="border-t border-border/60 pt-4 mt-2 space-y-4">
                       <div>
                         <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">OLA Negative Balance (₹)</label>
-                        <input 
-                          type="number"
-                          placeholder="e.g. 1500..."
-                          value={olaNegativeBalance}
-                          onChange={(e) => setOlaNegativeBalance(e.target.value)}
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold"
-                        />
+                        <input type="number" placeholder="e.g. 1500..." value={olaNegativeBalance} onChange={(e) => setOlaNegativeBalance(e.target.value)}
+                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold" />
                       </div>
-
                       <div>
                         <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">OLA Balance Proof Photo</label>
                         {olaNegativeBalanceProof ? (
                           <div className="relative inline-block bg-white rounded-lg p-1 border border-border">
-                            <img src={olaNegativeBalanceProof} alt="OLA Balance Proof" className="max-h-24 object-contain rounded" />
+                            <img src={olaNegativeBalanceProof} alt="OLA Proof" className="max-h-24 object-contain rounded" />
                             <button type="button" onClick={() => setOlaNegativeBalanceProof(null)} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 cursor-pointer"><X className="h-3.5 w-3.5" /></button>
                           </div>
                         ) : (
                           <div className="flex gap-2">
-                            <button type="button" onClick={() => { setActiveCameraTarget("ola"); setCameraActive(true); }} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-bold py-2.5 cursor-pointer transition-colors">
-                              <Camera className="h-3.5 w-3.5" /> Capture
-                            </button>
-                            <label className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-slate-800 text-xs font-bold py-2.5 hover:bg-slate-50 cursor-pointer transition-colors">
+                            <button type="button" onClick={() => { setActiveCameraTarget("ola"); setCameraActive(true); }} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-bold py-2.5 cursor-pointer"><Camera className="h-3.5 w-3.5" /> Capture</button>
+                            <label className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-slate-800 text-xs font-bold py-2.5 hover:bg-slate-50 cursor-pointer">
                               <Upload className="h-3.5 w-3.5 text-primary" /> Upload
-                              <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  const r = new FileReader();
-                                  r.onloadend = () => { if (typeof r.result === "string") setOlaNegativeBalanceProof(r.result); };
-                                  r.readAsDataURL(file);
-                                }
-                              }} />
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onloadend = () => { if (typeof r.result === "string") setOlaNegativeBalanceProof(r.result); }; r.readAsDataURL(f); } }} />
                             </label>
                           </div>
                         )}
                       </div>
                     </div>
-
                   </div>
                 </div>
 
-                {/* COLUMN 3: ODOMETER & READING PROOF */}
+                {/* COL 3: Odometer */}
                 <div className="space-y-6">
                   <div className="border-b border-border pb-3">
                     <h3 className="font-sans text-sm font-bold text-slate-900 flex items-center gap-2">
@@ -571,22 +599,14 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                       Odometer Details
                     </h3>
                   </div>
-
                   <div className="space-y-4">
                     <div>
-                      <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Drop-Off Odometer Reading (in KM) <span className="text-red-500">*</span></label>
-                      <input 
-                        type="number" 
-                        placeholder="Current reading..."
-                        value={odometerReading}
-                        onChange={(e) => setOdometerReading(e.target.value)}
-                        required
-                        className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold"
-                      />
+                      <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Odometer Reading (KM) *</label>
+                      <input type="number" placeholder="Current reading..." value={odometerReading} onChange={(e) => setOdometerReading(e.target.value)}
+                        className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold" />
                     </div>
-
                     <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 space-y-3">
-                      <span className="block font-sans text-xs font-bold text-slate-800 text-center">Odometer Photo Upload *</span>
+                      <span className="block font-sans text-xs font-bold text-slate-800 text-center">Odometer Photo *</span>
                       {odometerPhoto ? (
                         <div className="relative flex items-center justify-center bg-white rounded-lg p-2 border border-slate-200">
                           <img src={odometerPhoto} alt="Odometer" className="max-h-36 object-contain rounded" />
@@ -594,42 +614,33 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                         </div>
                       ) : (
                         <div className="flex gap-2">
-                          <button type="button" onClick={() => { setActiveCameraTarget("odometer"); setCameraActive(true); }} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-primary text-white text-xs font-bold py-2.5 hover:bg-primary-hover cursor-pointer transition-colors"><Camera className="h-3.5 w-3.5" /> Capture</button>
-                          <label className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-slate-800 text-xs font-bold py-2.5 hover:bg-slate-50 cursor-pointer transition-colors">
+                          <button type="button" onClick={() => { setActiveCameraTarget("odometer"); setCameraActive(true); }} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-primary text-white text-xs font-bold py-2.5 hover:bg-primary-hover cursor-pointer"><Camera className="h-3.5 w-3.5" /> Capture</button>
+                          <label className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-slate-800 text-xs font-bold py-2.5 hover:bg-slate-50 cursor-pointer">
                             <Upload className="h-3.5 w-3.5 text-primary" /> Upload
-                            <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                              const file = e.target.files?.[0];
-                              if (file) {
-                                const r = new FileReader();
-                                r.onloadend = () => { if (typeof r.result === "string") setOdometerPhoto(r.result); };
-                                r.readAsDataURL(file);
-                              }
-                            }} />
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onloadend = () => { if (typeof r.result === "string") setOdometerPhoto(r.result); }; r.readAsDataURL(f); } }} />
                           </label>
                         </div>
                       )}
                     </div>
                   </div>
                 </div>
-
               </div>
 
-              {/* CAR CONDITION PHOTOS (SECTION 4 INCLUDING BATTERY) */}
+              {/* SECTION 4: Car Condition Photos */}
               <div className="border-t border-border pt-8 space-y-6">
                 <div className="border-b border-border pb-3">
                   <h3 className="font-sans text-sm font-bold text-slate-900 flex items-center gap-2">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-800 text-xs font-bold">4</span>
-                    Car Condition Photos *
+                    Car Condition Photos
                   </h3>
                 </div>
-
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
                   {[
-                    { label: "Left-Hand (LH) Side", state: photoLhSide, setState: setPhotoLhSide, target: "lhSide" },
-                    { label: "Right-Hand (RH) Side", state: photoRhSide, setState: setPhotoRhSide, target: "rhSide" },
+                    { label: "LH Side", state: photoLhSide, setState: setPhotoLhSide, target: "lhSide" },
+                    { label: "RH Side", state: photoRhSide, setState: setPhotoRhSide, target: "rhSide" },
                     { label: "Front Side", state: photoFrontSide, setState: setPhotoFrontSide, target: "frontSide" },
                     { label: "Back Side", state: photoBackSide, setState: setPhotoBackSide, target: "backSide" },
-                    { label: "Battery Photo Upload", state: batteryPhoto, setState: setBatteryPhoto, target: "battery" }
+                    { label: "Battery Photo", state: batteryPhoto, setState: setBatteryPhoto, target: "battery" },
                   ].map((ph) => (
                     <div key={ph.label} className="space-y-2">
                       <span className="block font-sans text-xs font-bold text-slate-800">{ph.label}</span>
@@ -644,14 +655,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                             <button type="button" onClick={() => { setActiveCameraTarget(ph.target as any); setCameraActive(true); }} className="w-full flex items-center justify-center gap-1 rounded-lg bg-primary text-white text-[11px] font-bold py-2 hover:bg-primary-hover cursor-pointer"><Camera className="h-3.5 w-3.5" /> Capture</button>
                             <label className="w-full flex items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white text-slate-700 text-[11px] font-bold py-2 hover:bg-slate-100 cursor-pointer">
                               <Upload className="h-3.5 w-3.5 text-primary" /> Upload
-                              <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  const r = new FileReader();
-                                  r.onloadend = () => { if (typeof r.result === "string") ph.setState(r.result); };
-                                  r.readAsDataURL(file);
-                                }
-                              }} />
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onloadend = () => { if (typeof r.result === "string") ph.setState(r.result); }; r.readAsDataURL(f); } }} />
                             </label>
                           </div>
                         )}
@@ -661,62 +665,40 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                 </div>
               </div>
 
-              {/* FINANCIAL & DUES SETTLEMENT SECTION */}
+              {/* SECTION 5: Financial Settlement */}
               <div className="border-t border-border pt-8 space-y-6">
                 <div className="border-b border-border pb-3">
                   <h3 className="font-sans text-sm font-bold text-slate-900 flex items-center gap-2">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-slate-100 text-slate-800 text-xs font-bold">5</span>
-                    Dues, Penalties &amp; Refund Settlement
+                    Dues, Penalties & Refund Settlement
                   </h3>
                 </div>
-
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <div>
-                    <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Pending Dues Amount (₹)</label>
-                    <input 
-                      type="number" 
-                      placeholder="e.g. 1200..."
-                      value={pendingDues}
-                      onChange={(e) => setPendingDues(e.target.value)}
-                      className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold"
-                    />
+                    <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Pending Dues (₹)</label>
+                    <input type="number" placeholder="e.g. 1200..." value={pendingDues} onChange={(e) => setPendingDues(e.target.value)}
+                      className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold" />
                   </div>
-
                   <div>
-                    <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Damage Penalty Amount (₹)</label>
-                    <input 
-                      type="number" 
-                      placeholder="e.g. 500..."
-                      value={damagePenalty}
-                      onChange={(e) => setDamagePenalty(e.target.value)}
-                      className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold"
-                    />
+                    <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Damage Penalty (₹)</label>
+                    <input type="number" placeholder="e.g. 500..." value={damagePenalty} onChange={(e) => setDamagePenalty(e.target.value)}
+                      className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs font-semibold" />
                   </div>
-
                   <div>
                     <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Deposit Refund Status</label>
-                    <select 
-                      value={depositRefundStatus}
-                      onChange={(e) => setDepositRefundStatus(e.target.value)}
-                      className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs cursor-pointer font-semibold"
-                    >
-                      <option value="Pending Assessment">Pending Assessment</option>
-                      <option value="Refund Approved">Refund Approved</option>
-                      <option value="Deductions Applied">Deductions Applied</option>
-                      <option value="Forfeited">Forfeited</option>
+                    <select value={depositRefundStatus} onChange={(e) => setDepositRefundStatus(e.target.value)}
+                      className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs cursor-pointer font-semibold">
+                      <option>Pending Assessment</option>
+                      <option>Refund Approved</option>
+                      <option>Deductions Applied</option>
+                      <option>Forfeited</option>
                     </select>
                   </div>
                 </div>
-
                 <div>
                   <label className="block font-sans text-xs font-bold text-slate-800 mb-1.5">Hub Handover Notes / Vehicle Inspection Summary</label>
-                  <textarea 
-                    placeholder="Enter any additional remarks regarding damages, battery condition, or driver reason..."
-                    value={dropoffNotes}
-                    onChange={(e) => setDropoffNotes(e.target.value)}
-                    rows={3}
-                    className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs resize-none font-semibold"
-                  />
+                  <textarea placeholder="Remarks about damages, battery, driver reason..." value={dropoffNotes} onChange={(e) => setDropoffNotes(e.target.value)} rows={3}
+                    className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none shadow-2xs resize-none font-semibold" />
                 </div>
               </div>
 
@@ -724,128 +706,115 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
               <div className="flex items-center justify-between border-t border-border pt-6 mt-8">
                 <p className="text-[10px] font-bold text-red-500">* Mandatory Fields</p>
                 <div className="flex gap-3">
-                  <button 
-                    type="button" 
-                    onClick={resetForm}
-                    className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer"
-                  >
-                    Reset Form
+                  {editingId ? (
+                    <button type="button" onClick={() => { resetForm(); setActiveTab("registry"); }}
+                      className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer transition-colors">
+                      Cancel Edit
+                    </button>
+                  ) : (
+                    <button type="button" onClick={resetForm}
+                      className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer transition-colors">
+                      Reset Form
+                    </button>
+                  )}
+                  <button type="button" onClick={(e) => handleSubmit(e, true)}
+                    className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer transition-colors">
+                    Save as Draft
                   </button>
-                  <button 
-                    type="submit"
-                    className="h-11 rounded-lg bg-primary px-6 font-sans text-sm font-bold text-white shadow-md hover:bg-primary-hover cursor-pointer transition-all"
-                  >
-                    Submit Drop-Off Record
+                  <button type="submit"
+                    className="h-11 rounded-lg bg-primary px-6 font-sans text-sm font-bold text-white shadow-md hover:bg-primary-hover cursor-pointer transition-all">
+                    {editingId ? "Update Drop-Off Record" : "Submit Drop-Off Record"}
                   </button>
                 </div>
               </div>
-
             </form>
+          </div>
+        )}
+
+        {/* DRAFTS TAB */}
+        {activeTab === "drafts" && (
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+              <div className="border-b border-slate-200 p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="font-sans text-xl font-bold text-slate-900 tracking-tight flex items-center gap-2">
+                    <Clock className="h-5 w-5 text-amber-600" /> Saved Draft Records
+                  </h3>
+                  <p className="font-sans text-xs text-slate-500 mt-1">Unsent drop-off drafts. Click edit to complete entry.</p>
+                </div>
+                <button type="button" onClick={() => { resetForm(); setActiveTab("form"); }}
+                  className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 font-sans text-xs font-semibold text-white transition-colors cursor-pointer shadow-xs">
+                  <Plus className="h-4 w-4" /> New Drop-Off Entry
+                </button>
+              </div>
+              <RegistryTable rows={paginatedDrafts} />
+              <PaginationBar page={draftPage} totalPgs={draftTotalPages} setPage={setDraftPage} total={draftRecords.length} />
+            </div>
           </div>
         )}
 
         {/* REGISTRY TAB */}
         {activeTab === "registry" && (
-          <div className="rounded-2xl border border-border bg-white shadow-sm p-6 space-y-6">
-            
-            {/* REGISTRY TOOLBAR */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-              <div className="relative flex-grow max-w-md">
-                <Search className="absolute left-3.5 top-3 h-4 w-4 text-text-muted" />
-                <input
-                  type="text"
-                  placeholder="Search driver name, phone, vehicle number..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-10 w-full rounded-lg border border-border pl-10 pr-4 font-sans text-xs text-text bg-white outline-none focus:border-primary"
-                />
+          <div className="space-y-6">
+            {/* Filter Toolbar */}
+            <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs grid grid-cols-1 sm:grid-cols-4 gap-3 items-center">
+              <div className="relative sm:col-span-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                <input type="text" placeholder="Search driver, phone, vehicle, ID..." value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                  className="h-10 w-full rounded-xl border border-slate-200 pl-9 pr-4 font-sans text-xs text-slate-900 bg-white outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20" />
               </div>
+              <select value={filterReason} onChange={(e) => { setFilterReason(e.target.value); setCurrentPage(1); }}
+                className="h-10 w-full rounded-xl border border-slate-200 px-3 font-sans text-xs text-slate-800 bg-white outline-none focus:border-emerald-600 cursor-pointer">
+                <option value="all">All Reasons</option>
+                <option>Voluntary Return</option>
+                <option>Non-payment / Default</option>
+                <option>Vehicle Breakdown / Maintenance</option>
+                <option>Contract Completion</option>
+                <option>Other</option>
+              </select>
+              <select value={filterTime} onChange={(e) => { setFilterTime(e.target.value); setCurrentPage(1); }}
+                className="h-10 w-full rounded-xl border border-slate-200 px-3 font-sans text-xs text-slate-800 bg-white outline-none focus:border-emerald-600 cursor-pointer">
+                <option value="all">All Time</option>
+                <option value="today">Today</option>
+                <option value="week">This Week</option>
+                <option value="month">This Month</option>
+              </select>
+              <select value={filterCity} onChange={(e) => { setFilterCity(e.target.value); setCurrentPage(1); }}
+                className="h-10 w-full rounded-xl border border-slate-200 px-3 font-sans text-xs text-slate-800 bg-white outline-none focus:border-emerald-600 cursor-pointer">
+                <option value="all">All Cities</option>
+                {CITIES.map((c) => <option key={c.value} value={c.value}>{c.text}</option>)}
+              </select>
+            </div>
 
-              <div className="flex items-center gap-3">
-                <select
-                  value={filterCity}
-                  onChange={(e) => setFilterCity(e.target.value)}
-                  className="h-10 rounded-lg border border-border px-3 font-sans text-xs text-text bg-white outline-none focus:border-primary cursor-pointer"
-                >
-                  <option value="all">All Cities</option>
-                  {CITIES.map(c => <option key={c.value} value={c.value}>{c.text}</option>)}
-                </select>
-                <button
-                  type="button"
-                  onClick={() => setActiveTab("form")}
-                  className="h-10 px-4 bg-primary hover:bg-primary-hover text-white font-sans text-xs font-bold rounded-lg transition-colors cursor-pointer"
-                >
-                  + Add Drop-Off
-                </button>
+            {/* Table Card */}
+            <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
+              <div className="border-b border-slate-200 p-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h3 className="font-sans text-xl font-bold text-slate-900 tracking-tight">Drop-Off Registry</h3>
+                  <p className="font-sans text-xs text-slate-500 mt-1">Search, edit, and review all vehicle return records</p>
+                </div>
+                <div className="flex gap-2.5">
+                  <button onClick={handleExportCSV}
+                    className="flex h-10 items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 font-sans text-xs font-semibold text-slate-700 transition-colors cursor-pointer shadow-2xs">
+                    <Download className="h-4 w-4" /> Export CSV
+                  </button>
+                  <button onClick={() => { resetForm(); setActiveTab("form"); }}
+                    className="flex h-10 items-center justify-center gap-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 px-4 font-sans text-xs font-semibold text-white transition-colors cursor-pointer shadow-xs">
+                    <Plus className="h-4 w-4" /> Add Drop-Off
+                  </button>
+                </div>
               </div>
+              <RegistryTable rows={paginatedRecords} />
+              <PaginationBar page={currentPage} totalPgs={totalPages} setPage={setCurrentPage} total={filteredRecords.length} />
             </div>
-
-            {/* TABLE CONTAINER */}
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse whitespace-nowrap">
-                <thead>
-                  <tr className="bg-slate-50 border-b border-border/60">
-                    <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">ID</th>
-                    <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Driver Name</th>
-                    <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Driver ID</th>
-                    <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Phone Number</th>
-                    <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">City</th>
-                    <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Car Returned</th>
-                    <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Reason</th>
-                    <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Date</th>
-                    <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Time</th>
-                    <th className="px-4 py-3 font-sans text-[11px] font-bold text-slate-500 uppercase tracking-wider">Logged By</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/40">
-                  {filteredDropoffs.length === 0 ? (
-                    <tr>
-                      <td colSpan={10} className="px-6 py-12 text-center text-text-muted font-sans bg-slate-50/50 text-[11px]">
-                        No matching drop-off records found in the database.
-                      </td>
-                    </tr>
-                  ) : (
-                    filteredDropoffs.map((r: any) => {
-                      const isoStr = (r.created_at && typeof r.created_at === 'string' && (r.created_at.includes("T") || r.created_at.includes(" ")) && !r.created_at.endsWith("Z") && !/[+-]\d{2}:?\d{2}$/.test(r.created_at)) ? r.created_at.replace(" ", "T") + "Z" : r.created_at;
-                      const formattedTime = isoStr 
-                        ? new Date(isoStr).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }).toLowerCase() 
-                        : "05:15 pm";
-                      const loggedBy = r.created_by_name || r.executive_name || user.name || user.username || "Executive";
-                      
-                      return (
-                        <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-700">#{r.id}</td>
-                          <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-900">{r.driver_name || "-"}</td>
-                          <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{r.driver_id || "-"}</td>
-                          <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{r.driver_phone || "-"}</td>
-                          <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-800">{r.city_name || "-"}</td>
-                          <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">{r.vehicle_number || "-"}</td>
-                          <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-700">{r.dropoff_reason || "Voluntary Return"}</td>
-                          <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{r.dropoff_date || "-"}</td>
-                          <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{formattedTime}</td>
-                          <td className="px-4 py-3.5 font-sans text-xs text-slate-700 font-medium">{loggedBy}</td>
-                        </tr>
-                      );
-                    })
-                  )}
-                </tbody>
-              </table>
-            </div>
-            
-            {/* FOOTER STATS */}
-            <div className="flex items-center justify-between border-t border-border/60 bg-slate-50/50 px-6 py-3 font-sans text-xs text-slate-500">
-              <span>Showing {filteredDropoffs.length} of {dropoffRecords.length} database entries</span>
-              <span>Database Engine: PostgreSQL</span>
-            </div>
-
           </div>
         )}
-
       </main>
 
-      {/* CAMERA CAPTURE MODAL */}
+      {/* CAMERA MODAL */}
       {cameraActive && activeCameraTarget && (
-        <CameraCapture 
+        <CameraCapture
           title="Capture Drop-Off Photo"
           onCapture={(dataUrl) => {
             if (activeCameraTarget === "odometer") setOdometerPhoto(dataUrl);
@@ -855,13 +824,10 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
             if (activeCameraTarget === "frontSide") setPhotoFrontSide(dataUrl);
             if (activeCameraTarget === "backSide") setPhotoBackSide(dataUrl);
             if (activeCameraTarget === "ola") setOlaNegativeBalanceProof(dataUrl);
-            setCameraActive(false);
-            setActiveCameraTarget(null);
+            if (activeCameraTarget === "fastag") setFastagBalanceProof(dataUrl);
+            setCameraActive(false); setActiveCameraTarget(null);
           }}
-          onClose={() => {
-            setCameraActive(false);
-            setActiveCameraTarget(null);
-          }}
+          onClose={() => { setCameraActive(false); setActiveCameraTarget(null); }}
         />
       )}
     </div>
