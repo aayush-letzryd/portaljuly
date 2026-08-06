@@ -481,7 +481,7 @@ def startup_event():
         cur.execute("""
             CREATE TABLE IF NOT EXISTS july_walkin_logs (
                 log_id       SERIAL PRIMARY KEY,
-                walkin_id    INTEGER NOT NULL REFERENCES july_walkins(id) ON DELETE CASCADE,
+                walkin_id    VARCHAR(100) NOT NULL,
                 action       VARCHAR(30) NOT NULL,      -- CREATE / UPDATE / DELETE / STATUS_CHANGE
                 old_status   VARCHAR(50),
                 new_status   VARCHAR(50),
@@ -3221,6 +3221,13 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
                 user_p_id, user_p_id, user_p_id
             ))
             new_id = cur.fetchone()[0]
+            try:
+                cur.execute("""
+                    INSERT INTO july_walkin_logs (walkin_id, action, remarks, performed_by, performed_at)
+                    VALUES (%s, 'CREATE', %s, %s, NOW());
+                """, (f"E{new_id}", "Logged returning partner visit", user_p_id))
+            except Exception:
+                pass
             conn.commit()
             return {"success": True, "walkin_id": f"E{new_id}", "record_type": "existing"}
 
@@ -3248,6 +3255,13 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
                         data.joined_status or 'Onboarding Process Initiated', data.remarks or '',
                         user_p_id, existing_id
                     ))
+                    try:
+                        cur.execute("""
+                            INSERT INTO july_walkin_logs (walkin_id, action, remarks, performed_by, performed_at)
+                            VALUES (%s, 'UPDATE', %s, %s, NOW());
+                        """, (f"N{existing_id}", "Updated candidate walk-in details", user_p_id))
+                    except Exception:
+                        pass
                     conn.commit()
                     return {"success": True, "walkin_id": f"N{existing_id}", "record_type": "new", "updated_existing": True}
 
@@ -3278,11 +3292,16 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
                 data.referred_by_name or '',
                 data.referred_by_phone or '',
                 data.joined_status or 'Onboarding Process Initiated',
-                data.remarks or '',
-                'Submitted',
                 user_p_id, user_p_id, user_p_id
             ))
             new_id = cur.fetchone()[0]
+            try:
+                cur.execute("""
+                    INSERT INTO july_walkin_logs (walkin_id, action, remarks, performed_by, performed_at)
+                    VALUES (%s, 'CREATE', %s, %s, NOW());
+                """, (f"N{new_id}", "Created new candidate walk-in", user_p_id))
+            except Exception:
+                pass
             conn.commit()
             return {"success": True, "walkin_id": f"N{new_id}", "record_type": "new"}
 
