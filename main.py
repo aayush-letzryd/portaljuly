@@ -3292,7 +3292,9 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
                 data.referred_by_name or '',
                 data.referred_by_phone or '',
                 data.joined_status or 'Onboarding Process Initiated',
-                user_p_id, user_p_id, user_p_id
+                data.remarks or '',
+                'Submitted', user_p_id,
+                user_p_id, user_p_id
             ))
             new_id = cur.fetchone()[0]
             try:
