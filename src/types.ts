@@ -1,5 +1,5 @@
 export type VisitorType = "Individual" | "Operator";
-export type OnboardingOutcome = "Onboarding Process Initiated" | "Successfully Onboarded" | "Follow Up Required" | "No Follow Up Required / Closed" | "Others" | "Joined" | "Pending" | "Not Interested" | "Onboarding process initiated" | "Follow up required" | "No follow up required / Closed";
+export type OnboardingOutcome = "Follow-up Required" | "No Follow-up Required" | "Others" | "Onboarding Process Initiated" | "Successfully Onboarded" | "Follow Up Required" | "No Follow Up Required / Closed" | "Joined" | "Pending" | "Not Interested" | "Onboarding process initiated" | "Follow up required" | "No follow up required / Closed";
 
 // LetzRyd RBAC Role Codes
 export type RoleCode = "SA" | "BH" | "CM" | "DM" | "OB" | "SP" | string;
@@ -59,6 +59,8 @@ export interface OnboardingRecord {
   dl_back?: string;
   pan_card_photo?: string;
   aadhaar_card_photo?: string;
+  aadhaar_card_front?: string;
+  aadhaar_card_back?: string;
   vendor_name?: string; 
   vendor_id?: string;
   father_name: string; 
@@ -71,6 +73,28 @@ export interface OnboardingRecord {
   custom_rental_plan?: boolean;
   custom_rent_amount?: string;
   cancelled_cheque_photo?: string;
+  cheque2_photo?: string;
+  cheque3_photo?: string;
+  cheque4_photo?: string;
+  security_cheque_files?: string[] | string;
+  police_verification_status?: string;
+  police_verification_doc?: string;
+  reference_verified?: boolean;
+  driver_manager_id?: number | string;
+  driver_manager_name?: string;
+  ref1_name?: string;
+  ref1_phone?: string;
+  ref1_address?: string;
+  ref2_name?: string;
+  ref2_phone?: string;
+  ref2_address?: string;
+  ref3_name?: string;
+  ref3_phone?: string;
+  ref3_address?: string;
+  rental_model?: string;
+  security_deposit?: string;
+  letzown_cheques?: string;
+  is_spring_verified?: boolean;
   signature_photo?: string;
   platform_details?: string | Record<string, any>;
   approval_status?: string;

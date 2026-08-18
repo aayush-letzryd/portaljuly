@@ -306,7 +306,7 @@ export default function WalkInForm({
     }
   };
 
-  const [joinedStatus, setJoinedStatus] = useState<OnboardingOutcome>("Onboarding Process Initiated");
+  const [joinedStatus, setJoinedStatus] = useState<OnboardingOutcome>("Follow-up Required");
   const [remarks, setRemarks] = useState("");
 
   // Document Uploads / Camera State
@@ -619,7 +619,7 @@ export default function WalkInForm({
     setLeadSource("Direct Walk-in");
     setReferredByName("");
     setReferredByPhone("");
-    setJoinedStatus("Onboarding Process Initiated");
+    setJoinedStatus("Follow-up Required");
     setRemarks("");
     setIsDuplicate(false);
     setDuplicateMsg("");
@@ -759,7 +759,7 @@ export default function WalkInForm({
     setLeadSource(rawLeadChannel);
     setReferredByName(record.referred_by_name || "");
     setReferredByPhone(record.referred_by_phone || "");
-    setJoinedStatus(record.joined_status || "Onboarding Process Initiated");
+    setJoinedStatus(record.joined_status || "Follow-up Required");
     setRemarks(record.remarks && record.remarks !== "None" ? record.remarks : "");
 
     setActiveTab("form");
@@ -1353,10 +1353,8 @@ export default function WalkInForm({
                         <div className="flex flex-col gap-1.5">
                           <label className="font-sans text-xs font-semibold text-slate-700">Status *</label>
                           <select required value={joinedStatus} onChange={(e) => setJoinedStatus(e.target.value as OnboardingOutcome)} className="h-11 rounded-lg border border-border px-3 text-xs bg-white text-slate-800 outline-none focus:border-primary font-normal cursor-pointer">
-                              <option value="Onboarding Process Initiated">Onboarding Process Initiated</option>
-                              <option value="Successfully Onboarded">Successfully Onboarded</option>
-                              <option value="Follow Up Required">Follow Up Required</option>
-                              <option value="No Follow Up Required / Closed">No Follow Up Required / Closed</option>
+                              <option value="Follow-up Required">Follow-up Required</option>
+                              <option value="No Follow-up Required">No Follow-up Required</option>
                               <option value="Others">Others</option>
                           </select>
                         </div>

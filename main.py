@@ -418,7 +418,16 @@ def startup_event():
             "local_address_proof TEXT",
             "ref1_name VARCHAR(255)", "ref1_phone VARCHAR(50)", "ref1_address TEXT",
             "ref2_name VARCHAR(255)", "ref2_phone VARCHAR(50)", "ref2_address TEXT",
-            "ref3_name VARCHAR(255)", "ref3_phone VARCHAR(50)", "ref3_address TEXT"
+            "ref3_name VARCHAR(255)", "ref3_phone VARCHAR(50)", "ref3_address TEXT",
+            "cheque2_photo TEXT",
+            "cheque3_photo TEXT",
+            "cheque4_photo TEXT",
+            "security_cheques TEXT",
+            "police_verification_status VARCHAR(100)",
+            "police_verification_doc TEXT",
+            "reference_verified BOOLEAN DEFAULT FALSE",
+            "driver_manager_id INTEGER",
+            "driver_manager_name VARCHAR(255)"
         ]:
             cur.execute(f"ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS {col};")
 
@@ -440,6 +449,13 @@ def startup_event():
             "approval_submitted_at  TIMESTAMP",
             "cheque2_photo          TEXT",
             "cheque3_photo          TEXT",
+            "cheque4_photo          TEXT",
+            "security_cheques       TEXT",
+            "police_verification_status VARCHAR(100)",
+            "police_verification_doc    TEXT",
+            "reference_verified         BOOLEAN DEFAULT FALSE",
+            "driver_manager_id          INTEGER",
+            "driver_manager_name        VARCHAR(255)"
         ]:
             cur.execute(f"ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS {col};")
 
@@ -1501,6 +1517,13 @@ class OnboardingData(BaseModel):
     cancelled_cheque_photo: Optional[Any] = None
     cheque2_photo: Optional[Any] = None
     cheque3_photo: Optional[Any] = None
+    cheque4_photo: Optional[Any] = None
+    security_cheque_files: Optional[Any] = None
+    police_verification_status: Optional[str] = None
+    police_verification_doc: Optional[Any] = None
+    reference_verified: Optional[bool] = False
+    driver_manager_id: Optional[Union[int, str]] = None
+    driver_manager_name: Optional[str] = None
     signature_photo: Optional[Any] = None
     candidate_role: Optional[str] = "Driver"
     rental_model: Optional[str] = None
@@ -3539,8 +3562,8 @@ def create_onboarding(data: OnboardingData, authorization: Optional[str] = Heade
             )
         # ────────────────────────────────────────────────────────────────────────
 
-        # Ensure cheque columns exist (migration guard)
-        for col in ["cheque2_photo", "cheque3_photo"]:
+        # Ensure cheque and new columns exist (migration guard)
+        for col in ["cheque2_photo", "cheque3_photo", "cheque4_photo", "security_cheques", "police_verification_status", "police_verification_doc", "reference_verified", "driver_manager_id", "driver_manager_name"]:
             cur.execute(f"""
                 ALTER TABLE july_form_onboarding
                 ADD COLUMN IF NOT EXISTS {col} TEXT;
@@ -3558,15 +3581,16 @@ def create_onboarding(data: OnboardingData, authorization: Optional[str] = Heade
                 account_number, ifsc_code, upi_id,
                 vendor_type, driver_id, custom_rent_amount,
                 walkin_id, emergency_relationship, platform_details, documents_verified, 
-                custom_rental_plan, cancelled_cheque_photo, cheque2_photo, cheque3_photo, signature_photo,
-                account_name, account_type,
+                custom_rental_plan, cancelled_cheque_photo, cheque2_photo, cheque3_photo, cheque4_photo, security_cheques,
+                police_verification_status, police_verification_doc, reference_verified, driver_manager_id, driver_manager_name,
+                signature_photo, account_name, account_type,
                 candidate_role, rental_model, security_deposit, letzown_cheques, is_spring_verified,
                 aadhaar_card_front, aadhaar_card_back, driver_email, local_address_proof,
                 ref1_name, ref1_phone, ref1_address,
                 ref2_name, ref2_phone, ref2_address,
                 ref3_name, ref3_phone, ref3_address,
                 created_by, approval_status
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
             RETURNING id;
         """, (
             data.driver_name, data.phone_number, data.whatsapp_number, data.dob, data.city, data.operating_place,
@@ -3581,11 +3605,16 @@ def create_onboarding(data: OnboardingData, authorization: Optional[str] = Heade
             data.vendor_type, data.driver_id, data.custom_rent_amount,
             data.walkin_id, data.emergency_relationship, json.dumps(data.platform_details) if data.platform_details else None, data.documents_verified,
             data.custom_rental_plan, extract_image(data.cancelled_cheque_photo),
-            extract_image(data.cheque2_photo), extract_image(data.cheque3_photo),
+            extract_image(data.cheque2_photo), extract_image(data.cheque3_photo), extract_image(data.cheque4_photo),
+            json.dumps(data.security_cheque_files) if isinstance(data.security_cheque_files, list) else extract_image(data.security_cheque_files),
+            data.police_verification_status, extract_image(data.police_verification_doc), data.reference_verified,
+            int(data.driver_manager_id) if data.driver_manager_id and str(data.driver_manager_id).isdigit() else None,
+            data.driver_manager_name,
             extract_image(data.signature_photo),
             data.account_name, data.account_type,
             data.candidate_role, data.rental_model, data.security_deposit, data.letzown_cheques, data.is_spring_verified,
-            extract_image(data.aadhaar_card_front), extract_image(data.aadhaar_card_back), data.driver_email, extract_image(data.local_address_proof),
+            extract_image(data.aadhaar_card_front), extract_image(data.aadhaar_card_back), data.driver_email,
+            json.dumps(data.local_address_proof) if isinstance(data.local_address_proof, list) else extract_image(data.local_address_proof),
             data.ref1_name, data.ref1_phone, data.ref1_address,
             data.ref2_name, data.ref2_phone, data.ref2_address,
             data.ref3_name, data.ref3_phone, data.ref3_address,
@@ -3912,6 +3941,8 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
                     ref1_name=%s, ref1_phone=%s, ref1_address=%s,
                     ref2_name=%s, ref2_phone=%s, ref2_address=%s,
                     ref3_name=%s, ref3_phone=%s, ref3_address=%s,
+                    police_verification_status=%s, reference_verified=%s,
+                    driver_manager_id=%s, driver_manager_name=%s,
                     updated_by=%s, updated_at=NOW()
                 WHERE id=%s;
             """, (
@@ -3933,6 +3964,9 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
                 data.ref1_name, data.ref1_phone, data.ref1_address,
                 data.ref2_name, data.ref2_phone, data.ref2_address,
                 data.ref3_name, data.ref3_phone, data.ref3_address,
+                data.police_verification_status, data.reference_verified,
+                int(data.driver_manager_id) if data.driver_manager_id and str(data.driver_manager_id).isdigit() else None,
+                data.driver_manager_name,
                 user_p_id, id
             ))
             # Update photo fields only if new values provided
@@ -3944,8 +3978,13 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
                 ("aadhaar_card_photo",    extract_image(data.aadhaar_card_photo)),
                 ("aadhaar_card_front",    extract_image(data.aadhaar_card_front)),
                 ("aadhaar_card_back",     extract_image(data.aadhaar_card_back)),
-                ("local_address_proof",   extract_image(data.local_address_proof)),
+                ("local_address_proof",   json.dumps(data.local_address_proof) if isinstance(data.local_address_proof, list) else extract_image(data.local_address_proof)),
                 ("cancelled_cheque_photo",extract_image(data.cancelled_cheque_photo)),
+                ("cheque2_photo",         extract_image(data.cheque2_photo)),
+                ("cheque3_photo",         extract_image(data.cheque3_photo)),
+                ("cheque4_photo",         extract_image(data.cheque4_photo)),
+                ("security_cheques",      json.dumps(data.security_cheque_files) if isinstance(data.security_cheque_files, list) else extract_image(data.security_cheque_files)),
+                ("police_verification_doc", extract_image(data.police_verification_doc)),
                 ("signature_photo",       extract_image(data.signature_photo)),
             ]:
                 if val:
@@ -3989,13 +4028,18 @@ def get_onboarding(id: int):
                 selfie_photo, dl_front, dl_back, pan_card_photo,
                 vendor_type, driver_id, custom_rent_amount,
                 walkin_id, emergency_relationship, platform_details, COALESCE(documents_verified, TRUE) AS documents_verified,
-                custom_rental_plan, cancelled_cheque_photo, NULL AS cheque2_photo, NULL AS cheque3_photo, signature_photo,
+                custom_rental_plan, cancelled_cheque_photo, cheque2_photo, cheque3_photo, cheque4_photo, security_cheques, signature_photo,
                 account_name, account_type,
                 candidate_role, rental_model, security_deposit, letzown_cheques, COALESCE(is_spring_verified, TRUE) AS is_spring_verified,
                 aadhaar_card_front, aadhaar_card_back, driver_email, local_address_proof,
                 ref1_name, ref1_phone, ref1_address,
                 ref2_name, ref2_phone, ref2_address,
                 ref3_name, ref3_phone, ref3_address,
+                COALESCE(police_verification_status, '') AS police_verification_status,
+                police_verification_doc,
+                COALESCE(reference_verified, FALSE) AS reference_verified,
+                driver_manager_id,
+                driver_manager_name,
                 COALESCE(approval_status, 'Draft') AS approval_status,
                 created_at, updated_at
             FROM july_form_onboarding
@@ -4019,17 +4063,23 @@ def get_onboarding(id: int):
                 "vendor_type": r[29], "driver_id": r[30], "custom_rent_amount": r[31],
                 "walkin_id": r[32], "emergency_relationship": r[33], "platform_details": r[34],
                 "documents_verified": r[35], "custom_rental_plan": r[36],
-                "cancelled_cheque_photo": r[37], "cheque2_photo": r[38], "cheque3_photo": r[39], "signature_photo": r[40],
-                "account_name": r[41], "account_type": r[42],
-                "candidate_role": r[43], "rental_model": r[44], "security_deposit": r[45], 
-                "letzown_cheques": r[46], "is_spring_verified": r[47],
-                "aadhaar_card_front": r[48], "aadhaar_card_back": r[49], "driver_email": r[50], "local_address_proof": r[51],
-                "ref1_name": r[52], "ref1_phone": r[53], "ref1_address": r[54],
-                "ref2_name": r[55], "ref2_phone": r[56], "ref2_address": r[57],
-                "ref3_name": r[58], "ref3_phone": r[59], "ref3_address": r[60],
-                "approval_status": r[61],
-                "created_at": to_ist_iso(r[62]),
-                "updated_at": to_ist_iso(r[63] or r[62])
+                "cancelled_cheque_photo": r[37], "cheque2_photo": r[38], "cheque3_photo": r[39], "cheque4_photo": r[40],
+                "security_cheques": r[41], "security_cheque_files": r[41], "signature_photo": r[42],
+                "account_name": r[43], "account_type": r[44],
+                "candidate_role": r[45], "rental_model": r[46], "security_deposit": r[47], 
+                "letzown_cheques": r[48], "is_spring_verified": r[49],
+                "aadhaar_card_front": r[50], "aadhaar_card_back": r[51], "driver_email": r[52], "local_address_proof": r[53],
+                "ref1_name": r[54], "ref1_phone": r[55], "ref1_address": r[56],
+                "ref2_name": r[57], "ref2_phone": r[58], "ref2_address": r[59],
+                "ref3_name": r[60], "ref3_phone": r[61], "ref3_address": r[62],
+                "police_verification_status": r[63],
+                "police_verification_doc": r[64],
+                "reference_verified": r[65],
+                "driver_manager_id": r[66],
+                "driver_manager_name": r[67],
+                "approval_status": r[68],
+                "created_at": to_ist_iso(r[69]),
+                "updated_at": to_ist_iso(r[70] or r[69])
             }
             if r[29] == "Operator" and r[17]:
                 cur.execute("""
@@ -4103,6 +4153,8 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
                 ref1_name=%s, ref1_phone=%s, ref1_address=%s,
                 ref2_name=%s, ref2_phone=%s, ref2_address=%s,
                 ref3_name=%s, ref3_phone=%s, ref3_address=%s,
+                police_verification_status=%s, reference_verified=%s,
+                driver_manager_id=%s, driver_manager_name=%s,
                 updated_by=%s, updated_at=(NOW() AT TIME ZONE 'Asia/Kolkata')
             WHERE id=%s;
         """, (
@@ -4120,6 +4172,9 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
             data.ref1_name, data.ref1_phone, data.ref1_address,
             data.ref2_name, data.ref2_phone, data.ref2_address,
             data.ref3_name, data.ref3_phone, data.ref3_address,
+            data.police_verification_status, data.reference_verified,
+            int(data.driver_manager_id) if data.driver_manager_id and str(data.driver_manager_id).isdigit() else None,
+            data.driver_manager_name,
             user_p_id,
             id
         ))
@@ -4142,10 +4197,13 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
         new_aadhaar_img = extract_image(data.aadhaar_card_photo)
         new_aadhaar_front = extract_image(data.aadhaar_card_front)
         new_aadhaar_back = extract_image(data.aadhaar_card_back)
-        new_local_address_proof = extract_image(data.local_address_proof)
+        new_local_address_proof = json.dumps(data.local_address_proof) if isinstance(data.local_address_proof, list) else extract_image(data.local_address_proof)
         new_cancelled_cheque = extract_image(data.cancelled_cheque_photo)
         new_cheque2 = extract_image(data.cheque2_photo)
         new_cheque3 = extract_image(data.cheque3_photo)
+        new_cheque4 = extract_image(data.cheque4_photo)
+        new_security_cheques = json.dumps(data.security_cheque_files) if isinstance(data.security_cheque_files, list) else extract_image(data.security_cheque_files)
+        new_police_doc = extract_image(data.police_verification_doc)
         new_signature = extract_image(data.signature_photo)
         
         if new_selfie: cur.execute("UPDATE july_form_onboarding SET selfie_photo=%s WHERE id=%s;", (new_selfie, id))
@@ -4159,6 +4217,9 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
         if new_cancelled_cheque: cur.execute("UPDATE july_form_onboarding SET cancelled_cheque_photo=%s WHERE id=%s;", (new_cancelled_cheque, id))
         if new_cheque2: cur.execute("UPDATE july_form_onboarding SET cheque2_photo=%s WHERE id=%s;", (new_cheque2, id))
         if new_cheque3: cur.execute("UPDATE july_form_onboarding SET cheque3_photo=%s WHERE id=%s;", (new_cheque3, id))
+        if new_cheque4: cur.execute("UPDATE july_form_onboarding SET cheque4_photo=%s WHERE id=%s;", (new_cheque4, id))
+        if new_security_cheques: cur.execute("UPDATE july_form_onboarding SET security_cheques=%s WHERE id=%s;", (new_security_cheques, id))
+        if new_police_doc: cur.execute("UPDATE july_form_onboarding SET police_verification_doc=%s WHERE id=%s;", (new_police_doc, id))
         if new_signature: cur.execute("UPDATE july_form_onboarding SET signature_photo=%s WHERE id=%s;", (new_signature, id))
             
         if data.walkin_id:

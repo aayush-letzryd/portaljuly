@@ -328,7 +328,7 @@ export default function OnboardingForm({
   const [approvalRemarks, setApprovalRemarks] = useState<string | null>(null);
   const [approvalStatus, setApprovalStatus] = useState<string | null>(null);
   
-  // LetzOwn Dynamic Info & 3 References
+  // Candidate Level 2 References
   const [driverEmail, setDriverEmail] = useState("");
   const [ref1Name, setRef1Name] = useState("");
   const [ref1Phone, setRef1Phone] = useState("");
@@ -339,12 +339,29 @@ export default function OnboardingForm({
   const [ref3Name, setRef3Name] = useState("");
   const [ref3Phone, setRef3Phone] = useState("");
   const [ref3Address, setRef3Address] = useState("");
+  const [referenceVerified, setReferenceVerified] = useState<boolean>(false);
+
+  // Driver Manager Assignment
+  const [driverManagerId, setDriverManagerId] = useState<number | null>(null);
+  const [driverManagerName, setDriverManagerName] = useState<string>("");
+  const [driverManagersList, setDriverManagersList] = useState<any[]>([]);
+
+  // Police Verification
+  const [policeVerificationStatus, setPoliceVerificationStatus] = useState<string>("Not Required");
+  const [policeVerificationDoc, setPoliceVerificationDoc] = useState<string | null>(null);
+
+  // Multi-cheque Security Cheques Structure (up to 4 cheques)
+  const [securityChequeFiles, setSecurityChequeFiles] = useState<string[]>([]);
+  const removeSecurityChequeFile = (index: number) => {
+    setSecurityChequeFiles(prev => prev.filter((_, idx) => idx !== index));
+  };
 
   const [cancelledChequePhoto, setCancelledChequePhoto] = useState<string | null>(null);
   const [cheque2Photo, setCheque2Photo] = useState<string | null>(null);
   const [cheque3Photo, setCheque3Photo] = useState<string | null>(null);
+  const [cheque4Photo, setCheque4Photo] = useState<string | null>(null);
   const [signaturePhoto, setSignaturePhoto] = useState<string | null>(null);
-  const [cameraActiveField, setCameraActiveField] = useState<"selfie" | "dl_front" | "dl_back" | "pan" | "aadhaar" | "aadhaar_front" | "aadhaar_back" | "local_address_proof" | "cheque" | "cheque2" | "cheque3" | "signature" | string | null>(null);
+  const [cameraActiveField, setCameraActiveField] = useState<string | null>(null);
 
   const displayName = user.name || user.username || "User";
   const initials = displayName.split(" ").map((w) => w[0]).join("").substring(0, 2).toUpperCase();
@@ -526,6 +543,22 @@ export default function OnboardingForm({
         const currentUserId = user.portal_user_id || user.id || user.executive_id;
         const validApprovers = appData.filter((a: any) => a.id !== currentUserId);
         setApproversList(validApprovers);
+        
+        // Populate Driver Managers list
+        const dms = appData.filter((a: any) =>
+          a.role?.toLowerCase().includes("driver manager") ||
+          a.role?.toLowerCase().includes("fleet") ||
+          a.role?.toLowerCase().includes("manager") ||
+          ["DM", "FL", "CM", "GM", "BH"].includes(a.role_code)
+        );
+        const finalList = dms.length > 0 ? dms : appData;
+        setDriverManagersList(finalList);
+        if (finalList.length > 0 && !driverManagerId) {
+          const firstDM = finalList.find((d: any) => d.role?.toLowerCase().includes("driver manager") || d.role_code === "DM") || finalList[0];
+          setDriverManagerId(firstDM.id);
+          setDriverManagerName(firstDM.name);
+        }
+
         // Auto-set default to first City Manager or General Manager
         if (validApprovers.length > 0) {
           const preferred = validApprovers.find((a: any) =>
@@ -750,12 +783,43 @@ export default function OnboardingForm({
       return;
     }
 
+    if (targetStatus === "Pending Approval") {
+      // Validate 2 references
+      if (!ref1Name.trim() || !ref1Phone.trim()) {
+        alert("Reference 1 (Name and 10-digit Phone) is mandatory.");
+        return;
+      }
+      if (!ref2Name.trim() || !ref2Phone.trim()) {
+        alert("Reference 2 (Name and 10-digit Phone) is mandatory.");
+        return;
+      }
+      // LetzOwn specific mandatory checks
+      if (rentalModel === "LetzOwn") {
+        if (!ref1Address.trim() || !ref2Address.trim()) {
+          alert("Reference addresses for Reference 1 and Reference 2 are mandatory for the LetzOwn rental model.");
+          return;
+        }
+        if (securityChequeFiles.length < 4) {
+          alert("For the LetzOwn rental model, 4 Security Cheque documents are required.");
+          return;
+        }
+        if (localAddressProofFiles.length === 0) {
+          alert("For the LetzOwn rental model, Local Address Proof document is mandatory.");
+          return;
+        }
+        if (!policeVerificationDoc) {
+          alert("For the LetzOwn rental model, Police Verification Document is mandatory.");
+          return;
+        }
+      }
+    }
+
     const payload = {
       vendor_type: candidateRole, // Preserving backend mapping
       candidate_role: candidateRole,
       rental_model: rentalModel,
       security_deposit: securityDeposit,
-      letzown_cheques: rentalModel === "Drive to Own" ? letzownCheques : undefined,
+      letzown_cheques: rentalModel === "LetzOwn" ? "4" : (rentalModel === "Drive to Own" ? letzownCheques : undefined),
       driver_id: autoGeneratedId || `LR-${Math.floor(1000 + Math.random() * 9000)}`,
       custom_rent_amount: customRentAmount,
       operator_drivers: candidateRole === "Operator" ? operatorDrivers : [],
@@ -798,6 +862,11 @@ export default function OnboardingForm({
       ref3_name: ref3Name.trim() || undefined,
       ref3_phone: ref3Phone.trim() || undefined,
       ref3_address: ref3Address.trim() || undefined,
+      reference_verified: referenceVerified,
+      police_verification_status: policeVerificationStatus,
+      police_verification_doc: policeVerificationDoc || undefined,
+      driver_manager_id: driverManagerId || undefined,
+      driver_manager_name: driverManagerName || undefined,
       father_name: fatherName.trim(),
       bank_name: bankName || undefined,
       other_bank_name: otherBankName.trim() || undefined,
@@ -808,9 +877,12 @@ export default function OnboardingForm({
       upi_id: upiId.trim().toLowerCase() || undefined,
       documents_verified: documentsVerified,
       custom_rental_plan: customRentalPlan,
-      cancelled_cheque_photo: cancelledChequePhoto || undefined,
-      cheque2_photo: cheque2Photo || undefined,
-      cheque3_photo: cheque3Photo || undefined,
+      cancelled_cheque_photo: securityChequeFiles[0] || cancelledChequePhoto || undefined,
+      cheque2_photo: securityChequeFiles[1] || cheque2Photo || undefined,
+      cheque3_photo: securityChequeFiles[2] || cheque3Photo || undefined,
+      cheque4_photo: securityChequeFiles[3] || cheque4Photo || undefined,
+      security_cheques: securityChequeFiles.length > 0 ? JSON.stringify(securityChequeFiles) : undefined,
+      security_cheque_files: securityChequeFiles.length > 0 ? JSON.stringify(securityChequeFiles) : undefined,
       signature_photo: signaturePhoto || undefined,
       platform_details: thirdPartyPlatform !== 'None' ? { [thirdPartyPlatform]: platformDetails[thirdPartyPlatform] || { id: "" } } : { None: { id: "" } },
       approval_status: targetStatus,
@@ -954,6 +1026,16 @@ export default function OnboardingForm({
     setRef3Name("");
     setRef3Phone("");
     setRef3Address("");
+    setReferenceVerified(false);
+    setDriverManagerId(null);
+    setDriverManagerName("");
+    setPoliceVerificationStatus("Not Required");
+    setPoliceVerificationDoc(null);
+    setSecurityChequeFiles([]);
+    setCancelledChequePhoto(null);
+    setCheque2Photo(null);
+    setCheque3Photo(null);
+    setCheque4Photo(null);
     setVendorName("");
     setVendorId("");
     setFatherName("");
@@ -965,9 +1047,6 @@ export default function OnboardingForm({
     setUpiId("");
     setOperatingPlace("");
     setDocumentsVerified(false);
-    setCancelledChequePhoto(null);
-    setCheque2Photo(null);
-    setCheque3Photo(null);
     setSignaturePhoto(null);
     setThirdPartyPlatform("None");
     setPlatformDetails({});
@@ -977,7 +1056,7 @@ export default function OnboardingForm({
     setAutoFillBanner("");
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: "selfie" | "dl_front" | "dl_back" | "pan" | "aadhaar" | "aadhaar_front" | "aadhaar_back" | "local_address_proof" | "cheque" | "cheque2" | "cheque3" | "signature") => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: "selfie" | "dl_front" | "dl_back" | "pan" | "aadhaar" | "aadhaar_front" | "aadhaar_back" | "local_address_proof" | "security_cheque" | "police_doc" | "cheque" | "cheque2" | "cheque3" | "cheque4" | "signature" | string) => {
     const file = e.target.files?.[0];
     if (file) {
       const reader = new FileReader();
@@ -997,9 +1076,20 @@ export default function OnboardingForm({
               alert("Maximum 4 files allowed for Local Address Proof.");
             }
           }
+          if (field === "security_cheque") {
+            if (securityChequeFiles.length < 4) {
+              setSecurityChequeFiles(prev => [...prev, reader.result as string]);
+            } else {
+              alert("Maximum 4 security cheques allowed.");
+            }
+          }
+          if (field === "police_doc" || field === "police_verification_doc") {
+            setPoliceVerificationDoc(reader.result);
+          }
           if (field === "cheque") setCancelledChequePhoto(reader.result);
           if (field === "cheque2") setCheque2Photo(reader.result);
           if (field === "cheque3") setCheque3Photo(reader.result);
+          if (field === "cheque4") setCheque4Photo(reader.result);
           if (field === "signature") setSignaturePhoto(reader.result);
         }
       };
@@ -1084,6 +1174,35 @@ export default function OnboardingForm({
       } else {
         setLocalAddressProofFiles([]);
       }
+
+      if (data.security_cheques || data.security_cheque_files) {
+        const raw = data.security_cheques || data.security_cheque_files;
+        try {
+          if (typeof raw === 'string' && raw.startsWith("[")) {
+            setSecurityChequeFiles(JSON.parse(raw));
+          } else if (Array.isArray(raw)) {
+            setSecurityChequeFiles(raw);
+          } else {
+            setSecurityChequeFiles([raw]);
+          }
+        } catch (e) {
+          setSecurityChequeFiles([raw]);
+        }
+      } else {
+        const sc: string[] = [];
+        if (data.cancelled_cheque_photo) sc.push(data.cancelled_cheque_photo);
+        if (data.cheque2_photo) sc.push(data.cheque2_photo);
+        if (data.cheque3_photo) sc.push(data.cheque3_photo);
+        if (data.cheque4_photo) sc.push(data.cheque4_photo);
+        setSecurityChequeFiles(sc);
+      }
+
+      setPoliceVerificationStatus(data.police_verification_status || (data.rental_model === "LetzOwn" ? "Required" : "Not Required"));
+      setPoliceVerificationDoc(data.police_verification_doc || null);
+      setReferenceVerified(Boolean(data.reference_verified));
+      setDriverManagerId(data.driver_manager_id ? Number(data.driver_manager_id) : null);
+      setDriverManagerName(data.driver_manager_name || "");
+
       setDriverEmail(data.driver_email || "");
       setRef1Name(data.ref1_name || "");
       setRef1Phone(data.ref1_phone || "");
@@ -1109,6 +1228,7 @@ export default function OnboardingForm({
       setCancelledChequePhoto(data.cancelled_cheque_photo || null);
       setCheque2Photo(data.cheque2_photo || null);
       setCheque3Photo(data.cheque3_photo || null);
+      setCheque4Photo(data.cheque4_photo || null);
       setSignaturePhoto(data.signature_photo || null);
       setApprovalRemarks(data.approval_remarks || "All documents verified and physical inspection complete.");
       setApprovalStatus(data.approval_status || null);
@@ -1271,10 +1391,11 @@ export default function OnboardingForm({
     if (field === "aadhaar") setAadhaarPhoto(null);
     if (field === "aadhaar_front") setAadhaarCardFront(null);
     if (field === "aadhaar_back") setAadhaarCardBack(null);
-    if (field === "local_address_proof") setLocalAddressProof(null);
+    if (field === "police_doc" || field === "police_verification_doc") setPoliceVerificationDoc(null);
     if (field === "cheque") setCancelledChequePhoto(null);
     if (field === "cheque2") setCheque2Photo(null);
     if (field === "cheque3") setCheque3Photo(null);
+    if (field === "cheque4") setCheque4Photo(null);
     if (field === "signature") setSignaturePhoto(null);
   };
 
@@ -1598,21 +1719,98 @@ export default function OnboardingForm({
                       </div>
                     )}
 
-                    <div className="mb-6 bg-slate-50 border border-border p-4 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      <div>
-                        <h4 className="text-sm font-bold text-slate-900">Onboarding Type</h4>
-                        <p className="text-[10px] text-text-muted mt-0.5">Select if you are onboarding a Driver or an Operator</p>
+                    {/* Top Onboarding Config: Role, Rental Model, Driver Manager & Police Verification */}
+                    <div className="mb-6 bg-slate-50 border border-border p-5 rounded-2xl space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/70 pb-4">
+                        <div>
+                          <h4 className="text-sm font-bold text-slate-900">1. Onboarding Role &amp; Plan Configuration</h4>
+                          <p className="text-[10px] text-text-muted mt-0.5">Select candidate role, rental model, and assigned driver manager</p>
+                        </div>
+                        <div className="flex items-center gap-6">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="candidateRole" value="Driver" checked={candidateRole === "Driver"} onChange={() => setCandidateRole("Driver")} className="accent-primary w-4 h-4" />
+                            <span className="font-sans text-sm font-bold text-slate-800">Driver</span>
+                          </label>
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input type="radio" name="candidateRole" value="Operator" checked={candidateRole === "Operator"} onChange={() => setCandidateRole("Operator")} className="accent-primary w-4 h-4" />
+                            <span className="font-sans text-sm font-bold text-slate-800">Operator</span>
+                          </label>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-6">
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="radio" name="candidateRole" value="Driver" checked={candidateRole === "Driver"} onChange={() => setCandidateRole("Driver")} className="accent-primary w-4 h-4" />
-                          <span className="font-sans text-sm font-bold text-slate-800">Driver</span>
-                        </label>
-                        <label className="flex items-center gap-2 cursor-pointer">
-                          <input type="radio" name="candidateRole" value="Operator" checked={candidateRole === "Operator"} onChange={() => setCandidateRole("Operator")} className="accent-primary w-4 h-4" />
-                          <span className="font-sans text-sm font-bold text-slate-800">Operator</span>
-                        </label>
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-800">Rental Model *</label>
+                          <select 
+                            required={currentStep === 1} 
+                            value={rentalModel} 
+                            onChange={(e) => {
+                              const model = e.target.value;
+                              setRentalModel(model);
+                              if (model === "LetzOwn") {
+                                setPoliceVerificationStatus("Required");
+                              }
+                            }} 
+                            className="w-full h-11 px-3.5 bg-white border border-border rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-primary cursor-pointer"
+                          >
+                            <option value="Drive to Rent">Drive to Rent</option>
+                            <option value="Drive to Own">Drive to Own</option>
+                            <option value="LetzOwn">LetzOwn (Conditional Mandatory Compliance)</option>
+                            <option value="Salary Model">Salary Model</option>
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-800">Assigned Driver Manager *</label>
+                          <select
+                            required={currentStep === 1}
+                            value={driverManagerId || ""}
+                            onChange={(e) => {
+                              const id = e.target.value ? Number(e.target.value) : null;
+                              setDriverManagerId(id);
+                              const dm = driverManagersList.find(d => d.id === id);
+                              setDriverManagerName(dm ? dm.name : "");
+                            }}
+                            className="w-full h-11 px-3.5 bg-white border border-border rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-primary cursor-pointer"
+                          >
+                            <option value="">Select Driver Manager...</option>
+                            {driverManagersList.map((dm: any) => (
+                              <option key={dm.id} value={dm.id}>
+                                {dm.name} ({dm.role || 'Manager'})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <label className="text-xs font-bold text-slate-800">
+                            Police Verification Option {rentalModel === "LetzOwn" ? "(Mandatory *)" : ""}
+                          </label>
+                          <select
+                            required={currentStep === 1}
+                            value={policeVerificationStatus}
+                            onChange={(e) => setPoliceVerificationStatus(e.target.value)}
+                            disabled={rentalModel === "LetzOwn"}
+                            className={`w-full h-11 px-3.5 border rounded-xl text-xs font-semibold outline-none focus:border-primary ${
+                              rentalModel === "LetzOwn"
+                                ? "bg-amber-50/70 border-amber-300 text-amber-900 font-bold"
+                                : "bg-white border-border text-slate-800 cursor-pointer"
+                            }`}
+                          >
+                            <option value="Required">Required (Document Mandatory)</option>
+                            <option value="Pending">Pending Verification</option>
+                            <option value="Completed">Completed / Clear</option>
+                            {rentalModel !== "LetzOwn" && <option value="Not Required">Not Required</option>}
+                          </select>
+                        </div>
                       </div>
+
+                      {rentalModel === "LetzOwn" && (
+                        <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2 text-xs text-amber-800 font-medium">
+                          <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                          <span><strong>LetzOwn Selected:</strong> Police Verification, 4 Security Cheques, Local Address Proof, and Reference Addresses are strictly mandatory.</span>
+                        </div>
+                      )}
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1720,28 +1918,100 @@ export default function OnboardingForm({
                       </div>
                     </div>
 
-                    <div className="pt-6 border-t border-border/60">
-                      <h4 className="font-sans text-sm font-bold text-text-dim mb-4">Emergency Contact Details</h4>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold text-text-muted">Emergency Contact Name *</label>
-                          <input type="text" required={currentStep === 1} value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" placeholder="Name" />
+                    {/* Emergency Contact & References Section */}
+                    <div className="pt-6 border-t border-border/60 space-y-6">
+                      <div>
+                        <h4 className="font-sans text-sm font-bold text-text-dim mb-4">Emergency Contact Details</h4>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-text-muted">Emergency Contact Name *</label>
+                            <input type="text" required={currentStep === 1} value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" placeholder="Name" />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-text-muted">Relationship *</label>
+                            <select required={currentStep === 1} value={emergencyRelationship} onChange={(e) => setEmergencyRelationship(e.target.value)} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all">
+                              <option value="">Select Relation...</option>
+                              <option value="Father">Father</option>
+                              <option value="Mother">Mother</option>
+                              <option value="Spouse">Spouse</option>
+                              <option value="Sibling">Sibling</option>
+                              <option value="Friend">Friend</option>
+                              <option value="Other">Other</option>
+                            </select>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-text-muted">Emergency Phone *</label>
+                            <input type="tel" required={currentStep === 1} value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" placeholder="10-digit number" />
+                          </div>
                         </div>
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold text-text-muted">Relationship *</label>
-                          <select required={currentStep === 1} value={emergencyRelationship} onChange={(e) => setEmergencyRelationship(e.target.value)} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all">
-                            <option value="">Select Relation...</option>
-                            <option value="Father">Father</option>
-                            <option value="Mother">Mother</option>
-                            <option value="Spouse">Spouse</option>
-                            <option value="Sibling">Sibling</option>
-                            <option value="Friend">Friend</option>
-                            <option value="Other">Other</option>
-                          </select>
+                      </div>
+
+                      {/* Two References Section */}
+                      <div className="bg-slate-50 border border-border p-5 rounded-2xl space-y-4">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/70 pb-3">
+                          <div>
+                            <h4 className="font-sans text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+                              <UserCheck className="w-4 h-4 text-primary" /> Personal References (2 References Required)
+                            </h4>
+                            <p className="text-[10px] text-slate-500 mt-0.5">
+                              Reference address is {rentalModel === "LetzOwn" ? <strong className="text-amber-700">mandatory for LetzOwn</strong> : "optional for other rental models"}.
+                            </p>
+                          </div>
+                          <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer bg-white px-3 py-1.5 rounded-lg border border-border hover:border-primary transition-all">
+                            <input 
+                              type="checkbox" 
+                              checked={referenceVerified} 
+                              onChange={(e) => setReferenceVerified(e.target.checked)} 
+                              className="w-4 h-4 rounded text-primary focus:ring-primary/20 accent-primary" 
+                            />
+                            <span>Reference Verification Completed</span>
+                          </label>
                         </div>
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold text-text-muted">Emergency Phone *</label>
-                          <input type="tel" required={currentStep === 1} value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" placeholder="10-digit number" />
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          {/* Reference 1 */}
+                          <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-3 shadow-2xs">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                              <span className="text-xs font-bold text-primary">Reference 1 *</span>
+                              <span className="text-[10px] font-semibold text-slate-400">Primary Contact</span>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold text-slate-600">Full Name *</label>
+                              <input type="text" required={currentStep === 1} value={ref1Name} onChange={(e) => setRef1Name(e.target.value)} placeholder="Full Name" className="w-full h-9 px-3 bg-slate-50 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary font-medium" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold text-slate-600">10-digit Phone Number *</label>
+                              <input type="tel" required={currentStep === 1} value={ref1Phone} onChange={(e) => setRef1Phone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="10-digit Mobile" className="w-full h-9 px-3 bg-slate-50 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary font-medium" maxLength={10} />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold text-slate-600">
+                                Address {rentalModel === "LetzOwn" ? <span className="text-amber-600 font-bold">* (Compulsory for LetzOwn)</span> : <span className="text-slate-400 font-normal">(Optional)</span>}
+                              </label>
+                              <input type="text" required={currentStep === 1 && rentalModel === "LetzOwn"} value={ref1Address} onChange={(e) => setRef1Address(e.target.value)} placeholder="House, Street, Area, City" className="w-full h-9 px-3 bg-slate-50 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary font-medium" />
+                            </div>
+                          </div>
+
+                          {/* Reference 2 */}
+                          <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-3 shadow-2xs">
+                            <div className="flex items-center justify-between border-b border-slate-100 pb-1.5">
+                              <span className="text-xs font-bold text-primary">Reference 2 *</span>
+                              <span className="text-[10px] font-semibold text-slate-400">Secondary Contact</span>
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold text-slate-600">Full Name *</label>
+                              <input type="text" required={currentStep === 1} value={ref2Name} onChange={(e) => setRef2Name(e.target.value)} placeholder="Full Name" className="w-full h-9 px-3 bg-slate-50 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary font-medium" />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold text-slate-600">10-digit Phone Number *</label>
+                              <input type="tel" required={currentStep === 1} value={ref2Phone} onChange={(e) => setRef2Phone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="10-digit Mobile" className="w-full h-9 px-3 bg-slate-50 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary font-medium" maxLength={10} />
+                            </div>
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold text-slate-600">
+                                Address {rentalModel === "LetzOwn" ? <span className="text-amber-600 font-bold">* (Compulsory for LetzOwn)</span> : <span className="text-slate-400 font-normal">(Optional)</span>}
+                              </label>
+                              <input type="text" required={currentStep === 1 && rentalModel === "LetzOwn"} value={ref2Address} onChange={(e) => setRef2Address(e.target.value)} placeholder="House, Street, Area, City" className="w-full h-9 px-3 bg-slate-50 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary font-medium" />
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>
@@ -1751,146 +2021,190 @@ export default function OnboardingForm({
                   {/* ======================================= */}
                   {/* STEP 2: DOCUMENTS & KYC                 */}
                   {/* ======================================= */}
+                  {/* ======================================= */}
+                  {/* STEP 2: DOCUMENTS & KYC                 */}
+                  {/* ======================================= */}
                   <div className={`${currentStep === 2 ? 'block' : 'hidden'} space-y-8 animate-in fade-in slide-in-from-right-4 duration-500`}>
                     
-                    {/* PAN & Aadhaar (SpringVerify Integration) */}
-                    <div className="bg-slate-50 border border-border p-5 rounded-xl shadow-xs">
-                      <div className="flex items-center justify-between mb-4 border-b border-border pb-3">
-                        <h4 className="font-sans text-sm font-bold text-slate-900 flex items-center gap-2">
-                          <Shield className="h-4 w-4 text-primary" /> Primary KYC
-                        </h4>
+                    {/* Primary KYC Header with SpringVerify */}
+                    <div className="bg-slate-50 border border-border p-5 rounded-2xl shadow-xs space-y-6">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border/80 pb-4">
+                        <div>
+                          <h4 className="font-sans text-sm font-bold text-slate-900 flex items-center gap-2">
+                            <Shield className="h-4.5 w-4.5 text-primary" /> Primary KYC Documents &amp; Verification
+                          </h4>
+                          <p className="text-[11px] text-slate-500 mt-0.5">Capture documents first for OCR scan, followed by verified numbers below</p>
+                        </div>
                         {isSpringVerified ? (
-                          <span className="flex items-center gap-1 text-[10px] font-bold text-green bg-green/10 px-2 py-1 rounded">
-                            <CheckCircle className="h-3 w-3" /> Verified by SpringVerify
+                          <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-800 bg-emerald-100 px-3 py-1.5 rounded-lg border border-emerald-300">
+                            <CheckCircle className="h-4 w-4 text-emerald-600" /> Verified by SpringVerify
                           </span>
                         ) : (
-                          <button type="button" onClick={handleSpringVerify} disabled={isSpringVerifyLoading} className="flex items-center gap-1.5 bg-slate-900 text-white px-3 py-1.5 rounded text-[10px] font-bold hover:bg-slate-800 transition-colors disabled:opacity-50 cursor-pointer">
-                            {isSpringVerifyLoading ? <RefreshCw className="h-3 w-3 animate-spin" /> : <ShieldCheck className="h-3 w-3" />}
+                          <button type="button" onClick={handleSpringVerify} disabled={isSpringVerifyLoading} className="flex items-center gap-2 bg-slate-900 text-white px-3.5 py-2 rounded-lg text-xs font-bold hover:bg-slate-800 transition-all disabled:opacity-50 cursor-pointer shadow-xs">
+                            {isSpringVerifyLoading ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <ShieldCheck className="h-3.5 w-3.5" />}
                             {isSpringVerifyLoading ? "Verifying..." : "Verify via SpringVerify"}
                           </button>
                         )}
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold text-text-muted">PAN Number *</label>
-                          <div className="relative">
-                            <input
-                              type={showPan ? "text" : "password"}
-                              required={currentStep === 2}
-                              value={panNumber}
-                              onChange={(e) => setPanNumber(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 10))}
-                              className="w-full h-11 pl-4 pr-10 border border-border rounded-xl text-sm font-mono outline-none focus:border-primary"
-                              placeholder="ABCDE1234F"
-                              maxLength={10}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPan(!showPan)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer p-1"
-                              title={showPan ? "Mask PAN Number" : "Unmask PAN Number"}
-                            >
-                              {showPan ? <EyeOff className="w-4 h-4 text-primary" /> : <Eye className="w-4 h-4 text-slate-500" />}
-                            </button>
-                          </div>
+
+                      {/* Top Row: Candidate Selfie */}
+                      <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-3 shadow-2xs">
+                        <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                          <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                            <User className="w-3.5 h-3.5 text-primary" /> Candidate Live Selfie Photo *
+                          </span>
+                          <span className="text-[10px] font-semibold text-slate-400">Face clearly visible</span>
                         </div>
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold text-text-muted">Aadhaar Number *</label>
-                          <div className="relative">
-                            <input
-                              type={showAadhaar ? "text" : "password"}
-                              required={currentStep === 2}
-                              value={aadhaarNumber}
-                              onChange={(e) => {
-                                let val = e.target.value.replace(/\D/g, '').slice(0, 12);
-                                setAadhaarNumber(val.replace(/(\d{4})(?=\d)/g, "$1 "));
-                              }}
-                              className="w-full h-11 pl-4 pr-10 border border-border rounded-xl text-sm font-mono outline-none focus:border-primary"
-                              placeholder="0000 0000 0000"
-                              maxLength={14}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowAadhaar(!showAadhaar)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer p-1"
-                              title={showAadhaar ? "Mask Aadhaar Number" : "Unmask Aadhaar Number"}
-                            >
-                              {showAadhaar ? <EyeOff className="w-4 h-4 text-primary" /> : <Eye className="w-4 h-4 text-slate-500" />}
-                            </button>
-                          </div>
+                        <div className="flex flex-col sm:flex-row items-center gap-4">
+                          {selfiePhoto ? (
+                            <div className="relative bg-slate-50 border border-slate-200 rounded-xl p-2 flex items-center justify-center min-h-[110px] w-full sm:w-48">
+                              <img src={selfiePhoto} alt="Candidate Selfie" className="max-h-24 object-contain rounded-lg shadow-2xs" />
+                              <button type="button" onClick={() => removePhoto("selfie")} className="absolute top-1.5 right-1.5 rounded-full bg-rose-50 text-rose-500 p-1.5 hover:bg-rose-100 transition-all cursor-pointer shadow-xs"><Trash2 className="h-3.5 w-3.5" /></button>
+                            </div>
+                          ) : (
+                            <div className="flex flex-col items-center justify-center p-4 border border-dashed border-primary/40 bg-emerald-50/30 rounded-xl gap-2 w-full text-center">
+                              <span className="text-xs font-semibold text-slate-700">Capture or upload real-time candidate selfie</span>
+                              <div className="flex gap-2 w-full max-w-xs">
+                                <button type="button" onClick={() => setCameraActiveField("selfie")} className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-primary text-white text-xs font-bold py-2 hover:bg-primary-dark transition-colors cursor-pointer shadow-xs"><Camera className="h-3.5 w-3.5" /> Capture</button>
+                                <label className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-border bg-white text-slate-700 text-xs font-bold py-2 hover:bg-slate-50 transition-colors cursor-pointer shadow-xs"><Upload className="h-3.5 w-3.5 text-primary" /> Upload<input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "selfie")} /></label>
+                              </div>
+                            </div>
+                          )}
                         </div>
                       </div>
-                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mt-6">
-                        <div className="flex flex-col gap-2 rounded-xl border border-dashed border-border bg-white p-3">
-                          <span className="font-sans text-[11px] font-bold text-slate-800 text-center">Selfie Photo *</span>
-                          {selfiePhoto ? (
-                            <div className="relative flex-grow flex items-center justify-center rounded-lg p-2">
-                              <img src={selfiePhoto} alt="Selfie Photo" className="max-h-20 object-contain rounded shadow-xs" />
-                              <button type="button" onClick={() => removePhoto("selfie")} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 transition-all cursor-pointer"><Trash2 className="h-3 w-3" /></button>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center flex-grow p-2 gap-2 border border-border/50 bg-slate-50 rounded-lg">
-                              <div className="flex gap-1.5 w-full">
-                                <button type="button" onClick={() => setCameraActiveField("selfie")} className="flex-1 flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-semibold py-1.5 hover:bg-primary-hover transition-colors cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
-                                <label className="flex-1 flex items-center justify-center gap-1 rounded border border-border bg-white text-text-muted text-[10px] font-semibold py-1.5 hover:bg-slate-100 transition-colors cursor-pointer"><Upload className="h-3 w-3" /> Upload<input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "selfie")} /></label>
+
+                      {/* OCR Ready Grid: PAN Block & Aadhaar Block */}
+                      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        {/* PAN Card Block */}
+                        <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-4 shadow-2xs">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                            <span className="text-xs font-bold text-slate-900">1. PAN Card Document &amp; Number *</span>
+                            <span className="text-[10px] font-semibold text-primary">OCR Scan Layout</span>
+                          </div>
+
+                          {/* PAN Document/Photo (TOP) */}
+                          <div className="space-y-1.5">
+                            <label className="text-[11px] font-semibold text-slate-600">PAN Card Photo / Document *</label>
+                            {panCardPhoto ? (
+                              <div className="relative bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-center min-h-[120px]">
+                                <img src={panCardPhoto} alt="PAN Card" className="max-h-28 object-contain rounded-lg shadow-2xs" />
+                                <button type="button" onClick={() => removePhoto("pan")} className="absolute top-2 right-2 rounded-full bg-rose-50 text-rose-500 p-1.5 hover:bg-rose-100 transition-all cursor-pointer shadow-xs"><Trash2 className="h-3.5 w-3.5" /></button>
                               </div>
+                            ) : (
+                              <div className="flex flex-col items-center justify-center p-4 border border-dashed border-border bg-slate-50 rounded-xl gap-2 text-center min-h-[110px]">
+                                <span className="text-xs font-medium text-slate-600">Upload or Capture PAN Card</span>
+                                <div className="flex gap-2 w-full max-w-xs">
+                                  <button type="button" onClick={() => setCameraActiveField("pan")} className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-primary text-white text-xs font-bold py-1.5 hover:bg-primary-dark transition-colors cursor-pointer shadow-xs"><Camera className="h-3.5 w-3.5" /> Capture</button>
+                                  <label className="flex-1 flex items-center justify-center gap-1 rounded-lg border border-border bg-white text-slate-700 text-xs font-bold py-1.5 hover:bg-slate-50 transition-colors cursor-pointer shadow-xs"><Upload className="h-3.5 w-3.5 text-primary" /> Upload<input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "pan")} /></label>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* PAN Number Input (BELOW) */}
+                          <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                            <label className="text-xs font-bold text-slate-800">PAN Number *</label>
+                            <div className="relative">
+                              <input
+                                type={showPan ? "text" : "password"}
+                                required={currentStep === 2}
+                                value={panNumber}
+                                onChange={(e) => setPanNumber(e.target.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 10))}
+                                className="w-full h-11 pl-4 pr-10 border border-border rounded-xl text-sm font-mono uppercase outline-none focus:border-primary font-bold tracking-wider"
+                                placeholder="ABCDE1234F"
+                                maxLength={10}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowPan(!showPan)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer p-1"
+                                title={showPan ? "Mask PAN" : "Unmask PAN"}
+                              >
+                                {showPan ? <EyeOff className="w-4 h-4 text-primary" /> : <Eye className="w-4 h-4 text-slate-500" />}
+                              </button>
                             </div>
-                          )}
+                          </div>
                         </div>
 
-                        <div className="flex flex-col gap-2 rounded-xl border border-dashed border-border bg-white p-3">
-                          <span className="font-sans text-[11px] font-bold text-text-muted text-center">PAN Card Photo</span>
-                          {panCardPhoto ? (
-                            <div className="relative flex-grow flex items-center justify-center rounded-lg p-2">
-                              <img src={panCardPhoto} alt="PAN Card" className="max-h-20 object-contain rounded shadow-xs" />
-                              <button type="button" onClick={() => removePhoto("pan")} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 transition-all cursor-pointer"><Trash2 className="h-3 w-3" /></button>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center flex-grow p-2 gap-2 border border-border/50 bg-slate-50 rounded-lg">
-                              <div className="flex gap-1.5 w-full">
-                                <button type="button" onClick={() => setCameraActiveField("pan")} className="flex-1 flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-semibold py-1.5 hover:bg-primary-hover transition-colors cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
-                                <label className="flex-1 flex items-center justify-center gap-1 rounded border border-border bg-white text-text-muted text-[10px] font-semibold py-1.5 hover:bg-slate-100 transition-colors cursor-pointer"><Upload className="h-3 w-3" /> Upload<input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "pan")} /></label>
-                              </div>
-                            </div>
-                          )}
-                        </div>
+                        {/* Aadhaar Card Block */}
+                        <div className="p-4 bg-white border border-slate-200 rounded-xl space-y-4 shadow-2xs">
+                          <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                            <span className="text-xs font-bold text-slate-900">2. Aadhaar Card Document &amp; Number *</span>
+                            <span className="text-[10px] font-semibold text-primary">Front &amp; Back Photos</span>
+                          </div>
 
-                        <div className="flex flex-col gap-2 rounded-xl border border-dashed border-border bg-white p-3">
-                          <span className="font-sans text-[11px] font-bold text-text-muted text-center">Aadhaar Card – Front *</span>
-                          {aadhaarCardFront ? (
-                            <div className="relative flex-grow flex items-center justify-center rounded-lg p-2">
-                              <img src={aadhaarCardFront} alt="Aadhaar Front" className="max-h-20 object-contain rounded shadow-xs" />
-                              <button type="button" onClick={() => removePhoto("aadhaar_front")} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 transition-all cursor-pointer"><Trash2 className="h-3 w-3" /></button>
+                          {/* Aadhaar Photos (TOP) */}
+                          <div className="grid grid-cols-2 gap-3">
+                            {/* Aadhaar Front */}
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold text-slate-600">Front Photo *</label>
+                              {aadhaarCardFront ? (
+                                <div className="relative bg-slate-50 border border-slate-200 rounded-xl p-2 flex items-center justify-center min-h-[110px]">
+                                  <img src={aadhaarCardFront} alt="Aadhaar Front" className="max-h-24 object-contain rounded-lg shadow-2xs" />
+                                  <button type="button" onClick={() => removePhoto("aadhaar_front")} className="absolute top-1.5 right-1.5 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 transition-all cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-center justify-center p-3 border border-dashed border-border bg-slate-50 rounded-xl gap-1.5 text-center min-h-[110px]">
+                                  <span className="text-[10px] font-medium text-slate-600">Front Card</span>
+                                  <div className="flex gap-1 w-full">
+                                    <button type="button" onClick={() => setCameraActiveField("aadhaar_front")} className="flex-1 flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-bold py-1.5 hover:bg-primary-dark transition-colors cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
+                                    <label className="flex-1 flex items-center justify-center gap-1 rounded border border-border bg-white text-slate-700 text-[10px] font-bold py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"><Upload className="h-3 w-3 text-primary" /> Upload<input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "aadhaar_front")} /></label>
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center flex-grow p-2 gap-2 border border-border/50 bg-slate-50 rounded-lg">
-                              <div className="flex gap-1.5 w-full">
-                                <button type="button" onClick={() => setCameraActiveField("aadhaar_front")} className="flex-1 flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-semibold py-1.5 hover:bg-primary-hover transition-colors cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
-                                <label className="flex-1 flex items-center justify-center gap-1 rounded border border-border bg-white text-text-muted text-[10px] font-semibold py-1.5 hover:bg-slate-100 transition-colors cursor-pointer"><Upload className="h-3 w-3" /> Upload<input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "aadhaar_front")} /></label>
-                              </div>
-                            </div>
-                          )}
-                        </div>
 
-                        <div className="flex flex-col gap-2 rounded-xl border border-dashed border-border bg-white p-3">
-                          <span className="font-sans text-[11px] font-bold text-text-muted text-center">Aadhaar Card – Back *</span>
-                          {aadhaarCardBack ? (
-                            <div className="relative flex-grow flex items-center justify-center rounded-lg p-2">
-                              <img src={aadhaarCardBack} alt="Aadhaar Back" className="max-h-20 object-contain rounded shadow-xs" />
-                              <button type="button" onClick={() => removePhoto("aadhaar_back")} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 transition-all cursor-pointer"><Trash2 className="h-3 w-3" /></button>
+                            {/* Aadhaar Back */}
+                            <div className="space-y-1">
+                              <label className="text-[11px] font-semibold text-slate-600">Back Photo *</label>
+                              {aadhaarCardBack ? (
+                                <div className="relative bg-slate-50 border border-slate-200 rounded-xl p-2 flex items-center justify-center min-h-[110px]">
+                                  <img src={aadhaarCardBack} alt="Aadhaar Back" className="max-h-24 object-contain rounded-lg shadow-2xs" />
+                                  <button type="button" onClick={() => removePhoto("aadhaar_back")} className="absolute top-1.5 right-1.5 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 transition-all cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button>
+                                </div>
+                              ) : (
+                                <div className="flex flex-col items-center justify-center p-3 border border-dashed border-border bg-slate-50 rounded-xl gap-1.5 text-center min-h-[110px]">
+                                  <span className="text-[10px] font-medium text-slate-600">Back Card</span>
+                                  <div className="flex gap-1 w-full">
+                                    <button type="button" onClick={() => setCameraActiveField("aadhaar_back")} className="flex-1 flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-bold py-1.5 hover:bg-primary-dark transition-colors cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
+                                    <label className="flex-1 flex items-center justify-center gap-1 rounded border border-border bg-white text-slate-700 text-[10px] font-bold py-1.5 hover:bg-slate-50 transition-colors cursor-pointer"><Upload className="h-3 w-3 text-primary" /> Upload<input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "aadhaar_back")} /></label>
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center flex-grow p-2 gap-2 border border-border/50 bg-slate-50 rounded-lg">
-                              <div className="flex gap-1.5 w-full">
-                                <button type="button" onClick={() => setCameraActiveField("aadhaar_back")} className="flex-1 flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-semibold py-1.5 hover:bg-primary-hover transition-colors cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
-                                <label className="flex-1 flex items-center justify-center gap-1 rounded border border-border bg-white text-text-muted text-[10px] font-semibold py-1.5 hover:bg-slate-100 transition-colors cursor-pointer"><Upload className="h-3 w-3" /> Upload<input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "aadhaar_back")} /></label>
-                              </div>
+                          </div>
+
+                          {/* Aadhaar Number Input (BELOW) */}
+                          <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                            <label className="text-xs font-bold text-slate-800">Aadhaar Number *</label>
+                            <div className="relative">
+                              <input
+                                type={showAadhaar ? "text" : "password"}
+                                required={currentStep === 2}
+                                value={aadhaarNumber}
+                                onChange={(e) => {
+                                  let val = e.target.value.replace(/\D/g, '').slice(0, 12);
+                                  setAadhaarNumber(val.replace(/(\d{4})(?=\d)/g, "$1 "));
+                                }}
+                                className="w-full h-11 pl-4 pr-10 border border-border rounded-xl text-sm font-mono outline-none focus:border-primary font-bold tracking-wider"
+                                placeholder="0000 0000 0000"
+                                maxLength={14}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowAadhaar(!showAadhaar)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer p-1"
+                                title={showAadhaar ? "Mask Aadhaar" : "Unmask Aadhaar"}
+                              >
+                                {showAadhaar ? <EyeOff className="w-4 h-4 text-primary" /> : <Eye className="w-4 h-4 text-slate-500" />}
+                              </button>
                             </div>
-                          )}
+                          </div>
                         </div>
                       </div>
 
                       {/* Aadhaar-PAN Linkage Status Toggle */}
-                      <div className="mt-4 p-4 bg-white border border-border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="p-4 bg-white border border-border rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <div>
                           <span className="text-xs font-bold text-slate-800 block">Aadhaar &amp; PAN Linked for TDS Compliance? *</span>
                           <span className="text-[11px] text-slate-500">Required to ensure valid tax deductions at source</span>
@@ -1908,9 +2222,11 @@ export default function OnboardingForm({
                       </div>
 
                       {/* Multi-Page Local Address Proof */}
-                      <div className="mt-4 flex flex-col gap-3 rounded-xl border border-dashed border-border bg-white p-4">
+                      <div className="flex flex-col gap-3 rounded-xl border border-dashed border-border bg-white p-4">
                         <div className="flex items-center justify-between">
-                          <span className="font-sans text-xs font-bold text-slate-800">Local Address Proof (1 to 4 Pages/Files) *</span>
+                          <span className="font-sans text-xs font-bold text-slate-800">
+                            Local Address Proof (1 to 4 Pages/Files) {rentalModel === "LetzOwn" ? <strong className="text-amber-700">(Mandatory for LetzOwn *)</strong> : <span className="text-slate-400 font-normal">(Optional)</span>}
+                          </span>
                           <span className="text-[11px] font-semibold text-slate-500">{localAddressProofFiles.length} / 4 Files</span>
                         </div>
                         
@@ -1937,6 +2253,72 @@ export default function OnboardingForm({
                           )}
                         </div>
                       </div>
+
+                      {/* Security Cheques (Up to 4 Cheques Multi-Upload) */}
+                      <div className="flex flex-col gap-3 rounded-xl border border-dashed border-border bg-white p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="font-sans text-xs font-bold text-slate-800">
+                              Security Cheques (Up to 4 Cheques) {rentalModel === "LetzOwn" ? <strong className="text-amber-700">(4 Cheques Required for LetzOwn *)</strong> : <span className="text-slate-400 font-normal">(Optional / Up to 4)</span>}
+                            </span>
+                            {rentalModel === "LetzOwn" && (
+                              <span className="block text-[10px] text-amber-700 font-semibold mt-0.5">All 4 Security Cheque documents are mandatory for the LetzOwn rental model.</span>
+                            )}
+                          </div>
+                          <span className="text-[11px] font-semibold text-slate-500">{securityChequeFiles.length} / 4 Cheques</span>
+                        </div>
+                        
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                          {securityChequeFiles.map((fileUrl, index) => (
+                            <div key={index} className="relative bg-slate-50 border border-slate-200 rounded-lg p-2 flex flex-col items-center">
+                              <img src={fileUrl} alt={`Security Cheque ${index + 1}`} className="max-h-24 object-contain rounded shadow-xs" />
+                              <span className="text-[10px] font-bold text-slate-600 mt-1">Cheque #{index + 1}</span>
+                              <button type="button" onClick={() => removeSecurityChequeFile(index)} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 transition-all cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button>
+                            </div>
+                          ))}
+
+                          {securityChequeFiles.length < 4 && (
+                            <div className="flex flex-col items-center justify-center p-3 border border-dashed border-primary/40 bg-emerald-50/40 rounded-lg gap-2 text-center min-h-[100px]">
+                              <span className="text-[11px] font-semibold text-slate-700">Add Cheque #{securityChequeFiles.length + 1}</span>
+                              <div className="flex gap-1.5 w-full">
+                                <button type="button" onClick={() => setCameraActiveField("security_cheque")} className="flex-1 flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-bold py-1.5 hover:bg-primary-dark transition-colors cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
+                                <label className="flex-1 flex items-center justify-center gap-1 rounded border border-border bg-white text-slate-700 text-[10px] font-bold py-1.5 hover:bg-slate-100 transition-colors cursor-pointer">
+                                  <Upload className="h-3 w-3 text-primary" /> Upload
+                                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "security_cheque")} />
+                                </label>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Police Verification Document Upload */}
+                      <div className="flex flex-col gap-3 rounded-xl border border-dashed border-border bg-white p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="font-sans text-xs font-bold text-slate-800">
+                              Police Verification Document {rentalModel === "LetzOwn" ? <strong className="text-amber-700">(Mandatory for LetzOwn *)</strong> : <span className="text-slate-400 font-normal">(Optional)</span>}
+                            </span>
+                            <span className="block text-[10px] text-slate-500 mt-0.5">Upload official police verification report or certificate document</span>
+                          </div>
+                        </div>
+
+                        {policeVerificationDoc ? (
+                          <div className="relative bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-center max-w-sm">
+                            <img src={policeVerificationDoc} alt="Police Verification Document" className="max-h-28 object-contain rounded-lg shadow-2xs" />
+                            <button type="button" onClick={() => setPoliceVerificationDoc(null)} className="absolute top-2 right-2 rounded-full bg-rose-50 text-rose-500 p-1.5 hover:bg-rose-100 transition-all cursor-pointer shadow-xs"><Trash2 className="h-3.5 w-3.5" /></button>
+                          </div>
+                        ) : (
+                          <div className="flex flex-col items-center justify-center p-4 border border-dashed border-border bg-slate-50 rounded-xl gap-2 text-center max-w-sm">
+                            <span className="text-xs font-medium text-slate-600">Attach Police Verification Proof</span>
+                            <div className="flex gap-2 w-full">
+                              <button type="button" onClick={() => setCameraActiveField("police_doc")} className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-primary text-white text-xs font-bold py-1.5 hover:bg-primary-dark transition-colors cursor-pointer shadow-xs"><Camera className="h-3.5 w-3.5" /> Capture</button>
+                              <label className="flex-1 flex items-center justify-center gap-1 rounded-lg border border-border bg-white text-slate-700 text-xs font-bold py-1.5 hover:bg-slate-50 transition-colors cursor-pointer shadow-xs"><Upload className="h-3.5 w-3.5 text-primary" /> Upload<input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => handleFileUpload(e, "police_doc")} /></label>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
                     </div>
 
                     <hr className="border-border/60" />
@@ -1958,9 +2340,9 @@ export default function OnboardingForm({
                             <button
                               type="button"
                               onClick={() => setShowDl(!showDl)}
-                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer p-1"
                             >
-                              {showDl ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                              {showDl ? <EyeOff className="w-4 h-4 text-primary" /> : <Eye className="w-4 h-4 text-slate-500" />}
                             </button>
                           </div>
                         </div>
@@ -2015,135 +2397,77 @@ export default function OnboardingForm({
                   </div>
 
                   {/* ======================================= */}
-                  {/* STEP 3: RENT & CONFIGURATION (LetzOwn)  */}
+                  {/* ======================================= */}
+                  {/* STEP 3: RENT & CONFIGURATION            */}
                   {/* ======================================= */}
                   <div className={`${currentStep === 3 ? 'block' : 'hidden'} space-y-6 animate-in fade-in slide-in-from-right-4 duration-500`}>
                     
-                    <h4 className="font-sans text-sm font-bold text-text-dim border-b border-border pb-2">Rental &amp; Platform Configuration</h4>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-slate-50 border border-border p-5 rounded-xl">
-                      <div className="space-y-2">
-                        <label className="text-xs font-bold text-slate-800">Select Rental Model *</label>
-                        <select required={currentStep === 3} value={rentalModel} onChange={(e) => setRentalModel(e.target.value)} className="w-full h-11 px-4 bg-white border border-border rounded-xl text-sm outline-none focus:border-primary">
-                          <option value="Drive to Rent">Drive to Rent</option>
-                          <option value="Drive to Own">Drive to Own</option>
-                          <option value="LetzOwn">LetzOwn</option>
-                          <option value="Salary Model">Salary Model</option>
-                        </select>
-                      </div>
-                      
+                    <div className="flex items-center justify-between border-b border-border pb-3">
+                      <h4 className="font-sans text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <Database className="w-4 h-4 text-primary" /> 3. Rental Plan &amp; Operator Linkage
+                      </h4>
+                      <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-primary/10 text-primary border border-primary/20">
+                        {rentalModel}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-slate-50 border border-border p-5 rounded-2xl">
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-slate-800">Security Deposit Amount *</label>
                         <div className="relative">
                           <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
-                          <input type="number" required={currentStep === 3} value={securityDeposit} onChange={(e) => setSecurityDeposit(e.target.value)} className="w-full h-11 pl-9 pr-4 bg-white border border-border rounded-xl text-sm outline-none focus:border-primary" placeholder="e.g. 5000" />
+                          <input type="number" required={currentStep === 3} value={securityDeposit} onChange={(e) => setSecurityDeposit(e.target.value)} className="w-full h-11 pl-9 pr-4 bg-white border border-border rounded-xl text-sm outline-none focus:border-primary font-bold text-slate-900" placeholder="e.g. 5000" />
                         </div>
                       </div>
 
-                      {(rentalModel === "Drive to Own" || rentalModel === "LetzOwn") && (
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold text-slate-800">Required LetzOwn Cheques *</label>
-                          <select required={currentStep === 3} value={letzownCheques} onChange={(e) => setLetzownCheques(e.target.value)} className="w-full h-11 px-4 bg-white border border-border rounded-xl text-sm outline-none focus:border-primary">
-                            <option value="3">3 Cheques</option>
-                            <option value="4">4 Cheques</option>
-                          </select>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-800">Third-Party Platform Selection</label>
+                        <select
+                          value={thirdPartyPlatform}
+                          onChange={(e) => setThirdPartyPlatform(e.target.value)}
+                          className="w-full h-11 px-4 bg-white border border-border rounded-xl text-sm outline-none focus:border-primary font-medium cursor-pointer"
+                        >
+                          <option value="None">None</option>
+                          <option value="Uber">Uber</option>
+                          <option value="Ola">Ola</option>
+                          <option value="Rapido">Rapido</option>
+                        </select>
+                      </div>
+
+                      {thirdPartyPlatform !== "None" && (
+                        <div className="space-y-2 md:col-span-2">
+                          <label className="text-xs font-bold text-slate-800">{thirdPartyPlatform} Driver ID <span className="text-slate-400 font-normal">(Optional if verified)</span></label>
+                          <input
+                            type="text"
+                            placeholder={`e.g. ${thirdPartyPlatform.toUpperCase()}-12345`}
+                            value={platformDetails[thirdPartyPlatform]?.id || ""}
+                            onChange={(e) => setPlatformDetails(prev => ({
+                              ...prev,
+                              [thirdPartyPlatform]: { ...prev[thirdPartyPlatform], id: e.target.value }
+                            }))}
+                            className="w-full h-11 px-4 bg-white border border-border rounded-xl text-sm outline-none focus:border-primary font-mono"
+                          />
                         </div>
                       )}
                     </div>
 
-                    {/* Section 3: Relocated Third-Party Platform Dropdown (Uber, Ola, Rapido, None) */}
-                    <div className="bg-slate-50 border border-border p-5 rounded-xl space-y-4">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
-                          <label className="text-xs font-bold text-slate-800">Third-Party Platform Selection</label>
-                          <select
-                            value={thirdPartyPlatform}
-                            onChange={(e) => setThirdPartyPlatform(e.target.value)}
-                            className="w-full h-11 px-4 bg-white border border-border rounded-xl text-sm outline-none focus:border-primary font-medium cursor-pointer"
-                          >
-                            <option value="None">None</option>
-                            <option value="Uber">Uber</option>
-                            <option value="Ola">Ola</option>
-                            <option value="Rapido">Rapido</option>
-                          </select>
-                        </div>
-
-                        {thirdPartyPlatform !== "None" && (
-                          <div className="space-y-2">
-                            <label className="text-xs font-bold text-slate-800">{thirdPartyPlatform} Driver ID <span className="text-slate-400 font-normal">(Optional if verified)</span></label>
-                            <input
-                              type="text"
-                              placeholder={`e.g. ${thirdPartyPlatform.toUpperCase()}-12345`}
-                              value={platformDetails[thirdPartyPlatform]?.id || ""}
-                              onChange={(e) => setPlatformDetails(prev => ({
-                                ...prev,
-                                [thirdPartyPlatform]: { ...prev[thirdPartyPlatform], id: e.target.value }
-                              }))}
-                              className="w-full h-11 px-4 bg-white border border-border rounded-xl text-sm outline-none focus:border-primary font-mono"
-                            />
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {(rentalModel === "Drive to Own" || rentalModel === "LetzOwn") && (
-                      <div className="bg-amber-50/50 border border-amber-200/80 p-5 rounded-2xl space-y-5 mt-4">
-                        <div className="flex items-center gap-2 border-b border-amber-200 pb-2">
-                          <UserCheck className="w-4 h-4 text-amber-700" />
-                          <h4 className="font-sans text-xs font-bold text-amber-900 uppercase tracking-wider">LetzOwn Requirement: Driver Email & 3 Personal References</h4>
-                        </div>
-
-                        <div className="space-y-4">
-                          <div className="space-y-1.5">
-                            <label className="text-xs font-bold text-slate-800">Driver Email ID *</label>
-                            <input type="email" required={currentStep === 3} value={driverEmail} onChange={(e) => setDriverEmail(e.target.value)} className="w-full h-10 px-3 bg-white border border-border rounded-lg text-sm outline-none focus:border-primary font-medium" placeholder="driver@email.com" />
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            {/* Reference 1 */}
-                            <div className="p-3.5 bg-white border border-slate-200 rounded-xl space-y-3 shadow-2xs">
-                              <span className="text-xs font-bold text-primary block border-b border-slate-100 pb-1.5">Reference 1 *</span>
-                              <input type="text" required={currentStep === 3} value={ref1Name} onChange={(e) => setRef1Name(e.target.value)} placeholder="Full Name" className="w-full h-9 px-2.5 bg-slate-50 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary transition-all font-medium" />
-                              <input type="tel" required={currentStep === 3} value={ref1Phone} onChange={(e) => setRef1Phone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="10-digit Phone" className="w-full h-9 px-2.5 bg-slate-50 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary transition-all font-medium" maxLength={10} />
-                              <input type="text" required={currentStep === 3} value={ref1Address} onChange={(e) => setRef1Address(e.target.value)} placeholder="Local Address" className="w-full h-9 px-2.5 bg-slate-50 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary transition-all font-medium" />
-                            </div>
-
-                            {/* Reference 2 */}
-                            <div className="p-3.5 bg-white border border-slate-200 rounded-xl space-y-3 shadow-2xs">
-                              <span className="text-xs font-bold text-primary block border-b border-slate-100 pb-1.5">Reference 2 *</span>
-                              <input type="text" required={currentStep === 3} value={ref2Name} onChange={(e) => setRef2Name(e.target.value)} placeholder="Full Name" className="w-full h-9 px-2.5 bg-slate-50 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary transition-all font-medium" />
-                              <input type="tel" required={currentStep === 3} value={ref2Phone} onChange={(e) => setRef2Phone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="10-digit Phone" className="w-full h-9 px-2.5 bg-slate-50 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary transition-all font-medium" maxLength={10} />
-                              <input type="text" required={currentStep === 3} value={ref2Address} onChange={(e) => setRef2Address(e.target.value)} placeholder="Local Address" className="w-full h-9 px-2.5 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary transition-all font-medium" />
-                            </div>
-
-                            {/* Reference 3 */}
-                            <div className="p-3.5 bg-white border border-slate-200 rounded-xl space-y-3 shadow-2xs">
-                              <span className="text-xs font-bold text-primary block border-b border-slate-100 pb-1.5">Reference 3 *</span>
-                              <input type="text" required={currentStep === 3} value={ref3Name} onChange={(e) => setRef3Name(e.target.value)} placeholder="Full Name" className="w-full h-9 px-2.5 bg-slate-50 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary transition-all font-medium" />
-                              <input type="tel" required={currentStep === 3} value={ref3Phone} onChange={(e) => setRef3Phone(e.target.value.replace(/\D/g, '').slice(0, 10))} placeholder="10-digit Phone" className="w-full h-9 px-2.5 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary transition-all font-medium" maxLength={10} />
-                              <input type="text" required={currentStep === 3} value={ref3Address} onChange={(e) => setRef3Address(e.target.value)} placeholder="Local Address" className="w-full h-9 px-2.5 border border-border rounded-lg text-xs outline-none focus:bg-white focus:border-primary transition-all font-medium" />
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
-                    <div className="space-y-2 mt-4">
+                    <div className="space-y-2 bg-slate-50 border border-border p-5 rounded-2xl">
                       <div className="flex items-center gap-2 mb-2">
                         <input type="checkbox" id="customRent" checked={customRentalPlan} onChange={(e) => setCustomRentalPlan(e.target.checked)} className="rounded border-border text-primary focus:ring-primary/20" />
-                        <label htmlFor="customRent" className="text-xs font-bold text-text-muted cursor-pointer">Enable Custom Rental Plan overrides?</label>
+                        <label htmlFor="customRent" className="text-xs font-bold text-slate-800 cursor-pointer">Enable Custom Rental Plan overrides?</label>
                       </div>
                       <div className="relative max-w-sm">
                         <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
-                        <input type="number" disabled={!customRentalPlan} required={currentStep === 3 && customRentalPlan} value={customRentAmount} onChange={(e) => setCustomRentAmount(e.target.value)} className="w-full h-11 pl-9 pr-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary outline-none transition-all disabled:opacity-60" placeholder="₹ per day override" />
+                        <input type="number" disabled={!customRentalPlan} required={currentStep === 3 && customRentalPlan} value={customRentAmount} onChange={(e) => setCustomRentAmount(e.target.value)} className="w-full h-11 pl-9 pr-4 bg-white border border-border rounded-xl text-sm focus:border-primary outline-none transition-all disabled:opacity-60 font-bold" placeholder="₹ per day override" />
                       </div>
-                      {customRentalPlan && <p className="text-[10px] text-amber-600 italic">This will trigger a separate approval workflow for custom rates.</p>}
+                      {customRentalPlan && <p className="text-[10px] text-amber-600 italic font-semibold">This will trigger a separate approval workflow for custom rates.</p>}
                     </div>
 
                     {candidateRole === "Driver" && (
-                      <>
-                        <h4 className="font-sans text-sm font-bold text-text-dim border-b border-border pb-2 mt-8">Operator Linkage</h4>
+                      <div className="bg-slate-50 border border-border p-5 rounded-2xl space-y-4">
+                        <h4 className="font-sans text-xs font-bold text-slate-900 uppercase tracking-wider border-b border-border pb-2">Operator Linkage</h4>
                         <div className="space-y-4">
-                          <label className="flex items-center gap-2 text-sm text-text-muted cursor-pointer hover:text-primary w-max">
+                          <label className="flex items-center gap-2 text-xs font-bold text-slate-700 cursor-pointer hover:text-primary w-max">
                             <input type="checkbox" checked={sameAsDriver} onChange={(e) => {
                               setSameAsDriver(e.target.checked);
                               if (e.target.checked) {
@@ -2153,21 +2477,21 @@ export default function OnboardingForm({
                                 setVendorName("");
                                 setVendorId("");
                               }
-                            }} className="rounded border-border text-primary focus:ring-primary/20" />
+                            }} className="rounded border-border text-primary focus:ring-primary/20 accent-primary" />
                             Operator details same as Driver details (Individual)
                           </label>
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-2">
                               <label className="text-xs font-bold text-text-muted">Operator Name</label>
-                              <input type="text" value={vendorName} onChange={(e) => setVendorName(e.target.value)} disabled={sameAsDriver} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary outline-none transition-all disabled:opacity-60" placeholder="Enter Operator Name" />
+                              <input type="text" value={vendorName} onChange={(e) => setVendorName(e.target.value)} disabled={sameAsDriver} className="w-full h-11 px-4 bg-white border border-border rounded-xl text-sm focus:border-primary outline-none transition-all disabled:opacity-60 font-medium" placeholder="Enter Operator Name" />
                             </div>
                             <div className="space-y-2">
                               <label className="text-xs font-bold text-text-muted">Operator ID</label>
-                              <input type="text" value={vendorId} onChange={(e) => setVendorId(e.target.value)} disabled={sameAsDriver} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary outline-none transition-all disabled:opacity-60" placeholder="Enter Operator ID" />
+                              <input type="text" value={vendorId} onChange={(e) => setVendorId(e.target.value)} disabled={sameAsDriver} className="w-full h-11 px-4 bg-white border border-border rounded-xl text-sm focus:border-primary outline-none transition-all disabled:opacity-60 font-medium" placeholder="Enter Operator ID" />
                             </div>
                           </div>
                         </div>
-                      </>
+                      </div>
                     )}
                   </div>
 
@@ -2295,42 +2619,47 @@ export default function OnboardingForm({
                       
                       {/* Card 1: Candidate Info Summary */}
                       <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-2">
-                        <span className="font-bold text-slate-400 uppercase tracking-wider block text-[10px]">1. Candidate Summary</span>
+                        <span className="font-bold text-slate-400 uppercase tracking-wider block text-[10px]">1. Candidate &amp; References</span>
                         <p className="text-sm font-bold text-slate-900">{driverName || "N/A"} <span className="text-xs font-medium text-slate-500">({candidateRole})</span></p>
                         <div className="space-y-1 text-slate-600 text-[11px] border-t border-slate-200/60 pt-2">
                           <p><strong className="text-slate-700">Phone:</strong> {phoneNumber || "N/A"}</p>
                           <p><strong className="text-slate-700">City:</strong> {city}</p>
-                          <p><strong className="text-slate-700">DL:</strong> {dlNumber || "N/A"} | <strong className="text-slate-700">Aadhaar:</strong> {aadhaarNumber || "N/A"}</p>
-                          <p><strong className="text-slate-700">Father:</strong> {fatherName || "N/A"}</p>
+                          <p><strong className="text-slate-700">Driver Manager:</strong> {driverManagerName || "Unassigned"}</p>
                           <p><strong className="text-slate-700">Emergency:</strong> {emergencyName || "N/A"} ({emergencyPhone || "N/A"})</p>
+                          <p><strong className="text-slate-700">Ref 1:</strong> {ref1Name || "N/A"} ({ref1Phone || "N/A"})</p>
+                          <p><strong className="text-slate-700">Ref 2:</strong> {ref2Name || "N/A"} ({ref2Phone || "N/A"})</p>
+                          <p><strong className="text-slate-700">Ref Verification:</strong> {referenceVerified ? <span className="text-emerald-700 font-bold">Verified</span> : <span className="text-slate-400">Pending</span>}</p>
                         </div>
                       </div>
 
-                      {/* Card 2: Rental Plan Summary */}
+                      {/* Card 2: KYC & Compliance */}
                       <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-2">
-                        <span className="font-bold text-slate-400 uppercase tracking-wider block text-[10px]">2. Rental & Deposit Plan</span>
+                        <span className="font-bold text-slate-400 uppercase tracking-wider block text-[10px]">2. KYC &amp; Verification</span>
+                        <p className="text-sm font-bold text-slate-900">{maskSensitiveID(panNumber) || "PAN N/A"}</p>
+                        <div className="space-y-1 text-slate-600 text-[11px] border-t border-slate-200/60 pt-2">
+                          <p><strong className="text-slate-700">Aadhaar:</strong> {maskSensitiveID(aadhaarNumber) || "N/A"}</p>
+                          <p><strong className="text-slate-700">SpringVerify:</strong> {isSpringVerified ? <span className="text-emerald-700 font-bold">Verified</span> : <span className="text-amber-700">Not Verified</span>}</p>
+                          <p><strong className="text-slate-700">Local Address Proof:</strong> {localAddressProofFiles.length} file(s)</p>
+                          <p><strong className="text-slate-700">Security Cheques:</strong> {securityChequeFiles.length} cheque(s)</p>
+                          <p><strong className="text-slate-700">Police Verification:</strong> {policeVerificationStatus} {policeVerificationDoc ? "(Doc Attached)" : ""}</p>
+                          {candidateRole === "Driver" && (
+                            <p><strong className="text-slate-700">DL:</strong> {dlNumber || "N/A"} (Exp: {dlExpiryDate || "N/A"})</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Card 3: Rental & Bank Summary */}
+                      <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-2">
+                        <span className="font-bold text-slate-400 uppercase tracking-wider block text-[10px]">3. Plan &amp; Bank Details</span>
                         <p className="text-sm font-bold text-emerald-700">{rentalModel}</p>
                         <div className="space-y-1 text-slate-600 text-[11px] border-t border-slate-200/60 pt-2">
-                          <p><strong className="text-slate-700">Security Deposit:</strong> ₹{securityDeposit || "0"}</p>
-                          {customRentalPlan && (
-                            <p className="text-amber-800 font-bold bg-amber-50 p-1.5 rounded-lg border border-amber-200 mt-1">
-                              Custom Rent Override: ₹{customRentAmount}/day
-                            </p>
+                          <p><strong className="text-slate-700">Deposit:</strong> ₹{securityDeposit || "0"}</p>
+                          {thirdPartyPlatform !== "None" && (
+                            <p><strong className="text-slate-700">Platform:</strong> {thirdPartyPlatform}</p>
                           )}
-                          {candidateRole === "Operator" && vendorName && (
-                            <p><strong className="text-slate-700">Operator/Fleet Partner:</strong> {vendorName} ({vendorId})</p>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Card 3: Bank Summary */}
-                      <div className="bg-slate-50 border border-slate-200 p-4 rounded-xl space-y-2">
-                        <span className="font-bold text-slate-400 uppercase tracking-wider block text-[10px]">3. Bank & Payout Info</span>
-                        <p className="text-sm font-bold text-slate-900">{bankName === "Other" ? otherBankName : bankName}</p>
-                        <div className="space-y-1 text-slate-600 text-[11px] border-t border-slate-200/60 pt-2">
-                          <p><strong className="text-slate-700">Account Number:</strong> <span className="font-mono">{accountNumber || "N/A"}</span></p>
-                          <p><strong className="text-slate-700">IFSC Code:</strong> <span className="font-mono">{ifscCode || "N/A"}</span></p>
-                          <p><strong className="text-slate-700">UPI ID:</strong> {upiId || "N/A"}</p>
+                          <p><strong className="text-slate-700">Bank:</strong> {bankName === "Other" ? otherBankName : bankName}</p>
+                          <p><strong className="text-slate-700">Account:</strong> <span className="font-mono">{accountNumber || "N/A"}</span></p>
+                          <p><strong className="text-slate-700">IFSC:</strong> <span className="font-mono">{ifscCode || "N/A"}</span></p>
                         </div>
                       </div>
 
@@ -2948,10 +3277,27 @@ export default function OnboardingForm({
             if (cameraActiveField === "aadhaar") setAadhaarPhoto(dataUrl);
             if (cameraActiveField === "aadhaar_front") setAadhaarCardFront(dataUrl);
             if (cameraActiveField === "aadhaar_back") setAadhaarCardBack(dataUrl);
-            if (cameraActiveField === "local_address_proof") setLocalAddressProof(dataUrl);
+            if (cameraActiveField === "local_address_proof") {
+              if (localAddressProofFiles.length < 4) {
+                setLocalAddressProofFiles(prev => [...prev, dataUrl]);
+              } else {
+                alert("Maximum 4 files allowed for Local Address Proof.");
+              }
+            }
+            if (cameraActiveField === "security_cheque") {
+              if (securityChequeFiles.length < 4) {
+                setSecurityChequeFiles(prev => [...prev, dataUrl]);
+              } else {
+                alert("Maximum 4 security cheques allowed.");
+              }
+            }
+            if (cameraActiveField === "police_doc" || cameraActiveField === "police_verification_doc") {
+              setPoliceVerificationDoc(dataUrl);
+            }
             if (cameraActiveField === "cheque") setCancelledChequePhoto(dataUrl);
             if (cameraActiveField === "cheque2") setCheque2Photo(dataUrl);
             if (cameraActiveField === "cheque3") setCheque3Photo(dataUrl);
+            if (cameraActiveField === "cheque4") setCheque4Photo(dataUrl);
             if (cameraActiveField === "signature") setSignaturePhoto(dataUrl);
             setCameraActiveField(null);
           }}
