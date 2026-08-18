@@ -171,6 +171,12 @@ export interface AllocationRecord {
   fastag_balance_proof?: string;
   dropoff_location?: string;
   status?: string;
+  hub_name?: string;
+  customer_address?: string;
+  jama_form_filled?: boolean;
+  pdi_completed?: boolean;
+  insp_stepney?: string;
+  insp_stepney_photo?: string;
 }
 
 export interface ExpenseRecord {
@@ -341,9 +347,13 @@ export interface RentRecord {
   vehicle_model?: string;
   vehicle_number?: string;
   vehicle_age?: string;
+  vehicle_age_bucket?: string;
   vendor_id?: string;
   driver_id?: string;
   rent_amount: number;
+  discount_percent?: number;
+  discount_amount?: number;
+  monthly_plan_locked?: boolean;
   status?: string;
   created_at?: string;
 }

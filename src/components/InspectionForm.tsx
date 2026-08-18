@@ -50,6 +50,8 @@ export default function InspectionForm({
   const [fireExtinguishers, setFireExtinguishers] = useState("Available");
   const [seatCover, setSeatCover] = useState("Available");
   const [floorCarpet, setFloorCarpet] = useState("Available");
+  const [stepney, setStepney] = useState("Available");
+  const [hubName, setHubName] = useState("Miyapur Hub");
 
   // 15 PDI Photos
   const [photoFront, setPhotoFront] = useState<string | null>(null);
@@ -679,6 +681,7 @@ export default function InspectionForm({
                       {renderChecklistOption("Fire Extinguisher", fireExtinguishers, setFireExtinguishers)}
                       {renderChecklistOption("Seat Covers", seatCover, setSeatCover)}
                       {renderChecklistOption("Floor Carpet", floorCarpet, setFloorCarpet)}
+                      {renderChecklistOption("Stepney / Spare Tire", stepney, setStepney)}
                       <div className="flex items-center justify-between border border-border bg-slate-50/50 p-2.5 rounded-xl shadow-xs">
                         <span className="font-sans text-sm font-semibold text-text-muted">Key Quantity</span>
                         <input

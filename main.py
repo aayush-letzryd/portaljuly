@@ -786,7 +786,15 @@ def startup_event():
             for col in [
                 "odometer_reading NUMERIC(10, 1)",
                 "odometer_photo TEXT",
-                "battery_photo TEXT"
+                "battery_photo TEXT",
+                "hub_name VARCHAR(100)",
+                "customer_address TEXT",
+                "manual_dropoff_location TEXT",
+                "dropoff_location VARCHAR(100)",
+                "jama_form_filled BOOLEAN DEFAULT FALSE",
+                "pdi_completed BOOLEAN DEFAULT FALSE",
+                "insp_stepney VARCHAR(30) DEFAULT 'Available'",
+                "insp_stepney_photo TEXT"
             ]:
                 cur.execute(f"ALTER TABLE july_allocation_form ADD COLUMN IF NOT EXISTS {col};")
 
@@ -1602,7 +1610,13 @@ class AllocationData(BaseModel):
     insp_seat_cover: Optional[str] = None
     insp_floor_carpet: Optional[str] = None
     insp_music_system: Optional[str] = None
+    insp_stepney: Optional[str] = "Available"
+    insp_stepney_photo: Optional[Any] = None
     insp_remarks: Optional[str] = None
+    hub_name: Optional[str] = None
+    customer_address: Optional[str] = None
+    jama_form_filled: Optional[bool] = False
+    pdi_completed: Optional[bool] = False
 
 class DropOffData(BaseModel):
     dropoff_date: Optional[str] = None
@@ -1623,6 +1637,10 @@ class DropOffData(BaseModel):
     damage_penalty: Optional[Union[float, str]] = 0
     deposit_refund_status: Optional[str] = "Pending"
     dropoff_location: Optional[str] = "Hub"
+    manual_dropoff_location: Optional[str] = None
+    customer_address: Optional[str] = None
+    insp_stepney: Optional[str] = "Available"
+    insp_stepney_photo: Optional[Any] = None
     dropoff_notes: Optional[str] = None
     status: Optional[str] = "Submitted"
 
@@ -4768,6 +4786,47 @@ def lookup_driver(query: str, authorization: Optional[str] = Header(None)):
         postgreSQL_pool.putconn(conn)
 
 
+@app.get("/api/allocation/active")
+def get_active_allocation(query: str, authorization: Optional[str] = Header(None)):
+    if not query or len(query.strip()) < 1:
+        return {"found": False, "message": "Query too short"}
+    clean_q = query.strip()
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT 
+                id AS allocation_id,
+                driver_id,
+                driver_name,
+                driver_phone,
+                vehicle_number,
+                city_name,
+                hub_name,
+                customer_address,
+                odometer_reading,
+                insp_stepney,
+                insp_stepney_photo,
+                allocation_date,
+                created_at
+            FROM july_allocation_form
+            WHERE (LOWER(driver_id) = LOWER(%s)
+               OR driver_phone = %s
+               OR UPPER(vehicle_number) = UPPER(%s))
+              AND allocation_type = 'Allocation'
+            ORDER BY id DESC LIMIT 1;
+        """, (clean_q, clean_q, clean_q))
+        row = cur.fetchone()
+        if row:
+            cols = [d[0] for d in cur.description]
+            rec = dict(zip(cols, row))
+            rec["found"] = True
+            return _clean_dict_decimals(rec)
+        return {"found": False, "message": "No active allocation found"}
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+
 @app.get("/api/allocation/lookup-vehicle")
 def lookup_vehicle(query: str, authorization: Optional[str] = Header(None)):
     if not query or len(query.strip()) < 1:
@@ -4919,6 +4978,14 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
         ))
         new_id = cur.fetchone()[0]
 
+        # Update vehicle status in onboarding table to Allocated
+        if data.vehicle_number and data.vehicle_number.strip():
+            cur.execute("""
+                UPDATE july_vehicle_onboarding 
+                SET received_allocated = 'Allocated' 
+                WHERE UPPER(vehicle_number) = UPPER(%s);
+            """, (data.vehicle_number.strip(),))
+
         # Write CREATE log
         _write_alloc_log(
             cur, new_id, "CREATE",
@@ -4949,25 +5016,38 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
 
 
 class DropOffData(BaseModel):
-    dropoff_date: str
-    dropoff_reason: str
-    city_name: str
-    driver_id: str
-    driver_name: str
-    driver_phone: str
-    vehicle_number: str
-    odometer_reading: Optional[float] = None
-    odometer_photo: Optional[str] = None
-    battery_photo: Optional[str] = None
-    photo_lh_side: Optional[str] = None
-    photo_rh_side: Optional[str] = None
-    photo_front_side: Optional[str] = None
-    photo_back_side: Optional[str] = None
-    ola_negative_balance: Optional[str] = None
-    ola_negative_balance_proof: Optional[str] = None
-    pending_dues: Optional[float] = None
-    damage_penalty: Optional[float] = None
-    deposit_refund_status: Optional[str] = None
+    dropoff_date: Optional[str] = None
+    dropoff_reason: Optional[str] = None
+    city_name: Optional[str] = "Hyderabad"
+    dropoff_location: Optional[str] = "Hub"
+    manual_dropoff_location: Optional[str] = None
+    customer_address: Optional[str] = None
+    driver_id: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_phone: Optional[str] = None
+    vehicle_number: Optional[str] = None
+    odometer_reading: Optional[Union[float, str]] = None
+    odometer_photo: Optional[Any] = None
+    battery_photo: Optional[Any] = None
+    photo_lh_side: Optional[Any] = None
+    photo_rh_side: Optional[Any] = None
+    photo_front_side: Optional[Any] = None
+    photo_back_side: Optional[Any] = None
+    ola_negative_balance: Optional[Any] = None
+    ola_negative_balance_proof: Optional[Any] = None
+    pending_dues: Optional[Union[float, str]] = 0
+    damage_penalty: Optional[Union[float, str]] = 0
+    deposit_refund_status: Optional[str] = "Pending"
+    insp_jack: Optional[str] = "Available"
+    insp_jack_rod: Optional[str] = "Available"
+    insp_spanner: Optional[str] = "Available"
+    insp_parking_triangle: Optional[str] = "Available"
+    insp_fire_extinguishers: Optional[str] = "Available"
+    insp_seat_cover: Optional[str] = "Available"
+    insp_floor_carpet: Optional[str] = "Available"
+    insp_music_system: Optional[str] = "Available"
+    insp_stepney: Optional[str] = "Available"
+    insp_stepney_photo: Optional[Any] = None
     dropoff_notes: Optional[str] = None
     status: Optional[str] = "Submitted"
 
@@ -5037,32 +5117,51 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
         cur.execute("""
             INSERT INTO july_allocation_form (
                 allocation_date, allocation_type, sub_type, city_name,
+                dropoff_location, manual_dropoff_location, customer_address,
                 driver_id, driver_name, driver_phone,
                 vehicle_number, dropoff_odometer, dropoff_remarks,
                 photo_lh_side, photo_rh_side, photo_front_side, photo_back_side,
                 dropoff_photo, battery_photo, ola_negative_balance, ola_negative_balance_proof,
-                fastag_balance_amount, status, created_by,
+                fastag_balance_amount, insp_stepney, insp_stepney_photo, status, created_by,
                 created_at
             ) VALUES (
                 %s, 'Drop-Off', %s, %s,
                 %s, %s, %s,
                 %s, %s, %s,
-                %s, %s, %s, %s,
-                %s, %s, %s, %s,
                 %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s, %s, %s,
                 NOW() AT TIME ZONE 'Asia/Kolkata'
             ) RETURNING id;
         """, (
             data.dropoff_date, data.dropoff_reason, data.city_name,
+            data.dropoff_location, data.manual_dropoff_location, data.customer_address,
             data.driver_id, data.driver_name, data.driver_phone,
             data.vehicle_number, data.odometer_reading, data.dropoff_notes,
-            extract_image(data.photo_lh_side), extract_image(data.photo_rh_side),
-            extract_image(data.photo_front_side), extract_image(data.photo_back_side),
-            extract_image(data.odometer_photo), extract_image(data.battery_photo),
             data.ola_negative_balance, extract_image(data.ola_negative_balance_proof),
-            data.pending_dues, data.status or "Submitted", uid
+            data.pending_dues, data.insp_stepney, extract_image(data.insp_stepney_photo),
+            data.status or "Submitted", uid
         ))
         new_id = cur.fetchone()[0]
+
+        # Link End-to-End: Update vehicle status in onboarding table to Ready for Deployment
+        if data.vehicle_number and data.vehicle_number.strip():
+            cur.execute("""
+                UPDATE july_vehicle_onboarding 
+                SET received_allocated = 'Ready for Deployment' 
+                WHERE UPPER(vehicle_number) = UPPER(%s);
+            """, (data.vehicle_number.strip(),))
+            
+            # Close active allocation entry for this vehicle
+            cur.execute("""
+                UPDATE july_allocation_form 
+                SET status = 'Returned' 
+                WHERE UPPER(vehicle_number) = UPPER(%s) 
+                  AND allocation_type = 'Allocation' 
+                  AND (status IS NULL OR status NOT IN ('Returned', 'Completed'));
+            """, (data.vehicle_number.strip(),))
+
         conn.commit()
         return {"success": True, "id": new_id}
     except Exception as e:
@@ -5079,24 +5178,26 @@ def update_dropoff(id: int, data: DropOffData, authorization: Optional[str] = He
         cur.execute("""
             UPDATE july_allocation_form SET
                 allocation_date=%s, sub_type=%s, city_name=%s,
+                dropoff_location=%s, manual_dropoff_location=%s, customer_address=%s,
                 driver_id=%s, driver_name=%s, driver_phone=%s,
                 vehicle_number=%s, dropoff_odometer=%s, dropoff_remarks=%s,
                 photo_lh_side=%s, photo_rh_side=%s, photo_front_side=%s, photo_back_side=%s,
                 dropoff_photo=%s, battery_photo=%s,
                 ola_negative_balance=%s, ola_negative_balance_proof=%s,
-                fastag_balance_amount=%s, status=%s,
+                fastag_balance_amount=%s, insp_stepney=%s, insp_stepney_photo=%s, status=%s,
                 updated_at=NOW() AT TIME ZONE 'Asia/Kolkata'
             WHERE id=%s AND allocation_type='Drop-Off'
             RETURNING id;
         """, (
             data.dropoff_date, data.dropoff_reason, data.city_name,
+            data.dropoff_location, data.manual_dropoff_location, data.customer_address,
             data.driver_id, data.driver_name, data.driver_phone,
             data.vehicle_number, data.odometer_reading, data.dropoff_notes,
             extract_image(data.photo_lh_side), extract_image(data.photo_rh_side),
             extract_image(data.photo_front_side), extract_image(data.photo_back_side),
             extract_image(data.odometer_photo), extract_image(data.battery_photo),
             data.ola_negative_balance, extract_image(data.ola_negative_balance_proof),
-            data.pending_dues, data.status or "Submitted",
+            data.pending_dues, data.insp_stepney, extract_image(data.insp_stepney_photo), data.status or "Submitted",
             id
         ))
         if not cur.fetchone():

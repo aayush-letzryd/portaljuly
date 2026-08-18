@@ -100,7 +100,15 @@ export default function AllocationForm({
   const [fireExtinguishers, setFireExtinguishers] = useState("Available");
   const [seatCover, setSeatCover] = useState("Available");
   const [floorCarpet, setFloorCarpet] = useState("Available");
+  const [stepney, setStepney] = useState("Available");
+  const [stepneyPhoto, setStepneyPhoto] = useState<string | null>(null);
   const [inspectionRemarks, setInspectionRemarks] = useState("");
+
+  // Additional Allocation / Audit Requirements
+  const [hubName, setHubName] = useState("Miyapur Hub");
+  const [customerAddress, setCustomerAddress] = useState("");
+  const [jamaFormFilled, setJamaFormFilled] = useState(true);
+  const [pdiCompleted, setPdiCompleted] = useState(false);
 
   // Returned Vehicle Inspection Checklist States
   const [oldJack, setOldJack] = useState("Available");
@@ -186,7 +194,7 @@ export default function AllocationForm({
 
   const [cameraActive, setCameraActive] = useState(false);
   const [activeCameraTarget, setActiveCameraTarget] = useState<
-    "lhSide" | "rhSide" | "frontSide" | "backSide" | "olaProof" | "odometer" | "battery" | null
+    "lhSide" | "rhSide" | "frontSide" | "backSide" | "olaProof" | "odometer" | "battery" | "stepney" | null
   >(null);
 
   // Registry Search & Filter State
@@ -319,8 +327,15 @@ export default function AllocationForm({
       setSeatCover(data.insp_seat_cover || "Available");
       setFloorCarpet(data.insp_floor_carpet || "Available");
       setMusicSystem(data.insp_music_system || "Available");
+      setStepney(data.insp_stepney || "Available");
+      setStepneyPhoto(data.insp_stepney_photo || null);
       setInspectionRemarks(data.insp_remarks || "");
       
+      setHubName(data.hub_name || "Miyapur Hub");
+      setCustomerAddress(data.customer_address || "");
+      setJamaFormFilled(data.jama_form_filled !== undefined ? data.jama_form_filled : true);
+      setPdiCompleted(data.pdi_completed !== undefined ? data.pdi_completed : false);
+
       setActiveTab("form");
       setRetrieveIdInput("");
     } catch (err: any) {
@@ -366,7 +381,13 @@ export default function AllocationForm({
     setSeatCover("Available");
     setFloorCarpet("Available");
     setMusicSystem("Available");
+    setStepney("Available");
+    setStepneyPhoto(null);
     setInspectionRemarks("");
+    setHubName("Miyapur Hub");
+    setCustomerAddress("");
+    setJamaFormFilled(true);
+    setPdiCompleted(false);
     setDriverLookupStatus("");
     setShowVehicleDropdown(false);
   };
@@ -382,6 +403,18 @@ export default function AllocationForm({
       const cleanPhone = String(driverPhone || "").replace(/\D/g, "");
       if (!cleanPhone || cleanPhone.length < 10) return alert("Please enter a valid 10-digit driver phone number");
       if (!String(vehicleNumber || "").trim()) return alert("Vehicle registration number is required");
+
+      if (!jamaFormFilled) {
+        return alert("Allocation cannot happen until the Jama Form is filled.");
+      }
+
+      if (!customerAddress || !customerAddress.trim()) {
+        return alert("Customer address is mandatory for recovery and allocation.");
+      }
+
+      if (!pdiCompleted && stepney === "Available" && !stepneyPhoto) {
+        return alert("Stepney photo is required for vehicle inspection before allocation.");
+      }
     }
 
     try {
@@ -407,6 +440,7 @@ export default function AllocationForm({
             seat_cover: seatCover,
             floor_carpet: floorCarpet,
             music_system: musicSystem,
+            stepney,
             remarks: inspectionRemarks
           })
         });
@@ -443,7 +477,13 @@ export default function AllocationForm({
         insp_seat_cover: seatCover,
         insp_floor_carpet: floorCarpet,
         insp_music_system: musicSystem,
+        insp_stepney: stepney,
+        insp_stepney_photo: stepneyPhoto,
         insp_remarks: inspectionRemarks,
+        hub_name: hubName,
+        customer_address: customerAddress,
+        jama_form_filled: jamaFormFilled,
+        pdi_completed: pdiCompleted,
         status: targetStatus
       };
 
@@ -769,6 +809,23 @@ export default function AllocationForm({
                           ))}
                         </select>
                       </div>
+
+                      <div>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Hub Name <span className="text-red-500">*</span></label>
+                        <select 
+                          value={hubName}
+                          onChange={(e) => setHubName(e.target.value)}
+                          required
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs cursor-pointer"
+                        >
+                          <option value="Miyapur Hub">Miyapur Hub</option>
+                          <option value="Kukatpally Hub">Kukatpally Hub</option>
+                          <option value="Secunderabad Hub">Secunderabad Hub</option>
+                          <option value="LB Nagar Hub">LB Nagar Hub</option>
+                          <option value="Gachibowli Hub">Gachibowli Hub</option>
+                          <option value="Other Hub">Other Hub</option>
+                        </select>
+                      </div>
                     </div>
                   </div>
 
@@ -787,6 +844,35 @@ export default function AllocationForm({
                           {driverLookupStatus}
                         </div>
                       )}
+
+                      {/* Jama Form Status Check Banner */}
+                      <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/70">
+                        <div>
+                          <span className="block font-sans text-xs font-bold text-slate-900">Jama Form Filled <span className="text-red-500">*</span></span>
+                          <span className="block text-[10px] text-slate-500">Must be completed before vehicle allocation</span>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input 
+                            type="checkbox" 
+                            checked={jamaFormFilled} 
+                            onChange={(e) => setJamaFormFilled(e.target.checked)} 
+                            className="sr-only peer"
+                          />
+                          <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
+                        </label>
+                      </div>
+
+                      <div>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Customer Address (Mandatory for Recovery) <span className="text-red-500">*</span></label>
+                        <input 
+                          type="text" 
+                          placeholder="Complete address for recovery..."
+                          value={customerAddress}
+                          onChange={(e) => setCustomerAddress(e.target.value)}
+                          required
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
+                        />
+                      </div>
 
                       <div>
                         <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Driver Phone Number <span className="text-red-500">*</span></label>
@@ -1100,12 +1186,37 @@ export default function AllocationForm({
 
                 {/* 5. GIVEN VEHICLE INSPECTION CHECKLIST */}
                 <div className="border-t border-slate-200 pt-8 space-y-5">
-                  <div className="border-b border-slate-200 pb-2.5">
-                    <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">5</span>
-                      Inspection Checklist: Allocated Car ({vehicleNumber || "No vehicle entered"})
-                    </h3>
+                  <div className="border-b border-slate-200 pb-2.5 flex items-center justify-between">
+                    <div>
+                      <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">5</span>
+                        Inspection Checklist: Allocated Car ({vehicleNumber || "No vehicle entered"})
+                      </h3>
+                    </div>
+
+                    {/* First allocation after PDI / Showroom audit auto-bypass banner */}
+                    <div className="flex items-center gap-2">
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 cursor-pointer">
+                        <input 
+                          type="checkbox"
+                          checked={pdiCompleted}
+                          onChange={(e) => setPdiCompleted(e.target.checked)}
+                          className="rounded text-emerald-600 focus:ring-emerald-500"
+                        />
+                        First Allocation After PDI (Auto-Bypass Inspection)
+                      </label>
+                    </div>
                   </div>
+
+                  {pdiCompleted ? (
+                    <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/70 text-emerald-900 flex items-center gap-3">
+                      <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0" />
+                      <div className="text-xs">
+                        <span className="font-bold block">Pre-Delivery Inspection (PDI) Completed at Showroom</span>
+                        <span>This vehicle is new and its audit form is already complete. Re-inspection before allocation is automatically bypassed.</span>
+                      </div>
+                    </div>
+                  ) : null}
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-3">
@@ -1172,6 +1283,45 @@ export default function AllocationForm({
                             <button key={opt} type="button" onClick={() => setFloorCarpet(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${floorCarpet === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
                           ))}
                         </div>
+                      </div>
+
+                      {/* Stepney / Spare Tire Selection & Mandatory Photo */}
+                      <div className="flex flex-col gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                        <div className="flex items-center justify-between">
+                          <span className="font-sans text-xs font-medium text-slate-800">Stepney / Spare Tire</span>
+                          <div className="flex gap-2">
+                            {["Available", "Not Available"].map((opt) => (
+                              <button key={opt} type="button" onClick={() => setStepney(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${stepney === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {stepney === "Available" && (
+                          <div className="mt-1 pt-2 border-t border-slate-200 flex items-center justify-between">
+                            <span className="text-[11px] font-medium text-slate-700">Stepney Photo <span className="text-red-500">*</span></span>
+                            {stepneyPhoto ? (
+                              <div className="relative flex items-center gap-2 bg-white rounded-lg p-1 border border-slate-200">
+                                <img src={stepneyPhoto} alt="Stepney Photo" className="h-10 w-12 object-cover rounded" />
+                                <button type="button" onClick={() => setStepneyPhoto(null)} className="text-rose-500 hover:text-rose-700 cursor-pointer"><X className="h-3.5 w-3.5" /></button>
+                              </div>
+                            ) : (
+                              <div className="flex gap-2">
+                                <button type="button" onClick={() => setActiveCameraTarget("stepney")} className="flex items-center gap-1 rounded-lg bg-emerald-600 text-white text-[10px] font-medium px-2.5 py-1 hover:bg-emerald-700 cursor-pointer shadow-2xs transition-colors"><Camera className="h-3 w-3" /> Capture</button>
+                                <label className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white text-slate-700 text-[10px] font-medium px-2.5 py-1 hover:bg-slate-50 cursor-pointer transition-colors shadow-2xs">
+                                  <Upload className="h-3 w-3 text-emerald-600" /> Upload
+                                  <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) {
+                                      const r = new FileReader();
+                                      r.onloadend = () => { if (typeof r.result === "string") setStepneyPhoto(r.result); };
+                                      r.readAsDataURL(file);
+                                    }
+                                  }} />
+                                </label>
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
@@ -1647,6 +1797,7 @@ export default function AllocationForm({
             else if (activeCameraTarget === "rhSide") setPhotoRhSide(base64);
             else if (activeCameraTarget === "frontSide") setPhotoFrontSide(base64);
             else if (activeCameraTarget === "backSide") setPhotoBackSide(base64);
+            else if (activeCameraTarget === "stepney") setStepneyPhoto(base64);
             
             setCameraActive(false);
             setActiveCameraTarget(null);

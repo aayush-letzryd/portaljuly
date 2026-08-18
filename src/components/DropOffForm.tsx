@@ -40,6 +40,8 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
   const [dropoffReason, setDropoffReason] = useState("Voluntary Return");
   const [cityName, setCityName] = useState(user.city || "Hyderabad");
   const [dropoffLocation, setDropoffLocation] = useState("Hub");
+  const [manualDropoffLocation, setManualDropoffLocation] = useState("");
+  const [customerAddress, setCustomerAddress] = useState("");
   const [driverId, setDriverId] = useState("");
   const [driverName, setDriverName] = useState("");
   const [driverPhone, setDriverPhone] = useState("");
@@ -65,10 +67,22 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
   const [fastagBalanceProof, setFastagBalanceProof] = useState<string | null>(null);
   const [dropoffNotes, setDropoffNotes] = useState("");
 
+  // Inspection Checklist State (Returned Car)
+  const [jack, setJack] = useState("Available");
+  const [jackRod, setJackRod] = useState("Available");
+  const [spanner, setSpanner] = useState("Available");
+  const [parkingTriangle, setParkingTriangle] = useState("Available");
+  const [fireExtinguishers, setFireExtinguishers] = useState("Available");
+  const [seatCover, setSeatCover] = useState("Available");
+  const [floorCarpet, setFloorCarpet] = useState("Available");
+  const [musicSystem, setMusicSystem] = useState("Available");
+  const [stepney, setStepney] = useState("Available");
+  const [stepneyPhoto, setStepneyPhoto] = useState<string | null>(null);
+
   // Camera
   const [cameraActive, setCameraActive] = useState(false);
   const [activeCameraTarget, setActiveCameraTarget] = useState<
-    "odometer" | "battery" | "lhSide" | "rhSide" | "frontSide" | "backSide" | "fastag" | "ola" | null
+    "odometer" | "battery" | "lhSide" | "rhSide" | "frontSide" | "backSide" | "fastag" | "ola" | "stepney" | null
   >(null);
 
   // Records
@@ -104,12 +118,14 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
   useEffect(() => { fetchRecords(); }, []);
 
   const handleFetchDriver = async (searchVal?: string) => {
-    const term = searchVal || driverPhone || driverId;
-    if (!term?.trim()) { alert("Please enter a Driver Phone Number or Driver ID."); return; }
+    const term = searchVal || driverPhone || driverId || vehicleNumber;
+    if (!term?.trim()) { alert("Please enter a Driver Phone Number, Driver ID, or Vehicle Number."); return; }
     setIsDriverLookupLoading(true);
     setDriverLookupStatus("");
     try {
       const token = localStorage.getItem("lr_token");
+      
+      // 1. Fetch driver details
       const res = await fetch(`/api/allocation/lookup-driver?query=${encodeURIComponent(term.trim())}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
@@ -121,9 +137,28 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
           if (d.driver_name) setDriverName(d.driver_name);
           if (d.driver_phone) setDriverPhone(d.driver_phone);
           if (d.city_name || d.city) setCityName(d.city_name || d.city);
-          setDriverLookupStatus(`✓ Found: ${d.driver_name || "Driver"} (${d.driver_id || "ID"})`);
+          setDriverLookupStatus(`✓ Found Driver: ${d.driver_name || "Driver"} (${d.driver_id || "ID"})`);
         } else {
           setDriverLookupStatus("No matching driver found.");
+        }
+      }
+
+      // 2. Fetch Active Allocation for full End-to-End Linking
+      const resActive = await fetch(`/api/allocation/active?query=${encodeURIComponent(term.trim())}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (resActive.ok) {
+        const act = await resActive.json();
+        if (act && act.found) {
+          if (act.vehicle_number) setVehicleNumber(act.vehicle_number);
+          if (act.driver_name) setDriverName(act.driver_name);
+          if (act.driver_id) setDriverId(act.driver_id);
+          if (act.driver_phone) setDriverPhone(act.driver_phone);
+          if (act.city_name) setCityName(act.city_name);
+          if (act.customer_address) setCustomerAddress(act.customer_address);
+          if (act.insp_stepney) setStepney(act.insp_stepney);
+          if (act.insp_stepney_photo) setStepneyPhoto(act.insp_stepney_photo);
+          setDriverLookupStatus(`✓ Linked Active Allocation #${act.allocation_id}: ${act.driver_name} (${act.vehicle_number})`);
         }
       }
     } catch {
@@ -154,6 +189,8 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
     setDropoffReason("Voluntary Return");
     setCityName(user.city || "Hyderabad");
     setDropoffLocation("Hub");
+    setManualDropoffLocation("");
+    setCustomerAddress("");
     setDriverId(""); setDriverName(""); setDriverPhone("");
     setVehicleNumber(""); setOdometerReading("");
     setOdometerPhoto(null); setBatteryPhoto(null);
@@ -163,6 +200,9 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
     setDepositRefundStatus("Pending Assessment");
     setFastagBalanceAmount(""); setFastagBalanceProof(null);
     setDropoffNotes(""); setDriverLookupStatus("");
+    setJack("Available"); setJackRod("Available"); setSpanner("Available"); setParkingTriangle("Available");
+    setFireExtinguishers("Available"); setSeatCover("Available"); setFloorCarpet("Available"); setMusicSystem("Available");
+    setStepney("Available"); setStepneyPhoto(null);
   };
 
   const loadForEdit = async (id: number) => {
@@ -177,6 +217,9 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
       setDropoffDate(r.dropoff_date?.split("T")[0] || new Date().toISOString().split("T")[0]);
       setDropoffReason(r.dropoff_reason || "Voluntary Return");
       setCityName(r.city_name || "Hyderabad");
+      setDropoffLocation(r.dropoff_location || "Hub");
+      setManualDropoffLocation(r.manual_dropoff_location || "");
+      setCustomerAddress(r.customer_address || "");
       setDriverId(r.driver_id || "");
       setDriverName(r.driver_name || "");
       setDriverPhone(r.driver_phone || "");
@@ -184,6 +227,8 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
       setOdometerReading(r.odometer_reading ? String(r.odometer_reading) : "");
       setPendingDues(r.pending_dues ? String(r.pending_dues) : "");
       setDropoffNotes(r.dropoff_notes || "");
+      setStepney(r.insp_stepney || "Available");
+      setStepneyPhoto(r.insp_stepney_photo || null);
       setActiveTab("form");
     } catch (err) {
       alert("Failed to load record for editing.");
@@ -195,6 +240,9 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
     if (!isDraft) {
       if (!vehicleNumber.trim()) return alert("Please specify the vehicle number.");
       if (!driverPhone.trim() && !driverId.trim()) return alert("Please enter Driver ID or Phone Number.");
+      if (dropoffLocation === "Forced Recovery" && !customerAddress.trim()) {
+        return alert("Customer Address is mandatory for Forced Recovery.");
+      }
       if (!odometerReading.trim()) return alert("Please enter Odometer Reading.");
       if (!odometerPhoto) return alert("Please upload or capture Odometer Photo.");
     }
@@ -206,6 +254,9 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
         dropoff_date: dropoffDate,
         dropoff_reason: dropoffReason,
         city_name: cityName,
+        dropoff_location: dropoffLocation,
+        manual_dropoff_location: dropoffLocation === "Manual Entry" ? manualDropoffLocation.trim() : null,
+        customer_address: customerAddress.trim(),
         driver_id: driverId.trim(),
         driver_name: driverName.trim(),
         driver_phone: driverPhone.trim(),
@@ -222,6 +273,16 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
         pending_dues: pendingDues ? parseFloat(pendingDues) : null,
         damage_penalty: damagePenalty ? parseFloat(damagePenalty) : null,
         deposit_refund_status: depositRefundStatus,
+        insp_jack: jack,
+        insp_jack_rod: jackRod,
+        insp_spanner: spanner,
+        insp_parking_triangle: parkingTriangle,
+        insp_fire_extinguishers: fireExtinguishers,
+        insp_seat_cover: seatCover,
+        insp_floor_carpet: floorCarpet,
+        insp_music_system: musicSystem,
+        insp_stepney: stepney,
+        insp_stepney_photo: stepneyPhoto,
         dropoff_notes: dropoffNotes,
         status: targetStatus,
       };
@@ -532,9 +593,24 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                         className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs cursor-pointer">
                         <option value="Hub">Hub Desk</option>
                         <option value="Service Station">Service Station</option>
-                        <option value="Customer Address">Customer Address</option>
+                        <option value="Forced Recovery">Forced Recovery</option>
+                        <option value="Manual Entry">Manual Entry (Enter Location)</option>
                       </select>
                     </div>
+                    {dropoffLocation === "Manual Entry" && (
+                      <div>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Enter Manual Drop-Off Location <span className="text-red-500">*</span></label>
+                        <input type="text" placeholder="Specify drop-off location..." value={manualDropoffLocation} onChange={(e) => setManualDropoffLocation(e.target.value)} required
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs" />
+                      </div>
+                    )}
+                    {dropoffLocation === "Forced Recovery" && (
+                      <div>
+                        <label className="block font-sans text-xs font-bold text-rose-700 mb-1">Customer Address (Mandatory for Forced Recovery) <span className="text-red-500">*</span></label>
+                        <textarea placeholder="Enter full address for forced recovery..." value={customerAddress} onChange={(e) => setCustomerAddress(e.target.value)} required rows={2}
+                          className="w-full rounded-xl border border-rose-300 bg-rose-50/50 px-3 py-2 text-xs font-medium text-slate-800 focus:border-rose-600 focus:ring-1 focus:ring-rose-600/20 outline-none transition-all shadow-2xs resize-none" />
+                      </div>
+                    )}
                     <div>
                       <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Operating City <span className="text-red-500">*</span></label>
                       <select value={cityName} onChange={(e) => setCityName(e.target.value)} required
@@ -701,7 +777,83 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                 </div>
               </div>
 
-              {/* SECTION 5 */}
+              {/* SECTION 5: RETURNED VEHICLE INSPECTION CHECKLIST */}
+              <div className="border-t border-slate-200 pt-8 space-y-5">
+                <div className="border-b border-slate-200 pb-2.5 flex items-center justify-between">
+                  <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">5</span>
+                    Returned Vehicle Inspection Checklist
+                  </h3>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {[
+                    { label: "Jack", val: jack, set: setJack },
+                    { label: "Jack Rod", val: jackRod, set: setJackRod },
+                    { label: "Spanner", val: spanner, set: setSpanner },
+                    { label: "Parking Triangle", val: parkingTriangle, set: setParkingTriangle },
+                    { label: "Fire Extinguisher", val: fireExtinguishers, set: setFireExtinguishers },
+                    { label: "Seat Covers", val: seatCover, set: setSeatCover },
+                    { label: "Floor Carpets", val: floorCarpet, set: setFloorCarpet },
+                    { label: "Music System", val: musicSystem, set: setMusicSystem },
+                  ].map((item) => (
+                    <div key={item.label} className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                      <span className="font-sans text-xs font-bold text-slate-800">{item.label}</span>
+                      <div className="flex gap-1 bg-white p-1 rounded-lg border border-slate-200">
+                        <button type="button" onClick={() => item.set("Available")}
+                          className={`px-3 py-1 rounded-md text-[11px] font-extrabold cursor-pointer transition-all ${item.val === "Available" ? "bg-emerald-600 text-white shadow-2xs" : "text-slate-500 hover:text-slate-800"}`}>
+                          Available
+                        </button>
+                        <button type="button" onClick={() => item.set("Not Available")}
+                          className={`px-3 py-1 rounded-md text-[11px] font-extrabold cursor-pointer transition-all ${item.val === "Not Available" ? "bg-rose-600 text-white shadow-2xs" : "text-slate-500 hover:text-slate-800"}`}>
+                          Not Available
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Stepney / Spare Tire */}
+                  <div className="flex flex-col gap-2.5 p-3 rounded-xl border border-emerald-300 bg-emerald-50/30 md:col-span-2">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-sans text-xs font-bold text-emerald-950 block">Stepney / Spare Tire</span>
+                        <span className="text-[10px] text-emerald-800 font-medium">Verify returned spare tire condition</span>
+                      </div>
+                      <div className="flex gap-1 bg-white p-1 rounded-lg border border-emerald-200">
+                        <button type="button" onClick={() => setStepney("Available")}
+                          className={`px-3 py-1 rounded-md text-[11px] font-extrabold cursor-pointer transition-all ${stepney === "Available" ? "bg-emerald-600 text-white shadow-2xs" : "text-slate-500 hover:text-slate-800"}`}>
+                          Available
+                        </button>
+                        <button type="button" onClick={() => setStepney("Not Available")}
+                          className={`px-3 py-1 rounded-md text-[11px] font-extrabold cursor-pointer transition-all ${stepney === "Not Available" ? "bg-rose-600 text-white shadow-2xs" : "text-slate-500 hover:text-slate-800"}`}>
+                          Not Available
+                        </button>
+                      </div>
+                    </div>
+                    {stepney === "Available" && (
+                      <div className="flex items-center justify-between border-t border-emerald-200/60 pt-2 mt-1">
+                        <span className="font-sans text-xs font-bold text-slate-700">Stepney Photo <span className="text-red-500">*</span></span>
+                        {stepneyPhoto ? (
+                          <div className="relative flex items-center gap-2 bg-white px-2 py-1 rounded-lg border border-slate-200">
+                            <img src={stepneyPhoto} alt="Stepney" className="h-10 w-10 object-cover rounded" />
+                            <button type="button" onClick={() => setStepneyPhoto(null)} className="text-rose-500 hover:text-rose-700 cursor-pointer p-1"><X className="h-4 w-4" /></button>
+                          </div>
+                        ) : (
+                          <div className="flex gap-2">
+                            <button type="button" onClick={() => { setActiveCameraTarget("stepney"); setCameraActive(true); }} className="flex items-center gap-1.5 rounded-lg bg-emerald-700 text-white text-[11px] font-bold px-3 py-1.5 hover:bg-emerald-800 cursor-pointer shadow-2xs"><Camera className="h-3.5 w-3.5" /> Capture</button>
+                            <label className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-[11px] font-bold px-3 py-1.5 hover:bg-slate-100 cursor-pointer shadow-2xs">
+                              <Upload className="h-3.5 w-3.5 text-emerald-700" /> Upload
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onloadend = () => { if (typeof r.result === "string") setStepneyPhoto(r.result); }; r.readAsDataURL(f); } }} />
+                            </label>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* SECTION 6 */}
               <div className="border-t border-slate-200 pt-8 space-y-5">
                 <div className="border-b border-slate-200 pb-2.5">
                   <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
@@ -861,6 +1013,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
             if (activeCameraTarget === "backSide") setPhotoBackSide(dataUrl);
             if (activeCameraTarget === "ola") setOlaNegativeBalanceProof(dataUrl);
             if (activeCameraTarget === "fastag") setFastagBalanceProof(dataUrl);
+            if (activeCameraTarget === "stepney") setStepneyPhoto(dataUrl);
             setCameraActive(false); setActiveCameraTarget(null);
           }}
           onClose={() => { setCameraActive(false); setActiveCameraTarget(null); }}
