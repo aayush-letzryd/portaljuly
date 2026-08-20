@@ -9,7 +9,7 @@ COPY package*.json ./
 RUN npm ci
 
 # Copy frontend source code & build production bundle into /app/dist
-COPY index.html vite.config.ts tsconfig*.json tailwind.config.js postcss.config.js ./
+COPY index.html vite.config.ts tsconfig.json ./
 COPY src/ ./src/
 COPY public/ ./public/
 RUN npm run build
@@ -26,7 +26,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 WORKDIR /app
 
-# Install system dependencies
+# Install system dependencies needed for psycopg2 / network tools
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     libpq-dev \
@@ -43,7 +43,7 @@ COPY main.py seed_access_control.py ./
 # Copy compiled React frontend from Stage 1 into /app/dist
 COPY --from=frontend-builder /app/dist ./dist
 
-# Expose port (Cloud Run injects PORT, default 8080)
+# Expose port (Cloud Run automatically injects $PORT, default 8080)
 EXPOSE 8080
 
 # Start Uvicorn ASGI server
