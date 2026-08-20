@@ -66,13 +66,33 @@ export default function AdjustmentForm({
 
   React.useEffect(() => {
     const token = localStorage.getItem("lr_token");
+    // Fetch all approvers list
     fetch("/api/july/approvers", {
       headers: { Authorization: `Bearer ${token}` }
     })
       .then(res => res.json())
       .then(data => { if (Array.isArray(data)) setApproversList(data); })
       .catch(() => {});
-  }, []);
+
+    // Fetch submitter's designated approval chain
+    const uid = (user as any).portal_user_id || (user as any).id || (user as any).user_id;
+    if (uid) {
+      fetch(`/api/approval-chain/${uid}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+        .then(res => res.json())
+        .then(chain => {
+          if (Array.isArray(chain) && chain.length > 0) {
+            const l1 = chain.find((c: any) => c.level === 1) || chain[0];
+            if (l1 && l1.approver_name) {
+              setEscalateTo(String(l1.approver_id || ""));
+              setApproverSearchQuery(`${l1.approver_name} (${l1.approver_role_name || l1.approver_role_code})`);
+            }
+          }
+        })
+        .catch(() => {});
+    }
+  }, [user]);
 
   // Legacy fields (kept in state for backend compatibility)
   const [financeTeamStatus, setFinanceTeamStatus] = useState<"Approved" | "Pending" | "Rejected">("Pending");
@@ -236,11 +256,13 @@ export default function AdjustmentForm({
     setPhoto(null);
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-
+  const handleSaveAndSubmit = async (sendForApproval: boolean) => {
     if (!enterAmount || parseFloat(enterAmount) <= 0) {
       return alert("Please enter a valid Amount");
+    }
+
+    if (!partnerName.trim()) {
+      return alert("Please enter Partner Name");
     }
 
     const payload = {
@@ -251,7 +273,7 @@ export default function AdjustmentForm({
       // Legacy overrides to satisfy backend Pydantic schema
       partner_number: null,
       vehicle_number: null,
-      city_name: null,
+      city_name: (user as any).city || "Bangalore",
       partner_type: null,
       adjustment_nature: "Monetary",
       time_duration: null,
@@ -272,8 +294,8 @@ export default function AdjustmentForm({
       cost_level: costLevel,
       escalate_to: String(escalateTo || ""),
       submitter_comments: submitterComments.trim(),
-      sent_for_approval: sentForApproval,
-      remarks: submitterComments.trim(), // sync to legacy remarks
+      sent_for_approval: sendForApproval ? "Yes" : "No",
+      remarks: submitterComments.trim(),
 
       finance_team_status: financeTeamStatus,
       status: status,
@@ -296,10 +318,26 @@ export default function AdjustmentForm({
 
       if (!res.ok) {
         const errorText = await res.text();
-        throw new Error(errorText || "Failed to submit adjustment request");
+        throw new Error(errorText || "Failed to save adjustment request");
       }
 
-      alert(editingId ? "Hisaab Adjustment Updated Successfully!" : "Hisaab Adjustment Submitted Successfully!");
+      const resData = await res.json();
+      const targetId = editingId || resData.id;
+
+      if (sendForApproval && targetId) {
+        const sendRes = await fetch(`/api/adjustment/send-for-approval/${targetId}`, {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${token}` }
+        });
+        if (!sendRes.ok) {
+          const sendErr = await sendRes.json();
+          throw new Error(sendErr.detail || "Saved as draft, but failed to send for approval");
+        }
+        alert("🚀 Hisaab Adjustment Submitted & Sent for Approval Successfully!");
+      } else {
+        alert(editingId ? "💾 Hisaab Adjustment Updated as Draft!" : "💾 Hisaab Adjustment Saved as Draft!");
+      }
+
       resetForm();
       fetchStats();
       fetchRecords();
@@ -307,6 +345,11 @@ export default function AdjustmentForm({
     } catch (err: any) {
       alert(err.message);
     }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    handleSaveAndSubmit(true);
   };
 
   const handleDelete = async (id: number, name: string) => {
@@ -535,6 +578,25 @@ export default function AdjustmentForm({
                   </button>
                 </div>
               )}
+
+              {/* Approval Workflow Progress Banner */}
+              <div className="bg-slate-50 border-b border-border px-8 py-3.5">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div>
+                    <span className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Approval Workflow</span>
+                    <h3 className="text-xs font-bold text-slate-800">Two-Level Verification Hierarchy</h3>
+                  </div>
+                  <div className="flex items-center gap-2 text-[11px] font-semibold text-slate-600 bg-white px-3 py-1.5 rounded-xl border border-slate-200 shadow-2xs">
+                    <span className="flex items-center gap-1 text-slate-700 font-bold">1. Draft</span>
+                    <span className="text-slate-300">➔</span>
+                    <span className="flex items-center gap-1 text-blue-600 font-bold">2. L1 (Manager)</span>
+                    <span className="text-slate-300">➔</span>
+                    <span className="flex items-center gap-1 text-purple-600 font-bold">3. L2 (City Head)</span>
+                    <span className="text-slate-300">➔</span>
+                    <span className="flex items-center gap-1 text-emerald-600 font-bold">4. Approved</span>
+                  </div>
+                </div>
+              </div>
 
               {/* Form Content */}
               <form onSubmit={handleSubmit} className="p-8 space-y-10">
@@ -851,11 +913,18 @@ export default function AdjustmentForm({
                     </div>
 
                     <button 
-                      type="submit"
-                      disabled={contestedLineItems.length === 0}
-                      className="rounded-xl bg-primary hover:bg-primary-hover px-6 py-2.5 font-sans text-xs font-bold text-white shadow-sm transition-all cursor-pointer disabled:opacity-50"
+                      type="button"
+                      onClick={() => handleSaveAndSubmit(false)}
+                      className="rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-5 py-2.5 font-sans text-xs font-bold text-slate-700 shadow-2xs transition-all cursor-pointer"
                     >
-                      {editingId ? "Save Changes" : "Submit for Approval"}
+                      💾 Save as Draft
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => handleSaveAndSubmit(true)}
+                      className="rounded-xl bg-primary hover:bg-primary-hover px-6 py-2.5 font-sans text-xs font-bold text-white shadow-sm transition-all cursor-pointer"
+                    >
+                      🚀 {editingId ? "Update & Send for Approval" : "Submit & Send for Approval"}
                     </button>
                   </div>
                 </div>
