@@ -153,20 +153,35 @@ export default function VehicleOnboardingForm({
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (res.ok) {
-        const validApprovers = data.filter((a: any) => a.id !== (user.portal_user_id || user.id));
+        const data = await res.json();
+        const validApprovers = (Array.isArray(data) ? data : []).filter((a: any) => a.id !== (user.portal_user_id || user.id));
         setApproversList(validApprovers);
         
-        // Auto-select preferred default approver based on role hierarchy
+        // Auto-select preferred default approver based on role hierarchy or approval chain
         if (validApprovers.length > 0) {
+          try {
+            const uid = user.portal_user_id || user.id;
+            const chainRes = await fetch(`/api/approval-chain/${uid}`, {
+              headers: { "Authorization": `Bearer ${token}` }
+            });
+            if (chainRes.ok) {
+              const chainData = await chainRes.json();
+              if (chainData.l1 && chainData.l1.portal_user_id) {
+                setApprovalRequestedTo(chainData.l1.portal_user_id);
+                return;
+              }
+            }
+          } catch (e) {}
+
           const uRole = (user.role || "").toLowerCase();
           let preferred = null;
           if (uRole.includes("city manager") || uRole.includes("cm")) {
-            preferred = validApprovers.find((a: any) => a.role?.toLowerCase().includes("general manager") || a.role_code === "GM") ||
+            preferred = validApprovers.find((a: any) => a.role?.toLowerCase().includes("general manager") || a.role_code === "GM" || a.role_code === "CH") ||
                         validApprovers.find((a: any) => a.role?.toLowerCase().includes("business head") || a.role_code === "BH");
-          } else if (uRole.includes("general manager") || uRole.includes("gm")) {
+          } else if (uRole.includes("general manager") || uRole.includes("gm") || uRole.includes("ch")) {
             preferred = validApprovers.find((a: any) => a.role?.toLowerCase().includes("business head") || a.role_code === "BH");
           } else {
-            preferred = validApprovers.find((a: any) => a.role?.toLowerCase().includes("city manager") || a.role_code === "CM");
+            preferred = validApprovers.find((a: any) => a.role_code === "SOM" || a.role_code === "OM" || a.role_code === "CH" || a.role?.toLowerCase().includes("city manager") || a.role_code === "CM");
           }
           
           if (preferred) {

@@ -20,10 +20,13 @@ const MODULE_CONFIG: Record<string, { label: string; textClass: string }> = {
   individual_onboarding: { label: "Driver Onboarding", textClass: "text-blue-600 font-semibold" },
   operator_onboarding: { label: "Operator Onboarding", textClass: "text-indigo-600 font-semibold" },
   vehicle_onboarding: { label: "Vehicle Onboarding", textClass: "text-purple-600 font-semibold" },
+  adjustment_form: { label: "Adjustment Form", textClass: "text-orange-600 font-semibold" },
 };
 
 const STATUS_TEXT_CLASSES: Record<string, string> = {
   "Pending Approval": "text-amber-600 font-bold",
+  "Pending L1 Approval": "text-amber-600 font-bold",
+  "Pending L2 Approval": "text-orange-600 font-bold",
   "Approved": "text-emerald-600 font-bold",
   "Rejected": "text-rose-600 font-bold",
   "Changes Requested": "text-orange-600 font-bold",

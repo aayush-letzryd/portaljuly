@@ -59,6 +59,7 @@ export default function AdjustmentForm({
   const [escalateTo, setEscalateTo] = useState("");
   const [submitterComments, setSubmitterComments] = useState("");
   const [sentForApproval, setSentForApproval] = useState<"Yes" | "No">("Yes");
+  const [approvalStatus, setApprovalStatus] = useState<string>("Draft");
   const [approversList, setApproversList] = useState<any[]>([]);
   const [approverSearchQuery, setApproverSearchQuery] = useState("");
   const [isApproverDropdownOpen, setIsApproverDropdownOpen] = useState(false);
@@ -195,6 +196,7 @@ export default function AdjustmentForm({
       setEscalateTo(data.escalate_to || "");
       setSubmitterComments(data.submitter_comments || data.remarks || "");
       setSentForApproval(data.sent_for_approval || "No");
+      setApprovalStatus(data.approval_status || "Draft");
 
       setFinanceTeamStatus(data.finance_team_status || "Pending");
       setStatus(data.status || "Hold");
@@ -227,6 +229,7 @@ export default function AdjustmentForm({
     setEscalateTo("");
     setSubmitterComments("");
     setSentForApproval("No");
+    setApprovalStatus("Draft");
 
     setFinanceTeamStatus("Pending");
     setStatus("Hold");
@@ -317,6 +320,25 @@ export default function AdjustmentForm({
       if (!res.ok) throw new Error("Delete failed");
       alert("Adjustment deleted successfully");
       fetchStats();
+      fetchRecords();
+    } catch (err: any) {
+      alert(err.message);
+    }
+  };
+
+  const handleSendForApproval = async (id: number) => {
+    if (!window.confirm(`Send Adjustment #${id} for approval?`)) return;
+    try {
+      const token = localStorage.getItem("lr_token");
+      const res = await fetch(`/api/adjustment/send-for-approval/${id}`, {
+        method: "POST",
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.detail || "Failed to send for approval");
+      }
+      alert("Sent for approval successfully!");
       fetchRecords();
     } catch (err: any) {
       alert(err.message);
@@ -993,18 +1015,29 @@ export default function AdjustmentForm({
                       <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-muted text-left">Amount & Type</th>
                       <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-muted text-left">Approvals</th>
                       <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-muted text-left">Status</th>
-                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-muted text-right w-24">Actions</th>
+                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-muted text-left">Approval Status</th>
+                      <th className="px-6 py-3.5 font-sans text-[10px] font-bold text-text-muted text-right w-32">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border bg-white">
                     {filteredRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={7} className="px-6 py-12 text-center text-text-muted font-sans text-xs">
+                        <td colSpan={8} className="px-6 py-12 text-center text-text-muted font-sans text-xs">
                           No matching adjustment records found in the database.
                         </td>
                       </tr>
                     ) : (
                       filteredRecords.map((r) => {
+                        const appStatus = r.approval_status || "Draft";
+                        const isDraft = appStatus === "Draft" || !appStatus;
+                        let appBadge = <span className="inline-block rounded-full px-2 py-0.5 text-[9px] font-extrabold bg-slate-100 text-slate-600 border border-slate-200">Draft</span>;
+                        if (appStatus.includes("Pending")) {
+                          appBadge = <span className="inline-block rounded-full px-2 py-0.5 text-[9px] font-extrabold bg-amber-100 text-amber-800 border border-amber-200">⏳ {appStatus}</span>;
+                        } else if (appStatus.includes("Approved")) {
+                          appBadge = <span className="inline-block rounded-full px-2 py-0.5 text-[9px] font-extrabold bg-green-100 text-green-800 border border-green-200">✅ Approved</span>;
+                        } else if (appStatus.includes("Reject")) {
+                          appBadge = <span className="inline-block rounded-full px-2 py-0.5 text-[9px] font-extrabold bg-red-100 text-red-800 border border-red-200">❌ Rejected</span>;
+                        }
                         return (
                           <tr key={r.id} className="hover:bg-bg/10 transition-colors">
                             <td className="px-6 py-4 font-mono text-xs font-bold text-primary">#{r.id}</td>
@@ -1037,8 +1070,20 @@ export default function AdjustmentForm({
                                 {r.status}
                               </span>
                             </td>
+                            <td className="px-6 py-4">
+                              {appBadge}
+                            </td>
                             <td className="px-6 py-4 text-right">
                               <div className="flex items-center justify-end gap-1.5">
+                                {isDraft && (
+                                  <button
+                                    onClick={() => handleSendForApproval(r.id)}
+                                    className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500 hover:bg-amber-600 text-white font-sans text-[10px] font-bold transition-colors cursor-pointer"
+                                    title="Send for Approval"
+                                  >
+                                    ✉ Send
+                                  </button>
+                                )}
                                 <button 
                                   onClick={() => loadRecordForEdit(r.id)}
                                   className="flex h-7 w-7 items-center justify-center rounded-lg bg-bg hover:bg-primary hover:text-white transition-colors cursor-pointer"

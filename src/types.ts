@@ -136,6 +136,8 @@ export interface AdjustmentRecord {
   escalate_to?: string;
   submitter_comments?: string;
   sent_for_approval?: string;
+  approval_status?: string;
+  current_approver_id?: number;
 }
 
 export interface AllocationRecord {
@@ -203,6 +205,7 @@ export interface User {
   role_id?: number;
   role_code?: RoleCode; // RBAC integration
   permissions?: string[];
+  allowed_forms?: string[]; // per-user form access from DB
 }
 
 export interface CityOption {

@@ -109,18 +109,25 @@ export default function FormSelector({ user, onSelectForm, onLogout }: FormSelec
             const roleCode = (user.role_code || "").toUpperCase();
             const username = (user.username || "").toLowerCase();
             const name = (user.name || "").toLowerCase();
-            const isAdmin = role.includes("admin") || role.includes("founder") || role.includes("ceo") || roleCode === "SA" || username === "admin" || name.includes("admin");
-            const isOnboardingExec = roleCode === "OB" || roleCode === "OE" || role.includes("onboarding") || username.includes("onboarding");
+            const isAdmin = role.includes("admin") || role.includes("founder") || role.includes("ceo") || role.includes("business head") || roleCode === "SA" || roleCode === "BH" || roleCode === "BH2" || username === "admin" || username.startsWith("bh.") || name.includes("admin");
 
-            // Onboarding Executives are allowed walkin, onboarding, allocation, and dropoff forms
-            if (isOnboardingExec && !isAdmin) {
+            // SA & Business Head always see all forms
+            if (isAdmin) return true;
+
+            // Use per-user allowed_forms from DB if available
+            if (user.allowed_forms && user.allowed_forms.length > 0) {
+              // Always show approvals tab to everyone
+              if (key === "approvals") return true;
+              return user.allowed_forms.includes(key);
+            }
+
+            // Fallback: original role-based logic (for users without DB form access entries)
+            const isOnboardingExec = roleCode === "OB" || roleCode === "OE" || role.includes("onboarding") || username.includes("onboarding");
+            if (isOnboardingExec) {
               return ["walkin", "onboarding", "allocation", "dropoff"].includes(key);
             }
+            return ["walkin", "onboarding", "vehicle_onboarding", "allocation", "dropoff"].includes(key);
 
-            if (!isAdmin) {
-              return ["walkin", "onboarding", "vehicle_onboarding", "allocation", "dropoff"].includes(key);
-            }
-            return true;
           }).map(({ key, label, sub, icon: Icon, iconBg, iconColor, hover, isCompleted }) => {
             
             const cardStyle = isCompleted
