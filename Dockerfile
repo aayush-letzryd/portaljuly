@@ -21,8 +21,7 @@ FROM python:3.11-slim
 
 # Prevent Python from writing .pyc files and buffer stdout/stderr
 ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PORT=8080
+    PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
@@ -43,8 +42,8 @@ COPY main.py seed_access_control.py ./
 # Copy compiled React frontend from Stage 1 into /app/dist
 COPY --from=frontend-builder /app/dist ./dist
 
-# Expose port (Cloud Run automatically injects $PORT, default 8080)
-EXPOSE 8080
+# Expose port (Cloud Run default 8080, Render default 8000/10000)
+EXPOSE 8080 8000 10000
 
-# Start Uvicorn ASGI server
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+# Start Uvicorn ASGI server with dynamic $PORT binding
+CMD sh -c "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8080}"

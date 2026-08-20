@@ -543,6 +543,7 @@ def startup_event():
                 performed_by    INTEGER,
                 performed_by_name VARCHAR(255),
                 performed_at    TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            );
         """)
 
         for col in [
