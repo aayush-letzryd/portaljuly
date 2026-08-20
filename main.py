@@ -795,7 +795,8 @@ def startup_event():
                     status                      VARCHAR(50)  NOT NULL DEFAULT 'Submitted',
                     created_by                  INTEGER,
                     updated_by                  INTEGER,
-                    created_at                  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                    created_at                  TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                );
             """)
 
             for col in [
