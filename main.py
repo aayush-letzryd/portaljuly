@@ -3635,8 +3635,8 @@ def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None,
                 f.current_approver_id,
                 f.approved_by,
                 f.approval_note AS approval_remarks,
-                COALESCE(f.created_at, f.updated_at, NOW()) AS created_at,
-                COALESCE(f.updated_at, f.created_at, NOW()) AS updated_at,
+                COALESCE(timezone('Asia/Kolkata', timezone('UTC', f.created_at)), timezone('Asia/Kolkata', timezone('UTC', f.updated_at)), NOW() AT TIME ZONE 'Asia/Kolkata') AS created_at,
+                COALESCE(timezone('Asia/Kolkata', timezone('UTC', f.updated_at)), timezone('Asia/Kolkata', timezone('UTC', f.created_at)), NOW() AT TIME ZONE 'Asia/Kolkata') AS updated_at,
                 f.security_deposit,
                 f.custom_rent_amount AS daily_rent,
                 COALESCE(f.vendor_type, f.candidate_role, 'Driver') AS vendor_type,
@@ -3687,18 +3687,12 @@ def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None,
         cur.execute(base_query, params)
         cols = [d[0] for d in cur.description]
         import datetime as dt_module
-        ist = dt_module.timezone(dt_module.timedelta(hours=5, minutes=30))
         results = []
         for row in cur.fetchall():
             item = {}
             for col, val in zip(cols, row):
                 if isinstance(val, (dt_module.datetime, dt_module.date)):
-                    if isinstance(val, dt_module.datetime):
-                        if val.tzinfo is None:
-                            val = val.replace(tzinfo=ist)
-                        item[col] = val.astimezone(ist).isoformat()
-                    else:
-                        item[col] = val.isoformat()
+                    item[col] = val.isoformat()
                 else:
                     item[col] = val
             results.append(item)
@@ -7504,8 +7498,7 @@ def to_ist_iso(dt):
     if isinstance(dt, (dt_module.datetime, dt_module.date)):
         if isinstance(dt, dt_module.datetime):
             if dt.tzinfo is None:
-                dt = dt.replace(tzinfo=ist_tz)
-                return dt.isoformat()
+                dt = dt.replace(tzinfo=dt_module.timezone.utc)
             return dt.astimezone(ist_tz).isoformat()
         return dt.isoformat()
     return str(dt)
