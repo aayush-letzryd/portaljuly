@@ -1953,6 +1953,25 @@ def extract_image(val: Any, folder: str = "uploads") -> Optional[str]:
 
     return raw_str
 
+from fastapi import UploadFile, File
+
+@app.post("/api/storage/upload")
+async def upload_direct_file(file: UploadFile = File(...), folder: Optional[str] = "uploads"):
+    try:
+        bucket = get_gcs_bucket()
+        content = await file.read()
+        ext = file.filename.split(".")[-1] if file.filename and "." in file.filename else "jpg"
+        file_key = f"{folder}/{uuid.uuid4().hex}.{ext}"
+        if bucket:
+            blob = bucket.blob(file_key)
+            blob.upload_from_string(content, content_type=file.content_type or "image/jpeg")
+            return {"url": f"https://storage.googleapis.com/{GCS_BUCKET_NAME}/{file_key}"}
+        else:
+            b64 = f"data:{file.content_type or 'image/jpeg'};base64," + base64.b64encode(content).decode("utf-8")
+            return {"url": b64}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # ─────────────────────────────────────────────────────────
 # Auth Endpoints
