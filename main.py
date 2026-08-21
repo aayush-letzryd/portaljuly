@@ -4478,21 +4478,43 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
         new_police_doc = extract_image(data.police_verification_doc)
         new_signature = extract_image(data.signature_photo)
         
-        if new_selfie: cur.execute("UPDATE july_form_onboarding SET selfie_photo=%s WHERE id=%s;", (new_selfie, id))
-        if new_dl_front: cur.execute("UPDATE july_form_onboarding SET dl_front=%s WHERE id=%s;", (new_dl_front, id))
-        if new_dl_back: cur.execute("UPDATE july_form_onboarding SET dl_back=%s WHERE id=%s;", (new_dl_back, id))
-        if new_pan: cur.execute("UPDATE july_form_onboarding SET pan_card_photo=%s WHERE id=%s;", (new_pan, id))
-        if new_aadhaar_img: cur.execute("UPDATE july_form_onboarding SET aadhaar_card_photo=%s WHERE id=%s;", (new_aadhaar_img, id))
-        if new_aadhaar_front: cur.execute("UPDATE july_form_onboarding SET aadhaar_card_front=%s WHERE id=%s;", (new_aadhaar_front, id))
-        if new_aadhaar_back: cur.execute("UPDATE july_form_onboarding SET aadhaar_card_back=%s WHERE id=%s;", (new_aadhaar_back, id))
-        if new_local_address_proof: cur.execute("UPDATE july_form_onboarding SET local_address_proof=%s WHERE id=%s;", (new_local_address_proof, id))
-        if new_cancelled_cheque: cur.execute("UPDATE july_form_onboarding SET cancelled_cheque_photo=%s WHERE id=%s;", (new_cancelled_cheque, id))
-        if new_cheque2: cur.execute("UPDATE july_form_onboarding SET cheque2_photo=%s WHERE id=%s;", (new_cheque2, id))
-        if new_cheque3: cur.execute("UPDATE july_form_onboarding SET cheque3_photo=%s WHERE id=%s;", (new_cheque3, id))
-        if new_cheque4: cur.execute("UPDATE july_form_onboarding SET cheque4_photo=%s WHERE id=%s;", (new_cheque4, id))
-        if new_security_cheques: cur.execute("UPDATE july_form_onboarding SET security_cheques=%s WHERE id=%s;", (new_security_cheques, id))
-        if new_police_doc: cur.execute("UPDATE july_form_onboarding SET police_verification_doc=%s WHERE id=%s;", (new_police_doc, id))
-        if new_signature: cur.execute("UPDATE july_form_onboarding SET signature_photo=%s WHERE id=%s;", (new_signature, id))
+        # Always update image fields — even if null (to allow clearing/replacing images)
+        cur.execute("""
+            UPDATE july_form_onboarding SET
+                selfie_photo=%s,
+                dl_front=%s,
+                dl_back=%s,
+                pan_card_photo=%s,
+                aadhaar_card_photo=%s,
+                aadhaar_card_front=%s,
+                aadhaar_card_back=%s,
+                local_address_proof=%s,
+                cancelled_cheque_photo=%s,
+                cheque2_photo=%s,
+                cheque3_photo=%s,
+                cheque4_photo=%s,
+                security_cheques=%s,
+                police_verification_doc=%s,
+                signature_photo=%s
+            WHERE id=%s;
+        """, (
+            new_selfie,
+            new_dl_front,
+            new_dl_back,
+            new_pan,
+            new_aadhaar_img,
+            new_aadhaar_front,
+            new_aadhaar_back,
+            new_local_address_proof,
+            new_cancelled_cheque,
+            new_cheque2,
+            new_cheque3,
+            new_cheque4,
+            new_security_cheques,
+            new_police_doc,
+            new_signature,
+            id
+        ))
             
         if data.walkin_id:
             cur.execute("DELETE FROM july_walkin_form_links WHERE onboarding_id = %s;", (id,))
