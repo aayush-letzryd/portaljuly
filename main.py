@@ -5399,8 +5399,12 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
                 driver_id, driver_name, driver_phone,
                 vehicle_number, dropoff_odometer, dropoff_remarks,
                 photo_lh_side, photo_rh_side, photo_front_side, photo_back_side,
-                dropoff_photo, battery_photo, ola_negative_balance, ola_negative_balance_proof,
-                fastag_balance_amount, insp_stepney, insp_stepney_photo, status, created_by,
+                dropoff_photo, battery_photo,
+                ola_negative_balance, ola_negative_balance_proof,
+                fastag_balance_amount,
+                insp_jack, insp_jack_rod, insp_spanner, insp_parking_triangle,
+                insp_fire_extinguishers, insp_seat_cover, insp_floor_carpet, insp_music_system,
+                insp_stepney, insp_stepney_photo, status, created_by,
                 created_at
             ) VALUES (
                 %s, 'Drop-Off', %s, %s,
@@ -5408,8 +5412,12 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
                 %s, %s, %s,
                 %s, %s, %s,
                 %s, %s, %s, %s,
+                %s, %s,
+                %s, %s,
+                %s,
                 %s, %s, %s, %s,
-                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s, %s,
                 NOW() AT TIME ZONE 'Asia/Kolkata'
             ) RETURNING id;
         """, (
@@ -5417,8 +5425,14 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
             data.dropoff_location, data.manual_dropoff_location, data.customer_address,
             data.driver_id, data.driver_name, data.driver_phone,
             data.vehicle_number, data.odometer_reading, data.dropoff_notes,
+            extract_image(data.photo_lh_side), extract_image(data.photo_rh_side),
+            extract_image(data.photo_front_side), extract_image(data.photo_back_side),
+            extract_image(data.odometer_photo), extract_image(data.battery_photo),
             data.ola_negative_balance, extract_image(data.ola_negative_balance_proof),
-            data.pending_dues, data.insp_stepney, extract_image(data.insp_stepney_photo),
+            data.pending_dues,
+            data.insp_jack, data.insp_jack_rod, data.insp_spanner, data.insp_parking_triangle,
+            data.insp_fire_extinguishers, data.insp_seat_cover, data.insp_floor_carpet, data.insp_music_system,
+            data.insp_stepney, extract_image(data.insp_stepney_photo),
             data.status or "Submitted", uid
         ))
         new_id = cur.fetchone()[0]
@@ -5462,7 +5476,10 @@ def update_dropoff(id: int, data: DropOffData, authorization: Optional[str] = He
                 photo_lh_side=%s, photo_rh_side=%s, photo_front_side=%s, photo_back_side=%s,
                 dropoff_photo=%s, battery_photo=%s,
                 ola_negative_balance=%s, ola_negative_balance_proof=%s,
-                fastag_balance_amount=%s, insp_stepney=%s, insp_stepney_photo=%s, status=%s,
+                fastag_balance_amount=%s,
+                insp_jack=%s, insp_jack_rod=%s, insp_spanner=%s, insp_parking_triangle=%s,
+                insp_fire_extinguishers=%s, insp_seat_cover=%s, insp_floor_carpet=%s, insp_music_system=%s,
+                insp_stepney=%s, insp_stepney_photo=%s, status=%s,
                 updated_at=NOW() AT TIME ZONE 'Asia/Kolkata'
             WHERE id=%s AND allocation_type='Drop-Off'
             RETURNING id;
@@ -5475,7 +5492,11 @@ def update_dropoff(id: int, data: DropOffData, authorization: Optional[str] = He
             extract_image(data.photo_front_side), extract_image(data.photo_back_side),
             extract_image(data.odometer_photo), extract_image(data.battery_photo),
             data.ola_negative_balance, extract_image(data.ola_negative_balance_proof),
-            data.pending_dues, data.insp_stepney, extract_image(data.insp_stepney_photo), data.status or "Submitted",
+            data.pending_dues,
+            data.insp_jack, data.insp_jack_rod, data.insp_spanner, data.insp_parking_triangle,
+            data.insp_fire_extinguishers, data.insp_seat_cover, data.insp_floor_carpet, data.insp_music_system,
+            data.insp_stepney, extract_image(data.insp_stepney_photo),
+            data.status or "Submitted",
             id
         ))
         if not cur.fetchone():
