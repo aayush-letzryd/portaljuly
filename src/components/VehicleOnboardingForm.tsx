@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { VehicleRecord, User as UserSession, CITIES } from "../types";
 import CameraCapture from "./CameraCapture";
+import { compressImage } from "../utils/imageCompressor";
 
 interface VehicleOnboardingFormProps {
   user: UserSession;

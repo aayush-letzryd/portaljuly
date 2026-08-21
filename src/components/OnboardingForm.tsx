@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { OnboardingRecord, User as UserSession, CITIES } from "../types";
 import CameraCapture from "./CameraCapture";
+import { compressImage } from "../utils/imageCompressor";
 
 interface OnboardingFormProps {
   user: UserSession;
