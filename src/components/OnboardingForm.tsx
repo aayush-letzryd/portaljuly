@@ -2552,14 +2552,14 @@ export default function OnboardingForm({
                         </div>
                       </div>
                       
-                      {/* Right: Security Cheque + Signature */}
+                      {/* Right: Bank Proof (Cancelled Cheque) + Signature */}
                       <div className="space-y-4">
-                        {/* Security Cheque */}
+                        {/* Cancelled Cheque / Bank Proof */}
                         <div className="flex flex-col gap-2 rounded-xl border border-dashed border-border bg-slate-50 p-3">
-                          <span className="font-sans text-[11px] font-bold text-text-muted text-center">Security Cheque <span className="text-primary">*</span></span>
+                          <span className="font-sans text-[11px] font-bold text-text-muted text-center">Cancelled Cheque / Bank Passbook</span>
                           {cancelledChequePhoto ? (
                             <div className="relative h-24 flex items-center justify-center bg-white rounded-lg p-2">
-                              <img src={cancelledChequePhoto} alt="Security Cheque" className="max-h-20 object-contain rounded shadow-xs" />
+                              <img src={cancelledChequePhoto} alt="Cancelled Cheque" className="max-h-20 object-contain rounded shadow-xs" />
                               <button type="button" onClick={() => removePhoto("cheque")} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 transition-all cursor-pointer"><Trash2 className="h-3 w-3" /></button>
                             </div>
                           ) : (
@@ -2571,66 +2571,6 @@ export default function OnboardingForm({
                             </div>
                           )}
                         </div>
-
-                        {/* Security Cheque 2 */}
-                        {(rentalModel === "LetzOwn" || rentalModel === "Drive to Own" || cheque2Photo) && (
-                          <div className="flex flex-col gap-2 rounded-xl border border-dashed border-border bg-slate-50 p-3">
-                            <span className="font-sans text-[11px] font-bold text-text-muted text-center">Security Cheque 2</span>
-                            {cheque2Photo ? (
-                              <div className="relative h-24 flex items-center justify-center bg-white rounded-lg p-2">
-                                <img src={cheque2Photo} alt="Security Cheque 2" className="max-h-20 object-contain rounded shadow-xs" />
-                                <button type="button" onClick={() => removePhoto("cheque2")} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 transition-all cursor-pointer"><Trash2 className="h-3 w-3" /></button>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center justify-center h-20 border border-border/50 bg-white rounded-lg gap-1">
-                                <div className="flex gap-1.5 w-full px-2">
-                                  <button type="button" onClick={() => setCameraActiveField("cheque2")} className="flex-1 flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-semibold py-1.5 hover:bg-primary-hover transition-colors cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
-                                  <label className="flex-1 flex items-center justify-center gap-1 rounded border border-border bg-white text-text-muted text-[10px] font-semibold py-1.5 hover:bg-slate-100 transition-colors cursor-pointer"><Upload className="h-3 w-3" /> Upload<input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "cheque2")} /></label>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Security Cheque 3 */}
-                        {(rentalModel === "LetzOwn" || rentalModel === "Drive to Own" || cheque3Photo) && (
-                          <div className="flex flex-col gap-2 rounded-xl border border-dashed border-border bg-slate-50 p-3">
-                            <span className="font-sans text-[11px] font-bold text-text-muted text-center">Security Cheque 3</span>
-                            {cheque3Photo ? (
-                              <div className="relative h-24 flex items-center justify-center bg-white rounded-lg p-2">
-                                <img src={cheque3Photo} alt="Security Cheque 3" className="max-h-20 object-contain rounded shadow-xs" />
-                                <button type="button" onClick={() => removePhoto("cheque3")} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 transition-all cursor-pointer"><Trash2 className="h-3 w-3" /></button>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center justify-center h-20 border border-border/50 bg-white rounded-lg gap-1">
-                                <div className="flex gap-1.5 w-full px-2">
-                                  <button type="button" onClick={() => setCameraActiveField("cheque3")} className="flex-1 flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-semibold py-1.5 hover:bg-primary-hover transition-colors cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
-                                  <label className="flex-1 flex items-center justify-center gap-1 rounded border border-border bg-white text-text-muted text-[10px] font-semibold py-1.5 hover:bg-slate-100 transition-colors cursor-pointer"><Upload className="h-3 w-3" /> Upload<input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "cheque3")} /></label>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Security Cheque 4 */}
-                        {(rentalModel === "LetzOwn" || rentalModel === "Drive to Own" || cheque4Photo) && (
-                          <div className="flex flex-col gap-2 rounded-xl border border-dashed border-border bg-slate-50 p-3">
-                            <span className="font-sans text-[11px] font-bold text-text-muted text-center">Security Cheque 4</span>
-                            {cheque4Photo ? (
-                              <div className="relative h-24 flex items-center justify-center bg-white rounded-lg p-2">
-                                <img src={cheque4Photo} alt="Security Cheque 4" className="max-h-20 object-contain rounded shadow-xs" />
-                                <button type="button" onClick={() => removePhoto("cheque4")} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 transition-all cursor-pointer"><Trash2 className="h-3 w-3" /></button>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center justify-center h-20 border border-border/50 bg-white rounded-lg gap-1">
-                                <div className="flex gap-1.5 w-full px-2">
-                                  <button type="button" onClick={() => setCameraActiveField("cheque4")} className="flex-1 flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-semibold py-1.5 hover:bg-primary-hover transition-colors cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
-                                  <label className="flex-1 flex items-center justify-center gap-1 rounded border border-border bg-white text-text-muted text-[10px] font-semibold py-1.5 hover:bg-slate-100 transition-colors cursor-pointer"><Upload className="h-3 w-3" /> Upload<input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "cheque4")} /></label>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        )}
                         <div className="flex flex-col gap-2 rounded-xl border border-dashed border-border bg-slate-50 p-3">
                           <span className="font-sans text-[11px] font-bold text-text-muted text-center">Candidate Signature</span>
                           {signaturePhoto ? (
