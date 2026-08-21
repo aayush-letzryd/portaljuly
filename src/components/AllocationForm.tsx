@@ -110,6 +110,8 @@ export default function AllocationForm({
   const [customerAddress, setCustomerAddress] = useState("");
   const [jamaFormFilled, setJamaFormFilled] = useState(true);
   const [pdiCompleted, setPdiCompleted] = useState(false);
+  const [fastagBalanceAmount, setFastagBalanceAmount] = useState("");
+  const [fastagBalanceProof, setFastagBalanceProof] = useState<string | null>(null);
 
   // Returned Vehicle Inspection Checklist States
   const [oldJack, setOldJack] = useState("Available");
@@ -128,45 +130,28 @@ export default function AllocationForm({
       return;
     }
     setIsDriverLookupLoading(true);
-    setDriverLookupStatus("");
     try {
       const token = localStorage.getItem("lr_token");
-      const res = await fetch(`/api/allocation/lookup-driver?query=${encodeURIComponent(term.trim())}`, {
+      const res = await fetch(`/api/drivers/search?query=${encodeURIComponent(term.trim())}`, {
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (res.ok) {
         const data = await res.json();
-        const d = Array.isArray(data) ? data[0] : data;
-        if (d && (d.found || d.driver_id || d.driver_name)) {
-          if (d.driver_id) setDriverId(d.driver_id);
-          if (d.driver_name) setDriverName(d.driver_name);
-          if (d.driver_phone) setDriverPhone(d.driver_phone);
-          if (d.city_name || d.city) setCityName(d.city_name || d.city);
-          
-          // Case-insensitive match against PLAN_MAPPING options
-          let matchedPlan = "Drive to Rent";
-          const rawPlan = (d.driver_plan || d.rental_model || "").trim();
-          if (rawPlan) {
-            const foundKey = Object.keys(PLAN_MAPPING).find(
-              k => k.toLowerCase() === rawPlan.toLowerCase()
-            );
-            if (foundKey) matchedPlan = foundKey;
-          }
-          setDriverPlan(matchedPlan);
-          
-          // Auto-populate contract & car model
-          const contractType = d.type_of_plan || PLAN_MAPPING[matchedPlan]?.typeOfPlan || "Subscription (Daily)";
-          const modelType = d.car_model || PLAN_MAPPING[matchedPlan]?.carModel || "Tata Xpres-T EV";
-          setTypeOfPlan(contractType);
-          setCarModel(modelType);
-
-          setDriverLookupStatus(`Found: ${d.driver_name || "Driver"} (${d.driver_id || "ID"})`);
+        if (data.found) {
+          setDriverId(data.driver_id || "");
+          setDriverName(data.driver_name || "");
+          setDriverPhone(data.driver_phone || "");
+          if (data.city_name) setCityName(data.city_name);
+          if (data.driver_plan) setDriverPlan(data.driver_plan);
+          if (data.type_of_plan) setTypeOfPlan(data.type_of_plan);
+          if (data.car_model) setCarModel(data.car_model);
+          setDriverLookupStatus("Driver details auto-filled successfully!");
         } else {
-          setDriverLookupStatus("No onboarded driver record found.");
+          setDriverLookupStatus("Driver not found in master records. You can enter details manually.");
         }
       }
-    } catch (err) {
-      setDriverLookupStatus("Failed to lookup driver details.");
+    } catch (e) {
+      setDriverLookupStatus("Error looking up driver details.");
     } finally {
       setIsDriverLookupLoading(false);
     }
@@ -177,16 +162,16 @@ export default function AllocationForm({
     if (val.trim().length >= 1) {
       try {
         const token = localStorage.getItem("lr_token");
-        const res = await fetch(`/api/allocation/lookup-vehicle?query=${encodeURIComponent(val.trim())}`, {
+        const res = await fetch(`/api/vehicles/search?query=${encodeURIComponent(val.trim())}`, {
           headers: { "Authorization": `Bearer ${token}` }
         });
         if (res.ok) {
-          const data = await res.json();
-          setVehicleSuggestions(data || []);
-          setShowVehicleDropdown(true);
+          const list = await res.json();
+          setVehicleSuggestions(list);
+          setShowVehicleDropdown(list.length > 0);
         }
       } catch (e) {
-        console.error(e);
+        setShowVehicleDropdown(false);
       }
     } else {
       setShowVehicleDropdown(false);
@@ -195,7 +180,7 @@ export default function AllocationForm({
 
   const [cameraActive, setCameraActive] = useState(false);
   const [activeCameraTarget, setActiveCameraTarget] = useState<
-    "lhSide" | "rhSide" | "frontSide" | "backSide" | "olaProof" | "odometer" | "battery" | "stepney" | null
+    "lhSide" | "rhSide" | "frontSide" | "backSide" | "olaProof" | "odometer" | "battery" | "stepney" | "dropoffPhoto" | "fastagProof" | null
   >(null);
 
   // Registry Search & Filter State
@@ -278,13 +263,9 @@ export default function AllocationForm({
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          setDropoffPhoto(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+      compressImage(file).then((b64) => {
+        if (b64) setDropoffPhoto(b64);
+      });
     }
   };
 
@@ -298,7 +279,7 @@ export default function AllocationForm({
       const data = await res.json();
       
       setEditingId(data.id);
-      setAllocationDate(data.allocation_date || "");
+      setAllocationDate(data.allocation_date ? String(data.allocation_date).split("T")[0] : new Date().toISOString().split("T")[0]);
       setTransactionType(data.allocation_type || "New Allocation");
       setCityName(data.city_name || "Hyderabad");
       setDriverId(data.driver_id != null ? String(data.driver_id) : "");
@@ -313,11 +294,19 @@ export default function AllocationForm({
       setBatteryPhoto(data.battery_photo || null);
       setOlaNegativeBalance(data.ola_negative_balance != null ? String(data.ola_negative_balance) : "");
       setOlaNegativeBalanceProof(data.ola_negative_balance_proof || null);
+      setFastagBalanceAmount(data.fastag_balance_amount != null ? String(data.fastag_balance_amount) : "");
+      setFastagBalanceProof(data.fastag_balance_proof || null);
       setGpsActive(data.gps_active || "Yes");
       setPhotoLhSide(data.photo_lh_side || null);
       setPhotoRhSide(data.photo_rh_side || null);
       setPhotoFrontSide(data.photo_front_side || null);
       setPhotoBackSide(data.photo_back_side || null);
+
+      // Swap / Returned vehicle fields
+      setOldVehicleNumber(data.old_vehicle_number || "");
+      setDropoffOdometer(data.dropoff_odometer != null ? String(data.dropoff_odometer) : "");
+      setDropoffRemarks(data.dropoff_remarks || "");
+      setDropoffPhoto(data.dropoff_photo || null);
 
       // Populate Vehicle Inspection States from draft/allocation record
       setJack(data.insp_jack || "Available");
@@ -339,6 +328,7 @@ export default function AllocationForm({
 
       setActiveTab("form");
       setRetrieveIdInput("");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err: any) {
       alert(err.message);
     }
@@ -367,11 +357,19 @@ export default function AllocationForm({
     setBatteryPhoto(null);
     setOlaNegativeBalance("");
     setOlaNegativeBalanceProof(null);
+    setFastagBalanceAmount("");
+    setFastagBalanceProof(null);
     setGpsActive("Yes");
     setPhotoLhSide(null);
     setPhotoRhSide(null);
     setPhotoFrontSide(null);
     setPhotoBackSide(null);
+
+    // Swap / Returned fields reset
+    setOldVehicleNumber("");
+    setDropoffOdometer("");
+    setDropoffRemarks("");
+    setDropoffPhoto(null);
 
     // Vehicle Inspection States Reset
     setJack("Available");
@@ -434,7 +432,7 @@ export default function AllocationForm({
             inspection_date: allocationDate,
             odometer_reading: odometerReading || "0",
             jack,
-            jack_rod: jackRod,
+            jack_rod,
             spanner,
             parking_triangle: parkingTriangle,
             fire_extinguishers: fireExtinguishers,
@@ -466,6 +464,12 @@ export default function AllocationForm({
         gps_active: gpsActive,
         ola_negative_balance: String(olaNegativeBalance || "").trim() || null,
         ola_negative_balance_proof: olaNegativeBalanceProof,
+        fastag_balance_amount: fastagBalanceAmount ? parseFloat(String(fastagBalanceAmount)) : null,
+        fastag_balance_proof: fastagBalanceProof,
+        old_vehicle_number: transactionType === "Swap" ? (String(oldVehicleNumber || "").trim().toUpperCase() || null) : null,
+        dropoff_odometer: transactionType === "Swap" && dropoffOdometer ? parseFloat(String(dropoffOdometer)) : null,
+        dropoff_remarks: transactionType === "Swap" ? (String(dropoffRemarks || "").trim() || null) : null,
+        dropoff_photo: transactionType === "Swap" ? dropoffPhoto : null,
         photo_lh_side: photoLhSide,
         photo_rh_side: photoRhSide,
         photo_front_side: photoFrontSide,
@@ -981,15 +985,51 @@ export default function AllocationForm({
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <button type="button" onClick={() => setActiveCameraTarget("olaProof")} className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-emerald-600 text-white text-[11px] font-medium py-1.5 hover:bg-emerald-700 cursor-pointer transition-colors shadow-2xs"><Camera className="h-3 w-3" /> Capture</button>
+                              <button type="button" onClick={() => { setActiveCameraTarget("olaProof"); setCameraActive(true); }} className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-emerald-600 text-white text-[11px] font-medium py-1.5 hover:bg-emerald-700 cursor-pointer transition-colors shadow-2xs"><Camera className="h-3 w-3" /> Capture</button>
                               <label className="flex-1 flex items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white text-slate-700 text-[11px] font-medium py-1.5 hover:bg-slate-50 cursor-pointer transition-colors shadow-2xs">
                                 <Upload className="h-3 w-3 text-emerald-600" /> Upload
                                 <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                                   const file = e.target.files?.[0];
                                   if (file) {
-                                    const r = new FileReader();
-                                    r.onloadend = () => { if (typeof r.result === "string") setOlaNegativeBalanceProof(r.result); };
-                                    r.readAsDataURL(file);
+                                    compressImage(file).then(setOlaNegativeBalanceProof);
+                                  }
+                                }} />
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Fastag Balance Input */}
+                      <div>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Fastag Balance (₹)</label>
+                        <input 
+                          type="number"
+                          placeholder="e.g. 500 (if any)..."
+                          value={fastagBalanceAmount}
+                          onChange={(e) => setFastagBalanceAmount(e.target.value)}
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
+                        />
+                      </div>
+
+                      {/* Fastag Balance Proof Photo Card */}
+                      <div>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Fastag Balance Proof Photo</label>
+                        <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-3 shadow-2xs">
+                          {fastagBalanceProof ? (
+                            <div className="relative flex items-center justify-center bg-white rounded-lg p-1 border border-slate-200">
+                              <img src={fastagBalanceProof} alt="Fastag Balance Proof" className="max-h-20 object-contain rounded" />
+                              <button type="button" onClick={() => setFastagBalanceProof(null)} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 cursor-pointer"><X className="h-3.5 w-3.5" /></button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <button type="button" onClick={() => { setActiveCameraTarget("fastagProof"); setCameraActive(true); }} className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-emerald-600 text-white text-[11px] font-medium py-1.5 hover:bg-emerald-700 cursor-pointer transition-colors shadow-2xs"><Camera className="h-3 w-3" /> Capture</button>
+                              <label className="flex-1 flex items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white text-slate-700 text-[11px] font-medium py-1.5 hover:bg-slate-50 cursor-pointer transition-colors shadow-2xs">
+                                <Upload className="h-3 w-3 text-emerald-600" /> Upload
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    compressImage(file).then(setFastagBalanceProof);
                                   }
                                 }} />
                               </label>
@@ -1090,15 +1130,13 @@ export default function AllocationForm({
                           </div>
                         ) : (
                           <div className="flex items-center gap-2">
-                            <button type="button" onClick={() => setActiveCameraTarget("odometer")} className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-emerald-600 text-white text-[11px] font-medium py-1.5 hover:bg-emerald-700 cursor-pointer transition-colors shadow-2xs"><Camera className="h-3.5 w-3.5" /> Capture</button>
+                            <button type="button" onClick={() => { setActiveCameraTarget("odometer"); setCameraActive(true); }} className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-emerald-600 text-white text-[11px] font-medium py-1.5 hover:bg-emerald-700 cursor-pointer transition-colors shadow-2xs"><Camera className="h-3.5 w-3.5" /> Capture</button>
                             <label className="flex-1 flex items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white text-slate-700 text-[11px] font-medium py-1.5 hover:bg-slate-50 cursor-pointer transition-colors shadow-2xs">
                               <Upload className="h-3.5 w-3.5 text-emerald-600" /> Upload
                               <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
-                                  const r = new FileReader();
-                                  r.onloadend = () => { if (typeof r.result === "string") setOdometerPhoto(r.result); };
-                                  r.readAsDataURL(file);
+                                  compressImage(file).then(setOdometerPhoto);
                                 }
                               }} />
                             </label>
@@ -1153,7 +1191,7 @@ export default function AllocationForm({
                               <div className="flex flex-col gap-1.5 justify-center items-center">
                                 <button
                                   type="button"
-                                  onClick={() => setActiveCameraTarget(ph.target as any)}
+                                  onClick={() => { setActiveCameraTarget(ph.target as any); setCameraActive(true); }}
                                   className="w-full flex items-center justify-center gap-1 rounded-lg bg-emerald-600 px-2 py-1 font-sans text-[11px] font-medium text-white hover:bg-emerald-700 shadow-2xs cursor-pointer"
                                 >
                                   <Camera className="h-3 w-3" />
@@ -1168,9 +1206,7 @@ export default function AllocationForm({
                                     onChange={(e) => {
                                       const file = e.target.files?.[0];
                                       if (file) {
-                                        const r = new FileReader();
-                                        r.onloadend = () => { if (typeof r.result === "string") ph.setState(r.result); };
-                                        r.readAsDataURL(file);
+                                        compressImage(file).then(ph.setState);
                                       }
                                     }} 
                                     className="hidden" 
@@ -1198,149 +1234,166 @@ export default function AllocationForm({
                     {/* First allocation after PDI / Showroom audit auto-bypass banner */}
                     <div className="flex items-center gap-2">
                       <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 cursor-pointer">
-                        <input 
+                        <input
                           type="checkbox"
                           checked={pdiCompleted}
                           onChange={(e) => setPdiCompleted(e.target.checked)}
-                          className="rounded text-emerald-600 focus:ring-emerald-500"
+                          className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4 cursor-pointer"
                         />
-                        First Allocation After PDI (Auto-Bypass Inspection)
+                        <span>PDI Audit Passed</span>
+                      </label>
+                      <label className="flex items-center gap-2 text-xs font-semibold text-slate-700 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={jamaFormFilled}
+                          onChange={(e) => setJamaFormFilled(e.target.checked)}
+                          className="rounded text-emerald-600 focus:ring-emerald-500 h-4 w-4 cursor-pointer"
+                        />
+                        <span>Jama Form Filled</span>
                       </label>
                     </div>
                   </div>
 
-                  {pdiCompleted ? (
-                    <div className="p-4 rounded-xl border border-emerald-200 bg-emerald-50/70 text-emerald-900 flex items-center gap-3">
-                      <CheckCircle className="h-5 w-5 text-emerald-600 shrink-0" />
-                      <div className="text-xs">
-                        <span className="font-bold block">Pre-Delivery Inspection (PDI) Completed at Showroom</span>
-                        <span>This vehicle is new and its audit form is already complete. Re-inspection before allocation is automatically bypassed.</span>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[
+                      { label: "Jack", val: jack, set: setJack },
+                      { label: "Jack Rod", val: jackRod, set: setJackRod },
+                      { label: "Spanner", val: spanner, set: setSpanner },
+                      { label: "Parking Triangle", val: parkingTriangle, set: setParkingTriangle },
+                      { label: "Fire Extinguisher", val: fireExtinguishers, set: setFireExtinguishers },
+                      { label: "Seat Covers", val: seatCover, set: setSeatCover },
+                      { label: "Floor Carpets", val: floorCarpet, set: setFloorCarpet },
+                      { label: "Music System", val: musicSystem, set: setMusicSystem },
+                    ].map((item) => (
+                      <div key={item.label} className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
+                        <span className="font-sans text-xs font-medium text-slate-800">{item.label}</span>
+                        <div className="flex gap-2">
+                          {["Available", "Not Available"].map((opt) => (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() => item.set(opt)}
+                              className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${
+                                item.val === opt 
+                                  ? "bg-emerald-50 border-emerald-300 text-emerald-800" 
+                                  : "bg-white border-slate-200 text-slate-600"
+                              }`}
+                            >
+                              {opt}
+                            </button>
+                          ))}
+                        </div>
                       </div>
+                    ))}
+
+                    {/* Stepney / Spare Tire Selection & Mandatory Photo */}
+                    <div className="flex flex-col gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50/50 md:col-span-2">
+                      <div className="flex items-center justify-between">
+                        <span className="font-sans text-xs font-medium text-slate-800">Stepney / Spare Tire</span>
+                        <div className="flex gap-2">
+                          {["Available", "Not Available"].map((opt) => (
+                            <button key={opt} type="button" onClick={() => setStepney(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${stepney === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {stepney === "Available" && (
+                        <div className="mt-1 pt-2 border-t border-slate-200 flex items-center justify-between">
+                          <span className="text-[11px] font-medium text-slate-700">Stepney Photo <span className="text-red-500">*</span></span>
+                          {stepneyPhoto ? (
+                            <div className="relative flex items-center gap-2 bg-white rounded-lg p-1 border border-slate-200">
+                              <img src={stepneyPhoto} alt="Stepney Photo" className="h-10 w-12 object-cover rounded" />
+                              <button type="button" onClick={() => setStepneyPhoto(null)} className="text-rose-500 hover:text-rose-700 cursor-pointer"><X className="h-3.5 w-3.5" /></button>
+                            </div>
+                          ) : (
+                            <div className="flex gap-2">
+                              <button type="button" onClick={() => { setActiveCameraTarget("stepney"); setCameraActive(true); }} className="flex items-center gap-1 rounded-lg bg-emerald-600 text-white text-[10px] font-medium px-2.5 py-1 hover:bg-emerald-700 cursor-pointer shadow-2xs transition-colors"><Camera className="h-3 w-3" /> Capture</button>
+                              <label className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white text-slate-700 text-[10px] font-medium px-2.5 py-1 hover:bg-slate-50 cursor-pointer transition-colors shadow-2xs">
+                                <Upload className="h-3 w-3 text-emerald-600" /> Upload
+                                <input type="file" accept="image/*" className="hidden" onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    compressImage(file).then(setStepneyPhoto);
+                                  }
+                                }} />
+                              </label>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
-                  ) : null}
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
-                        <span className="font-sans text-xs font-medium text-slate-800">Jack</span>
-                        <div className="flex gap-2">
-                          {["Available", "Not Available"].map((opt) => (
-                            <button key={opt} type="button" onClick={() => setJack(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${jack === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
-                        <span className="font-sans text-xs font-medium text-slate-800">Jack Rod</span>
-                        <div className="flex gap-2">
-                          {["Available", "Not Available"].map((opt) => (
-                            <button key={opt} type="button" onClick={() => setJackRod(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${jackRod === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
-                        <span className="font-sans text-xs font-medium text-slate-800">Spanner</span>
-                        <div className="flex gap-2">
-                          {["Available", "Not Available"].map((opt) => (
-                            <button key={opt} type="button" onClick={() => setSpanner(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${spanner === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
-                        <span className="font-sans text-xs font-medium text-slate-800">Parking Triangle</span>
-                        <div className="flex gap-2">
-                          {["Available", "Not Available"].map((opt) => (
-                            <button key={opt} type="button" onClick={() => setParkingTriangle(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${parkingTriangle === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
-                          ))}
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
-                        <span className="font-sans text-xs font-medium text-slate-800">Fire Extinguisher</span>
-                        <div className="flex gap-2">
-                          {["Available", "Not Available"].map((opt) => (
-                            <button key={opt} type="button" onClick={() => setFireExtinguishers(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${fireExtinguishers === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
-                        <span className="font-sans text-xs font-medium text-slate-800">Seat Covers</span>
-                        <div className="flex gap-2">
-                          {["Available", "Not Available"].map((opt) => (
-                            <button key={opt} type="button" onClick={() => setSeatCover(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${seatCover === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
-                        <span className="font-sans text-xs font-medium text-slate-800">Floor Carpets</span>
-                        <div className="flex gap-2">
-                          {["Available", "Not Available"].map((opt) => (
-                            <button key={opt} type="button" onClick={() => setFloorCarpet(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${floorCarpet === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
-                          ))}
-                        </div>
-                      </div>
-
-                      {/* Stepney / Spare Tire Selection & Mandatory Photo */}
-                      <div className="flex flex-col gap-2 p-3 rounded-xl border border-slate-200 bg-slate-50/50">
-                        <div className="flex items-center justify-between">
-                          <span className="font-sans text-xs font-medium text-slate-800">Stepney / Spare Tire</span>
-                          <div className="flex gap-2">
-                            {["Available", "Not Available"].map((opt) => (
-                              <button key={opt} type="button" onClick={() => setStepney(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${stepney === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {stepney === "Available" && (
-                          <div className="mt-1 pt-2 border-t border-slate-200 flex items-center justify-between">
-                            <span className="text-[11px] font-medium text-slate-700">Stepney Photo <span className="text-red-500">*</span></span>
-                            {stepneyPhoto ? (
-                              <div className="relative flex items-center gap-2 bg-white rounded-lg p-1 border border-slate-200">
-                                <img src={stepneyPhoto} alt="Stepney Photo" className="h-10 w-12 object-cover rounded" />
-                                <button type="button" onClick={() => setStepneyPhoto(null)} className="text-rose-500 hover:text-rose-700 cursor-pointer"><X className="h-3.5 w-3.5" /></button>
-                              </div>
-                            ) : (
-                              <div className="flex gap-2">
-                                <button type="button" onClick={() => setActiveCameraTarget("stepney")} className="flex items-center gap-1 rounded-lg bg-emerald-600 text-white text-[10px] font-medium px-2.5 py-1 hover:bg-emerald-700 cursor-pointer shadow-2xs transition-colors"><Camera className="h-3 w-3" /> Capture</button>
-                                <label className="flex items-center gap-1 rounded-lg border border-slate-300 bg-white text-slate-700 text-[10px] font-medium px-2.5 py-1 hover:bg-slate-50 cursor-pointer transition-colors shadow-2xs">
-                                  <Upload className="h-3 w-3 text-emerald-600" /> Upload
-                                  <input type="file" accept="image/*" className="hidden" onChange={(e) => {
-                                    const file = e.target.files?.[0];
-                                    if (file) {
-                                      const r = new FileReader();
-                                      r.onloadend = () => { if (typeof r.result === "string") setStepneyPhoto(r.result); };
-                                      r.readAsDataURL(file);
-                                    }
-                                  }} />
-                                </label>
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex items-center justify-between p-3 rounded-xl border border-slate-200 bg-slate-50/50">
-                        <span className="font-sans text-xs font-medium text-slate-800">Music System</span>
-                        <div className="flex gap-2">
-                          {["Available", "Not Available"].map((opt) => (
-                            <button key={opt} type="button" onClick={() => setMusicSystem(opt)} className={`px-3 py-1 rounded-lg text-xs font-medium border transition-all cursor-pointer ${musicSystem === opt ? "bg-emerald-50 border-emerald-300 text-emerald-800" : "bg-white border-slate-200 text-slate-600"}`}>{opt}</button>
-                          ))}
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Inspection Remarks (Allocated Car)</label>
-                        <input type="text" value={inspectionRemarks} onChange={(e) => setInspectionRemarks(e.target.value)} placeholder="Condition details..." className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20" />
-                      </div>
+                    <div className="md:col-span-2">
+                      <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Inspection Remarks (Allocated Car)</label>
+                      <input type="text" value={inspectionRemarks} onChange={(e) => setInspectionRemarks(e.target.value)} placeholder="Condition details..." className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium text-slate-900 focus:outline-none focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20" />
                     </div>
                   </div>
                 </div>
+
+                {/* 6. SWAP / RETURNED VEHICLE DETAILS & CHECKLIST (CONDITIONAL FOR SWAP) */}
+                {transactionType === "Swap" && (
+                  <div className="border-t border-slate-200 pt-8 space-y-5">
+                    <div className="border-b border-slate-200 pb-2.5">
+                      <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-amber-100 text-amber-800 text-[11px] font-bold">6</span>
+                        Swap: Returned Old Vehicle Details &amp; Handover
+                      </h3>
+                      <p className="font-sans text-xs text-slate-500 mt-1">Capture returned vehicle inspection and handover details for this car swap.</p>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                      <div>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Old / Returned Vehicle Number</label>
+                        <input
+                          type="text"
+                          placeholder="e.g. TS09UB1234..."
+                          value={oldVehicleNumber}
+                          onChange={(e) => setOldVehicleNumber(e.target.value.toUpperCase())}
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium uppercase text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Returned Odometer Reading (KM)</label>
+                        <input
+                          type="number"
+                          placeholder="e.g. 45200..."
+                          value={dropoffOdometer}
+                          onChange={(e) => setDropoffOdometer(e.target.value)}
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Returned Vehicle Remarks</label>
+                        <input
+                          type="text"
+                          placeholder="Condition of returned car..."
+                          value={dropoffRemarks}
+                          onChange={(e) => setDropoffRemarks(e.target.value)}
+                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Returned Vehicle Handover Photo Card */}
+                    <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-3.5 space-y-2">
+                      <span className="block font-sans text-xs font-bold text-slate-800">Returned Vehicle Drop-Off / Handover Photo</span>
+                      {dropoffPhoto ? (
+                        <div className="relative inline-block bg-white rounded-lg p-1.5 border border-slate-200">
+                          <img src={dropoffPhoto} alt="Returned Vehicle Handover" className="h-28 w-auto object-cover rounded-lg" />
+                          <button type="button" onClick={() => setDropoffPhoto(null)} className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-white cursor-pointer hover:bg-rose-700 transition-colors"><X className="h-3 w-3" /></button>
+                        </div>
+                      ) : (
+                        <div className="flex gap-2 max-w-sm">
+                          <button type="button" onClick={() => { setActiveCameraTarget("dropoffPhoto"); setCameraActive(true); }} className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold py-2 hover:bg-emerald-700 cursor-pointer shadow-2xs transition-colors"><Camera className="h-3.5 w-3.5" /> Capture</button>
+                          <label className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white text-slate-800 text-xs font-bold py-2 hover:bg-slate-50 cursor-pointer transition-colors">
+                            <Upload className="h-3.5 w-3.5 text-primary" /> Upload
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { compressImage(f).then(setDropoffPhoto); } }} />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 {/* FORM ACTIONS */}
                 <div className="flex items-center justify-between border-t border-border pt-6 mt-8">
@@ -1799,6 +1852,8 @@ export default function AllocationForm({
             else if (activeCameraTarget === "frontSide") setPhotoFrontSide(base64);
             else if (activeCameraTarget === "backSide") setPhotoBackSide(base64);
             else if (activeCameraTarget === "stepney") setStepneyPhoto(base64);
+            else if (activeCameraTarget === "dropoffPhoto") setDropoffPhoto(base64);
+            else if (activeCameraTarget === "fastagProof") setFastagBalanceProof(base64);
             
             setCameraActive(false);
             setActiveCameraTarget(null);

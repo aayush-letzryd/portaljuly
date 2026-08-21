@@ -228,6 +228,7 @@ export default function WalkInForm({
   const [fetchBannerMsg, setFetchBannerMsg] = useState<string>("");
   const [showHistoryModal, setShowHistoryModal] = useState<boolean>(false);
   const [isFormReadOnly, setIsFormReadOnly] = useState<boolean>(false);
+  const getTodayIST = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
   const applyRecordAutoFill = (match: any) => {
     setFirstName(match.first_name || match.person_name?.split(" ")[0] || "");
@@ -235,8 +236,8 @@ export default function WalkInForm({
     if (match.dl_number) setDlNumber(match.dl_number);
     if (match.aadhaar_number) setAadhaarNumber(match.aadhaar_number);
     if (match.city) setCity(normalizeCity(match.city));
-    if (match.aadhaar_image) setAadhaarImage(match.aadhaar_image);
-    if (match.dl_image) setDlImage(match.dl_image);
+    if (match.aadhaar_image !== undefined) setAadhaarImage(match.aadhaar_image || null);
+    if (match.dl_image !== undefined) setDlImage(match.dl_image || null);
     if (match.visitor_type) setInterestedPosition(match.visitor_type);
     
     const isOnboardedOrExisting = Boolean(
@@ -344,8 +345,8 @@ export default function WalkInForm({
   useEffect(() => {
     if (!editingId && !enquiryDate) {
       const now = new Date();
-      setEnquiryDate(now.toISOString().split("T")[0]);
-      setEnquiryTime(now.toTimeString().slice(0, 5));
+      setEnquiryDate(getTodayIST());
+      setEnquiryTime(now.toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" }));
     }
   }, [editingId, enquiryDate]);
 
@@ -547,8 +548,8 @@ export default function WalkInForm({
       person_number: cleanPhone || undefined,
       dl_number: dlNumber ? dlNumber.trim().toUpperCase() : undefined,
       aadhaar_number: cleanAadhaar ? cleanAadhaar.replace(/(\d{4})(\d{4})(\d{4})/, "$1 $2 $3") : undefined,
-      aadhaar_image: aadhaarImage || undefined,
-      dl_image: dlImage || undefined,
+      aadhaar_image: aadhaarImage || null,
+      dl_image: dlImage || null,
       visiting_reason: visitingReason,
       operating_place: operatingPlace.trim() || undefined,
       mode_of_enquiry: leadChannel || 'Direct Walk-in',
@@ -601,8 +602,8 @@ export default function WalkInForm({
   const resetForm = () => {
     setEditingId(null);
     const now = new Date();
-    setEnquiryDate(now.toISOString().split("T")[0]);
-    setEnquiryTime(now.toTimeString().slice(0, 5));
+    setEnquiryDate(getTodayIST());
+    setEnquiryTime(now.toLocaleTimeString("en-GB", { timeZone: "Asia/Kolkata", hour: "2-digit", minute: "2-digit" }));
     setVisitingReason("Onboarding");
     setCity("Hyderabad");
     setOperatingPlace("");

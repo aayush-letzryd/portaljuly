@@ -263,6 +263,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
       setStepney(r.insp_stepney || "Available");
       setStepneyPhoto(r.insp_stepney_photo || null);
       setActiveTab("form");
+      window.scrollTo({ top: 0, behavior: "smooth" });
     } catch (err) {
       alert("Failed to load record for editing.");
     }
@@ -306,6 +307,8 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
         pending_dues: pendingDues ? parseFloat(pendingDues) : null,
         damage_penalty: damagePenalty ? parseFloat(damagePenalty) : null,
         deposit_refund_status: depositRefundStatus,
+        fastag_balance_amount: fastagBalanceAmount ? parseFloat(fastagBalanceAmount) : (pendingDues ? parseFloat(pendingDues) : null),
+        fastag_balance_proof: fastagBalanceProof,
         insp_jack: jack,
         insp_jack_rod: jackRod,
         insp_spanner: spanner,
@@ -901,10 +904,15 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                     Dues, Penalties &amp; Refund Settlement
                   </h3>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-5">
                   <div>
                     <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Pending Dues (₹)</label>
                     <input type="number" placeholder="e.g. 1200..." value={pendingDues} onChange={(e) => setPendingDues(e.target.value)}
+                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs" />
+                  </div>
+                  <div>
+                    <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Fastag Balance (₹)</label>
+                    <input type="number" placeholder="e.g. 350..." value={fastagBalanceAmount} onChange={(e) => setFastagBalanceAmount(e.target.value)}
                       className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs" />
                   </div>
                   <div>
@@ -923,6 +931,31 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                     </select>
                   </div>
                 </div>
+
+                {/* Fastag / Settlement Proof Photo */}
+                <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="block font-sans text-xs font-bold text-slate-800">Fastag / Settlement Balance Proof Photo</span>
+                    {fastagBalanceProof && (
+                      <span className="text-[10px] text-emerald-600 font-bold bg-emerald-50 px-2 py-0.5 rounded">Proof Attached</span>
+                    )}
+                  </div>
+                  {fastagBalanceProof ? (
+                    <div className="relative inline-block bg-white rounded-lg p-1.5 border border-slate-200">
+                      <img src={fastagBalanceProof} alt="Fastag Proof" className="h-28 w-auto object-cover rounded-lg" />
+                      <button type="button" onClick={() => setFastagBalanceProof(null)} className="absolute -top-1.5 -right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-white cursor-pointer hover:bg-rose-700 transition-colors"><X className="h-3 w-3" /></button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2 max-w-sm">
+                      <button type="button" onClick={() => { setActiveCameraTarget("fastag"); setCameraActive(true); }} className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-bold py-2 cursor-pointer transition-colors"><Camera className="h-3.5 w-3.5" /> Capture</button>
+                      <label className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white text-slate-800 text-xs font-bold py-2 hover:bg-slate-50 cursor-pointer transition-colors">
+                        <Upload className="h-3.5 w-3.5 text-primary" /> Upload
+                        <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { compressImage(f).then(setFastagBalanceProof); } }} />
+                      </label>
+                    </div>
+                  )}
+                </div>
+
                 <div>
                   <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Hub Handover Notes / Vehicle Inspection Summary</label>
                   <textarea placeholder="Remarks about damages, battery, driver reason..." value={dropoffNotes} onChange={(e) => setDropoffNotes(e.target.value)} rows={3}

@@ -17,6 +17,55 @@ interface VehicleOnboardingFormProps {
   isReviewMode?: boolean;
 }
 
+const ensureISOIST = (dateStr?: string): string | undefined => {
+  if (!dateStr) return undefined;
+  let str = dateStr.trim();
+  if (str.includes(" ") && !str.includes("T")) {
+    str = str.replace(" ", "T");
+  }
+  if (!str.endsWith("Z") && !/[+-]\d{2}:?\d{2}$/.test(str)) {
+    str = str + "Z";
+  }
+  return str;
+};
+
+const formatDisplayDate = (createdAt?: string, fallbackDate?: string): string => {
+  const isoStr = ensureISOIST(createdAt);
+  if (isoStr) {
+    try {
+      const d = new Date(isoStr);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+      }
+    } catch (e) {}
+  }
+  if (fallbackDate && fallbackDate !== "1970-01-01") {
+    try {
+      const cleanDate = fallbackDate.trim();
+      const parts = cleanDate.split("-");
+      if (parts.length === 3) {
+        const d = new Date(parseInt(parts[0], 10), parseInt(parts[1], 10) - 1, parseInt(parts[2], 10));
+        return d.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" });
+      }
+    } catch (e) {}
+    return fallbackDate;
+  }
+  return "—";
+};
+
+const formatDisplayTime = (createdAt?: string, fallbackTime?: string): string => {
+  const isoStr = ensureISOIST(createdAt);
+  if (isoStr) {
+    try {
+      const d = new Date(isoStr);
+      if (!isNaN(d.getTime())) {
+        return d.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }).toLowerCase();
+      }
+    } catch (e) {}
+  }
+  return fallbackTime || "—";
+};
+
 function SearchableApproverSelect({ 
   approvers, 
   selectedId, 
@@ -519,22 +568,22 @@ export default function VehicleOnboardingForm({
       setInsuranceType(data.insurance_mapping || "Comprehensive / First Party");
       setManufacturerMonth(data.delivery_month || "");
       
-      setRegistrationDate(data.registration_date || "");
-      setRtoTaxValidity(data.rto_tax_validity || "");
-      setPermitValidity(data.permit_validity || "");
-      setFitnessValidity(data.fitness_validity || "");
-      setPollutionValidity(data.pollution_validity || "");
+      setRegistrationDate(data.registration_date && data.registration_date !== "1970-01-01" ? data.registration_date : "");
+      setRtoTaxValidity(data.rto_tax_validity && data.rto_tax_validity !== "1970-01-01" ? data.rto_tax_validity : "");
+      setPermitValidity(data.permit_validity && data.permit_validity !== "1970-01-01" ? data.permit_validity : "");
+      setFitnessValidity(data.fitness_validity && data.fitness_validity !== "1970-01-01" ? data.fitness_validity : "");
+      setPollutionValidity(data.pollution_validity && data.pollution_validity !== "1970-01-01" ? data.pollution_validity : "");
       setAuthorizationCertificate(data.authorization_certificate || "");
       
-      setInsuranceEndDate(data.insurance_validity || "");
+      setInsuranceEndDate(data.insurance_validity && data.insurance_validity !== "1970-01-01" ? data.insurance_validity : "");
       setInsuranceBroker(data.insurance_broker || "");
       setInsuranceUnderwriter(data.insurance_underwriter || "");
-      setInsuranceStartDate(data.insurance_start_date || "");
+      setInsuranceStartDate(data.insurance_start_date && data.insurance_start_date !== "1970-01-01" ? data.insurance_start_date : "");
       setInsuranceIdv(data.insurance_idv || "");
-      setCoverEngineProtect(data.cover_engine_protect || false);
-      setCoverConsumables(data.cover_consumables || false);
-      setCoverZeroDep(data.cover_zero_dep || false);
-      setCoverRsa(data.cover_rsa || false);
+      setCoverEngineProtect(data.cover_engine_protect === true || data.cover_engine_protect === "true" || data.cover_engine_protect === "True");
+      setCoverConsumables(data.cover_consumables === true || data.cover_consumables === "true" || data.cover_consumables === "True");
+      setCoverZeroDep(data.cover_zero_dep === true || data.cover_zero_dep === "true" || data.cover_zero_dep === "True");
+      setCoverRsa(data.cover_rsa === true || data.cover_rsa === "true" || data.cover_rsa === "True");
       
       setChassisNumber(data.chassis_number || "");
       setEngineNumber(data.engine_number || "");
@@ -547,7 +596,7 @@ export default function VehicleOnboardingForm({
       setGpsId(data.tracking_device_type || "");
       setCngInstalled(data.cng_installed || "No");
       setCngPlate(data.cng_plate || "");
-      setCngInstallationDate(data.cng_installation_date || "");
+      setCngInstallationDate(data.cng_installation_date && data.cng_installation_date !== "1970-01-01" ? data.cng_installation_date : "");
       
       setJack(data.jack || "Available");
       setJackRod(data.jack_rod || "Available");
@@ -581,6 +630,8 @@ export default function VehicleOnboardingForm({
       setRtoTaxReceipt(data.rto_tax_receipt || null);
       setApprovalStatus(data.approval_status || null);
       setApprovalRemarks(data.approval_remarks || null);
+      setApprovalRequestedTo(data.current_approver_id || null);
+      setApprovalSubmissionNote(data.approval_remarks || "");
 
       setActiveTab("form");
       setCurrentStep(1);
@@ -666,6 +717,9 @@ export default function VehicleOnboardingForm({
     setInsuranceDocument(null);
     setAuthorizationCertificateDoc(null);
     setRtoTaxReceipt(null);
+    setApprovalStatus(null);
+    setApprovalRemarks(null);
+    setApprovalSubmissionNote("");
     setOcrData({});
   };
 
@@ -694,16 +748,16 @@ export default function VehicleOnboardingForm({
       received_allocated: receivedAllocated,
       fuel_type: fuelType,
       delivery_month: manufacturerMonth || undefined,
-      registration_date: registrationDate || "1970-01-01",
-      rto_tax_validity: rtoTaxValidity || undefined,
-      permit_validity: permitValidity || undefined,
-      fitness_validity: fitnessValidity || "1970-01-01",
-      pollution_validity: pollutionValidity || undefined,
+      registration_date: registrationDate.trim() || undefined,
+      rto_tax_validity: rtoTaxValidity.trim() || undefined,
+      permit_validity: permitValidity.trim() || undefined,
+      fitness_validity: fitnessValidity.trim() || undefined,
+      pollution_validity: pollutionValidity.trim() || undefined,
       
-      insurance_validity: insuranceEndDate || "1970-01-01", 
+      insurance_validity: insuranceEndDate.trim() || undefined, 
       insurance_broker: insuranceBroker.trim() || undefined,
       insurance_underwriter: insuranceUnderwriter.trim() || undefined,
-      insurance_start_date: insuranceStartDate || undefined,
+      insurance_start_date: insuranceStartDate.trim() || undefined,
       insurance_mapping: insuranceType,
       insurance_idv: insuranceIdv.trim() || undefined,
       cover_engine_protect: coverEngineProtect,
@@ -732,28 +786,28 @@ export default function VehicleOnboardingForm({
       floor_carpet: floorCarpet,
       fast_tag: fastTag,
       music_system: musicSystem,
-      image_front: imageFront || undefined,
-      image_lh: imageLh || undefined,
-      image_back: imageBack || undefined,
-      image_rh: imageRh || undefined,
-      engine_chasis_no_img: engineChasisNoImg || undefined,
-      battery_sl_no_img: batterySlNoImg || undefined,
-      engine_compartment_img: engineCompartmentImg || undefined,
-      fast_tag_img: fastTagImg || undefined,
-      music_system_img: musicSystemImg || undefined,
-      key_quantity: typeof keyQuantity === "number" ? keyQuantity : undefined,
-      rh_fr_tyre_img: rhFrTyreImg || undefined,
-      lh_fr_tyre_img: lhFrTyreImg || undefined,
-      rh_rear_tyre_img: rhRearTyreImg || undefined,
-      lh_rear_tyre_img: lhRearTyreImg || undefined,
-      spare_wheel_img: spareWheelImg || undefined,
-      rc_document: rcDocument || undefined,
-      insurance_document: insuranceDocument || undefined,
-      authorization_certificate_doc: authorizationCertificateDoc || undefined,
-      rto_tax_receipt: rtoTaxReceipt || undefined,
-      approval_status: isDraft ? "Draft" : "Pending Approval",
+      image_front: imageFront || null,
+      image_lh: imageLh || null,
+      image_back: imageBack || null,
+      image_rh: imageRh || null,
+      engine_chasis_no_img: engineChasisNoImg || null,
+      battery_sl_no_img: batterySlNoImg || null,
+      engine_compartment_img: engineCompartmentImg || null,
+      fast_tag_img: fastTagImg || null,
+      music_system_img: musicSystemImg || null,
+      key_quantity: typeof keyQuantity === "number" ? keyQuantity : null,
+      rh_fr_tyre_img: rhFrTyreImg || null,
+      lh_fr_tyre_img: lhFrTyreImg || null,
+      rh_rear_tyre_img: rhRearTyreImg || null,
+      lh_rear_tyre_img: lhRearTyreImg || null,
+      spare_wheel_img: spareWheelImg || null,
+      rc_document: rcDocument || null,
+      insurance_document: insuranceDocument || null,
+      authorization_certificate_doc: authorizationCertificateDoc || null,
+      rto_tax_receipt: rtoTaxReceipt || null,
+      approval_status: isDraft ? "Draft" : (approvalStatus === "Changes Requested" ? "Pending Approval" : "Pending Approval"),
       current_approver_id: isDraft ? undefined : (approvalRequestedTo || undefined),
-      approval_remarks: undefined,
+      approval_remarks: approvalSubmissionNote.trim() || undefined,
       created_by: user.portal_user_id || undefined
     };
 
@@ -2015,10 +2069,12 @@ export default function VehicleOnboardingForm({
                         if (record.received_allocated === "Ready for Delivery") statusColor = "bg-emerald-100 text-emerald-900";
                         if (record.received_allocated === "In Process") statusColor = "bg-amber-50 text-amber-700";
 
-                        const isoStr = (record.created_at && typeof record.created_at === 'string' && (record.created_at.includes("T") || record.created_at.includes(" ")) && !record.created_at.endsWith("Z") && !/[+-]\d{2}:?\d{2}$/.test(record.created_at)) ? record.created_at.replace(" ", "T") + "Z" : record.created_at;
-                        const createdDate = isoStr ? new Date(isoStr).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric", timeZone: "Asia/Kolkata" }) : "—";
-                        const createdTime = isoStr ? new Date(isoStr).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true, timeZone: "Asia/Kolkata" }).toLowerCase() : "—";
+                        const createdDate = formatDisplayDate(record.created_at);
+                        const createdTime = formatDisplayTime(record.created_at);
                         
+                        const fitnessDisplay = record.fitness_validity && record.fitness_validity !== "1970-01-01" ? record.fitness_validity : "—";
+                        const insuranceDisplay = record.insurance_validity && record.insurance_validity !== "1970-01-01" ? record.insurance_validity : "—";
+
                         return (
                           <tr key={record.id} className="hover:bg-slate-50/50 transition-colors">
                             <td className="py-4 px-4 font-mono font-bold text-text-muted">#{record.id}</td>
@@ -2029,10 +2085,10 @@ export default function VehicleOnboardingForm({
                                 <div className="text-[9px] text-text-muted font-mono mt-0.5">{record.letzryd_unique_no}</div>
                               )}
                             </td>
-                            <td className="py-4 px-4 font-semibold text-text-muted">{record.city_name}</td>
+                            <td className="py-4 px-4 font-semibold text-text-muted">{record.city_name || record.city}</td>
                             <td className="py-4 px-4 font-mono text-[10px]">
-                              <div>Fitness: <span className="font-bold text-text">{record.fitness_validity}</span></div>
-                              <div className="mt-0.5">Insurance: <span className="font-bold text-text">{record.insurance_validity}</span></div>
+                              <div>Fitness: <span className="font-bold text-text">{fitnessDisplay}</span></div>
+                              <div className="mt-0.5">Insurance: <span className="font-bold text-text">{insuranceDisplay}</span></div>
                             </td>
                             <td className="py-4 px-4 font-mono font-bold text-text-muted">{record.kms_reading} KMs</td>
                             <td className="py-4 px-4">

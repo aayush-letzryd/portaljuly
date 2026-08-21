@@ -40,12 +40,14 @@ export default function AccidentsForm({
   // Form Fields State
   const [editingId, setEditingId] = useState<number | null>(null);
 
+  const getTodayIST = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+
   // Panel 1: Incident & Vehicle
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [vendorId, setVendorId] = useState("");
   const [vendorName, setVendorName] = useState("");
   const [cityName, setCityName] = useState("Hyderabad");
-  const [dateOfAccident, setDateOfAccident] = useState(new Date().toISOString().split("T")[0]);
+  const [dateOfAccident, setDateOfAccident] = useState(getTodayIST());
   const [timeOfAccident, setTimeOfAccident] = useState("");
   const [placeOfAccident, setPlaceOfAccident] = useState("");
   const [vehicleStatus, setVehicleStatus] = useState<"Drivable" | "Needs Towing" | "Impounded by Police">("Drivable");
@@ -202,7 +204,7 @@ export default function AccidentsForm({
     setVendorId("");
     setVendorName("");
     setCityName("Hyderabad");
-    setDateOfAccident(new Date().toISOString().split("T")[0]);
+    setDateOfAccident(getTodayIST());
     setTimeOfAccident("");
     setPlaceOfAccident("");
     setVehicleStatus("Drivable");
@@ -267,11 +269,11 @@ export default function AccidentsForm({
       challan_amount: challanAmount || null,
       fine_amount: fineAmount || null,
       comments: comments.trim() || null,
-      front_vehicle_photo: frontPhoto,
-      back_vehicle_photo: backPhoto,
-      right_vehicle_photo: rightPhoto,
-      left_vehicle_photo: leftPhoto,
-      fir_document_copy: firFiled === "Yes" ? firDoc : null
+      front_vehicle_photo: frontPhoto || null,
+      back_vehicle_photo: backPhoto || null,
+      right_vehicle_photo: rightPhoto || null,
+      left_vehicle_photo: leftPhoto || null,
+      fir_document_copy: firFiled === "Yes" ? (firDoc || null) : null
     };
 
     try {

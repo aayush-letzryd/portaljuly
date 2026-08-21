@@ -46,11 +46,13 @@ export default function AdjustmentForm({
   const [partnerCode, setPartnerCode] = useState("");
   const [driverId, setDriverId] = useState("");
   
+  const getTodayIST = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
+
   // New Fields
   const [hisaabNumber, setHisaabNumber] = useState("");
   const [adjustmentLevel, setAdjustmentLevel] = useState<"Operator" | "Driver">("Operator");
   const [adjustmentType, setAdjustmentType] = useState<"Credit" | "Debit" | "Waiver">("Credit");
-  const [adjustmentDate, setAdjustmentDate] = useState(new Date().toISOString().split("T")[0]); // Hardcoded today
+  const [adjustmentDate, setAdjustmentDate] = useState(getTodayIST()); // Hardcoded today in IST
   const [enterAmount, setEnterAmount] = useState("");
   const [contestedLineItems, setContestedLineItems] = useState<string[]>([]);
   
@@ -193,7 +195,7 @@ export default function AdjustmentForm({
       setHisaabNumber(data.hisaab_number || "");
       setAdjustmentLevel((data.adjustment_level === "Driver" || data.adjustment_level === "Operator") ? data.adjustment_level : "Operator");
       setAdjustmentType(data.adjustment_type || "Credit");
-      setAdjustmentDate(data.adjustment_date || new Date().toISOString().split("T")[0]);
+      setAdjustmentDate(data.adjustment_date || getTodayIST());
       setEnterAmount(data.enter_amount || "");
       
       if (data.contested_line_items) {
@@ -235,7 +237,7 @@ export default function AdjustmentForm({
     setHisaabNumber("");
     setAdjustmentLevel("Operator");
     setAdjustmentType("Credit");
-    setAdjustmentDate(new Date().toISOString().split("T")[0]);
+    setAdjustmentDate(getTodayIST());
     setEnterAmount("");
     setContestedLineItems([]);
     
@@ -294,7 +296,7 @@ export default function AdjustmentForm({
 
       finance_team_status: financeTeamStatus,
       status: status,
-      photo: photo
+      photo: photo || null
     };
 
     try {

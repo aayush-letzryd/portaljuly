@@ -475,12 +475,20 @@ def startup_event():
         for col in [
             "created_by          INTEGER",
             "updated_by          INTEGER",
-            "updated_at          TIMESTAMP",
+            "created_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
+            "updated_at          TIMESTAMP DEFAULT CURRENT_TIMESTAMP",
             "approval_status     VARCHAR(50) DEFAULT 'Draft'",
             "current_approver_id INTEGER",
             "approved_by         INTEGER",
+            "gst_number          VARCHAR(100)",
+            "gst_certificate     TEXT",
+            "incorporation_doc   TEXT",
         ]:
             cur.execute(f"ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS {col};")
+
+        cur.execute("ALTER TABLE july_form_onboarding ALTER COLUMN created_at SET DEFAULT CURRENT_TIMESTAMP;")
+        cur.execute("UPDATE july_form_onboarding SET created_at = updated_at WHERE created_at IS NULL;")
+        cur.execute("UPDATE july_form_onboarding SET created_at = NOW() WHERE created_at IS NULL;")
 
         # ── Audit columns: july_vehicle_onboarding ───────────────────────────
         for col in [
@@ -811,7 +819,11 @@ def startup_event():
                 "jama_form_filled BOOLEAN DEFAULT FALSE",
                 "pdi_completed BOOLEAN DEFAULT FALSE",
                 "insp_stepney VARCHAR(30) DEFAULT 'Available'",
-                "insp_stepney_photo TEXT"
+                "insp_stepney_photo TEXT",
+                "damage_penalty NUMERIC(12, 2) DEFAULT 0",
+                "deposit_refund_status VARCHAR(50) DEFAULT 'Pending Assessment'",
+                "pending_dues NUMERIC(12, 2) DEFAULT 0",
+                "fastag_balance_proof TEXT"
             ]:
                 cur.execute(f"ALTER TABLE july_allocation_form ADD COLUMN IF NOT EXISTS {col};")
 
@@ -1208,6 +1220,13 @@ def startup_event():
             );
         """)
 
+        for col in [
+            "created_by INTEGER",
+            "updated_at TIMESTAMP",
+            "updated_by INTEGER"
+        ]:
+            cur.execute(f"ALTER TABLE july_accidents_registry ADD COLUMN IF NOT EXISTS {col};")
+
         # ── july_inspections ───────────────────────────
         cur.execute("""
             CREATE TABLE IF NOT EXISTS july_inspections (
@@ -1535,22 +1554,22 @@ class WalkinData(BaseModel):
     remarks:         Optional[str] = None
 
 class OnboardingData(BaseModel):
-    driver_name: str
-    phone_number: str
+    driver_name: Optional[str] = ""
+    phone_number: Optional[str] = ""
     whatsapp_number: Optional[str] = None
-    dob: str
-    city: str
+    dob: Optional[str] = None
+    city: Optional[str] = "Hyderabad"
     operating_place: Optional[str] = None
-    present_address: str
-    permanent_address: str
-    emergency_name: str
-    emergency_phone: str
+    present_address: Optional[str] = None
+    permanent_address: Optional[str] = None
+    emergency_name: Optional[str] = None
+    emergency_phone: Optional[str] = None
     emergency_relationship: Optional[str] = None
     dl_number: Optional[str] = None
     dl_expiry_date: Optional[str] = None
     lead_source: Optional[str] = None
-    pan_number: str
-    aadhaar_number: str
+    pan_number: Optional[str] = None
+    aadhaar_number: Optional[str] = None
     pan_aadhaar_linked: Optional[str] = None
     selfie_photo: Optional[Any] = None
     dl_front: Optional[Any] = None
@@ -1573,7 +1592,7 @@ class OnboardingData(BaseModel):
     vendor_name: Optional[str] = None
     vendor_id: Optional[str] = None
     aadhaar_card_photo: Optional[Any] = None
-    father_name: str
+    father_name: Optional[str] = None
     bank_name: Optional[str] = None
     other_bank_name: Optional[str] = None
     account_number: Optional[str] = None
@@ -1604,6 +1623,12 @@ class OnboardingData(BaseModel):
     security_deposit: Optional[str] = None
     letzown_cheques: Optional[str] = None
     is_spring_verified: Optional[bool] = False
+    gst_number: Optional[str] = None
+    gst_certificate: Optional[Any] = None
+    incorporation_doc: Optional[Any] = None
+    approval_status: Optional[str] = None
+    approval_requested_to: Optional[int] = None
+    approval_note: Optional[str] = None
 
 class AdjustmentData(BaseModel):
     partner_name: Optional[str] = None
@@ -1652,11 +1677,11 @@ class AllocationData(BaseModel):
     car_model: Optional[str] = None
     vehicle_number: str
     old_vehicle_number: Optional[str] = None
-    dropoff_odometer: Optional[str] = None
+    dropoff_odometer: Optional[Union[float, str]] = None
     dropoff_remarks: Optional[str] = None
     dropoff_photo: Optional[Any] = None
     sub_type: Optional[str] = None
-    ola_negative_balance: Optional[str] = None
+    ola_negative_balance: Optional[Union[float, str]] = None
     ola_negative_balance_proof: Optional[Any] = None
     photo_lh_side: Optional[Any] = None
     photo_rh_side: Optional[Any] = None
@@ -1664,9 +1689,10 @@ class AllocationData(BaseModel):
     photo_back_side: Optional[Any] = None
     gps_active: Optional[str] = None
     duplicate_key_status: Optional[str] = None
-    fastag_balance_amount: Optional[str] = None
+    fastag_balance_amount: Optional[Union[float, str]] = None
     fastag_balance_proof: Optional[Any] = None
     dropoff_location: Optional[str] = None
+    manual_dropoff_location: Optional[str] = None
     status: Optional[str] = None
     created_by: Optional[int] = None
     odometer_reading: Optional[Union[float, str]] = None
@@ -1687,11 +1713,17 @@ class AllocationData(BaseModel):
     customer_address: Optional[str] = None
     jama_form_filled: Optional[bool] = False
     pdi_completed: Optional[bool] = False
+    damage_penalty: Optional[Union[float, str]] = None
+    deposit_refund_status: Optional[str] = None
+    pending_dues: Optional[Union[float, str]] = None
 
 class DropOffData(BaseModel):
     dropoff_date: Optional[str] = None
     dropoff_reason: Optional[str] = None
     city_name: Optional[str] = "Hyderabad"
+    dropoff_location: Optional[str] = "Hub"
+    manual_dropoff_location: Optional[str] = None
+    customer_address: Optional[str] = None
     driver_id: Optional[str] = None
     driver_name: Optional[str] = None
     driver_phone: Optional[str] = None
@@ -1703,12 +1735,21 @@ class DropOffData(BaseModel):
     photo_rh_side: Optional[Any] = None
     photo_front_side: Optional[Any] = None
     photo_back_side: Optional[Any] = None
+    ola_negative_balance: Optional[Union[float, str]] = None
+    ola_negative_balance_proof: Optional[Any] = None
     pending_dues: Optional[Union[float, str]] = 0
     damage_penalty: Optional[Union[float, str]] = 0
-    deposit_refund_status: Optional[str] = "Pending"
-    dropoff_location: Optional[str] = "Hub"
-    manual_dropoff_location: Optional[str] = None
-    customer_address: Optional[str] = None
+    deposit_refund_status: Optional[str] = "Pending Assessment"
+    fastag_balance_amount: Optional[Union[float, str]] = None
+    fastag_balance_proof: Optional[Any] = None
+    insp_jack: Optional[str] = "Available"
+    insp_jack_rod: Optional[str] = "Available"
+    insp_spanner: Optional[str] = "Available"
+    insp_parking_triangle: Optional[str] = "Available"
+    insp_fire_extinguishers: Optional[str] = "Available"
+    insp_seat_cover: Optional[str] = "Available"
+    insp_floor_carpet: Optional[str] = "Available"
+    insp_music_system: Optional[str] = "Available"
     insp_stepney: Optional[str] = "Available"
     insp_stepney_photo: Optional[Any] = None
     dropoff_notes: Optional[str] = None
@@ -1942,7 +1983,7 @@ def extract_image(val: Any, folder: str = "uploads") -> Optional[str]:
     elif isinstance(val, str):
         raw_str = val
 
-    if not raw_str:
+    if not raw_str or str(raw_str).strip().lower() in ("", "null", "undefined", "none"):
         return None
 
     if raw_str.startswith("http://") or raw_str.startswith("https://"):
@@ -3256,15 +3297,18 @@ def search_walkins(q: str):
         cur = conn.cursor()
         sp = f"%{q}%"
         cur.execute("""
-            SELECT 'N' || id::text AS id, 'new' AS record_type, first_name, last_name, person_name, person_number, city, interested_position AS visitor_type, visiting_reason, event_date::text, false AS is_existing_partner
+            SELECT 'N' || id::text AS id, 'new' AS record_type, first_name, last_name, person_name, person_number, city, interested_position AS visitor_type, visiting_reason, event_date::text, false AS is_existing_partner,
+                   dl_number, aadhaar_number, aadhaar_image, dl_image
             FROM july_new_walkins
             WHERE person_number ILIKE %s OR person_name ILIKE %s OR first_name ILIKE %s
             UNION ALL
-            SELECT 'E' || id::text AS id, 'existing' AS record_type, first_name, last_name, person_name, person_number, city, partner_type AS visitor_type, visiting_reason, event_date::text, true AS is_existing_partner
+            SELECT 'E' || id::text AS id, 'existing' AS record_type, first_name, last_name, person_name, person_number, city, partner_type AS visitor_type, visiting_reason, event_date::text, true AS is_existing_partner,
+                   '' AS dl_number, '' AS aadhaar_number, NULL AS aadhaar_image, NULL AS dl_image
             FROM july_existing_walkins
             WHERE person_number ILIKE %s OR person_name ILIKE %s OR first_name ILIKE %s
             UNION ALL
-            SELECT 'O' || id::text AS id, 'existing' AS record_type, '' AS first_name, '' AS last_name, driver_name AS person_name, phone_number AS person_number, city, COALESCE(candidate_role, 'Driver') AS visitor_type, 'Partner Visit' AS visiting_reason, created_at::text AS event_date, true AS is_existing_partner
+            SELECT 'O' || id::text AS id, 'existing' AS record_type, '' AS first_name, '' AS last_name, driver_name AS person_name, phone_number AS person_number, city, COALESCE(candidate_role, 'Driver') AS visitor_type, 'Partner Visit' AS visiting_reason, created_at::text AS event_date, true AS is_existing_partner,
+                   dl_number, aadhaar_number, COALESCE(aadhaar_card_photo, aadhaar_card_front) AS aadhaar_image, dl_front AS dl_image
             FROM july_form_onboarding
             WHERE (phone_number ILIKE %s OR driver_name ILIKE %s)
               AND approval_status ILIKE 'Approved%%'
@@ -3518,17 +3562,22 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
                         UPDATE july_new_walkins SET
                             first_name=%s, last_name=%s, person_name=%s, city=%s, operating_place=%s,
                             interested_position=%s, visiting_reason=%s, event_date=%s, enquiry_time=%s,
-                            dl_number=%s, aadhaar_number=%s, lead_channel=%s, lead_channel_details=%s,
-                            joined_status=%s, remarks=%s, updated_at=NOW(), updated_by=%s
+                            dl_number=%s, aadhaar_number=%s, aadhaar_image=%s, dl_image=%s,
+                            lead_channel=%s, lead_channel_details=%s, referred_by_name=%s, referred_by_phone=%s,
+                            joined_status=%s, remarks=%s, submission_status=%s, updated_at=NOW(), updated_by=%s
                         WHERE id=%s;
                     """, (
                         f_name, l_name, full_n, str(data.city) if data.city else 'Hyderabad',
                         data.operating_place or '', data.visitor_type or data.partner_type or 'Driver',
                         data.visiting_reason or 'Onboarding Inquiry',
                         data.event_date or datetime.now().strftime("%Y-%m-%d"),
-                        data.enquiry_time or datetime.now().strftime("%H:%M"), data.dl_number or '', data.aadhaar_number or '',
+                        data.enquiry_time or datetime.now().strftime("%H:%M"),
+                        data.dl_number or '', data.aadhaar_number or '',
+                        extract_image(data.aadhaar_image), extract_image(data.dl_image),
                         data.lead_channel or 'Direct Walk-in', data.lead_channel_details or '',
+                        data.referred_by_name or '', data.referred_by_phone or '',
                         data.joined_status or 'Onboarding Process Initiated', data.remarks or '',
+                        data.submission_status or 'Submitted',
                         user_p_id, existing_id
                     ))
                     try:
@@ -3561,15 +3610,15 @@ def create_walkin(data: WalkinData, authorization: Optional[str] = Header(None))
                 data.enquiry_time or datetime.now().strftime("%H:%M"),
                 data.dl_number or '',
                 data.aadhaar_number or '',
-                data.aadhaar_image or None,
-                data.dl_image or None,
+                extract_image(data.aadhaar_image),
+                extract_image(data.dl_image),
                 data.lead_channel or 'Direct Walk-in',
                 data.lead_channel_details or '',
                 data.referred_by_name or '',
                 data.referred_by_phone or '',
                 data.joined_status or 'Onboarding Process Initiated',
                 data.remarks or '',
-                'Submitted', user_p_id,
+                data.submission_status or 'Submitted', user_p_id,
                 user_p_id, user_p_id
             ))
             new_id = cur.fetchone()[0]
@@ -3623,17 +3672,37 @@ def update_walkin(walkin_id: str, data: WalkinData, authorization: Optional[str]
                         first_name=%s, last_name=%s, person_name=%s, person_number=%s,
                         city=%s, operating_place=%s, interested_position=%s, visiting_reason=%s,
                         event_date=%s, enquiry_time=%s, dl_number=%s, aadhaar_number=%s,
-                        lead_channel=%s, lead_channel_details=%s, joined_status=%s, remarks=%s,
+                        aadhaar_image=%s, dl_image=%s,
+                        lead_channel=%s, lead_channel_details=%s, referred_by_name=%s, referred_by_phone=%s,
+                        joined_status=%s, remarks=%s, submission_status=%s,
                         updated_at=NOW(), updated_by=%s
                     WHERE id=%s;
-                """, (f_name, l_name, full_n, data.person_number, data.city, data.operating_place, data.visitor_type or data.interested_position or 'Driver', data.visiting_reason, data.event_date, data.enquiry_time, data.dl_number, data.aadhaar_number, data.lead_channel, data.lead_channel_details, data.joined_status, data.remarks, user_p_id, raw_id))
+                """, (
+                    f_name, l_name, full_n, data.person_number, data.city, data.operating_place,
+                    data.visitor_type or data.interested_position or 'Driver', data.visiting_reason,
+                    data.event_date, data.enquiry_time, data.dl_number, data.aadhaar_number,
+                    extract_image(data.aadhaar_image), extract_image(data.dl_image),
+                    data.lead_channel, data.lead_channel_details, data.referred_by_name, data.referred_by_phone,
+                    data.joined_status, data.remarks, data.submission_status or 'Submitted',
+                    user_p_id, raw_id
+                ))
             else:
                 cur.execute("""
                     UPDATE july_walkins SET
                         first_name=%s, last_name=%s, person_name=%s, person_number=%s,
-                        city=%s, visiting_reason=%s, updated_at=NOW()
+                        city=%s, operating_place=%s, visiting_reason=%s, dl_number=%s, aadhaar_number=%s,
+                        aadhaar_image=%s, dl_image=%s, lead_channel=%s, lead_channel_details=%s,
+                        referred_by_name=%s, referred_by_phone=%s, joined_status=%s, remarks=%s,
+                        updated_at=NOW()
                     WHERE id=%s;
-                """, (f_name, l_name, full_n, data.person_number, data.city, data.visiting_reason, raw_id))
+                """, (
+                    f_name, l_name, full_n, data.person_number, data.city, data.operating_place,
+                    data.visiting_reason, data.dl_number, data.aadhaar_number,
+                    extract_image(data.aadhaar_image), extract_image(data.dl_image),
+                    data.lead_channel, data.lead_channel_details,
+                    data.referred_by_name, data.referred_by_phone, data.joined_status, data.remarks,
+                    raw_id
+                ))
 
         conn.commit()
         return {"success": True}
@@ -3672,7 +3741,7 @@ def delete_walkin(walkin_id: str, authorization: Optional[str] = Header(None)):
 # Onboarding API
 # ─────────────────────────────────────────────────────────
 @app.get("/api/onboarding")
-def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None, status: Optional[str] = None, limit: Optional[int] = 100):
+def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None, status: Optional[str] = None, vendor_type: Optional[str] = None, limit: Optional[int] = 100):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
@@ -3700,8 +3769,8 @@ def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None,
                 f.current_approver_id,
                 f.approved_by,
                 f.approval_note AS approval_remarks,
-                COALESCE(timezone('Asia/Kolkata', timezone('UTC', f.created_at)), timezone('Asia/Kolkata', timezone('UTC', f.updated_at)), NOW() AT TIME ZONE 'Asia/Kolkata') AS created_at,
-                COALESCE(timezone('Asia/Kolkata', timezone('UTC', f.updated_at)), timezone('Asia/Kolkata', timezone('UTC', f.created_at)), NOW() AT TIME ZONE 'Asia/Kolkata') AS updated_at,
+                COALESCE(f.created_at, f.updated_at, NOW()) AS created_at,
+                COALESCE(f.updated_at, f.created_at, NOW()) AS updated_at,
                 f.security_deposit,
                 f.custom_rent_amount AS daily_rent,
                 COALESCE(f.vendor_type, f.candidate_role, 'Driver') AS vendor_type,
@@ -3709,7 +3778,8 @@ def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None,
                 COALESCE(NULLIF(TRIM(CONCAT(e1.first_name, ' ', e1.last_name)), ''), u1.username, 'Admin') AS executive_name,
                 COALESCE(NULLIF(TRIM(CONCAT(e2.first_name, ' ', e2.last_name)), ''), u2.username, u1.username, 'Admin') AS updated_by_name,
                 COALESCE(NULLIF(TRIM(CONCAT(e3.first_name, ' ', e3.last_name)), ''), u3.username, 'Driver Manager 1') AS approver_name,
-                COALESCE(NULLIF(TRIM(CONCAT(e4.first_name, ' ', e4.last_name)), ''), u4.username, 'Admin') AS approved_by_name
+                COALESCE(NULLIF(TRIM(CONCAT(e4.first_name, ' ', e4.last_name)), ''), u4.username, 'Admin') AS approved_by_name,
+                f.gst_number
             FROM july_form_onboarding f
             LEFT JOIN july_portal_users u1 ON u1.portal_user_id = f.created_by
             LEFT JOIN july_employees e1 ON e1.employee_id = u1.employee_id
@@ -3730,6 +3800,10 @@ def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None,
             params.append(status)
         elif not status:
             base_query += " AND (f.approval_status IS NULL OR f.approval_status != 'Draft')"
+
+        if vendor_type:
+            base_query += " AND (f.vendor_type ILIKE %s OR f.candidate_role ILIKE %s)"
+            params.extend([f"%{vendor_type}%", f"%{vendor_type}%"])
 
         if search:
             base_query += """
@@ -3756,8 +3830,10 @@ def get_all_onboarding(search: Optional[str] = None, city: Optional[str] = None,
         for row in cur.fetchall():
             item = {}
             for col, val in zip(cols, row):
-                if isinstance(val, (dt_module.datetime, dt_module.date)):
-                    item[col] = val.isoformat()
+                if col in ("created_at", "updated_at"):
+                    item[col] = to_ist_iso(val)
+                elif isinstance(val, (dt_module.datetime, dt_module.date)):
+                    item[col] = to_ist_iso(val)
                 else:
                     item[col] = val
             results.append(item)
@@ -3783,38 +3859,52 @@ def create_onboarding(data: OnboardingData, authorization: Optional[str] = Heade
         import json
 
         # ── DUPLICATE CHECK ─────────────────────────────────────────────────────
-        # Check phone number first (always present)
-        cur.execute(
-            "SELECT id, driver_name FROM july_form_onboarding WHERE phone_number = %s LIMIT 1;",
-            (data.phone_number,)
-        )
-        dup = cur.fetchone()
-        if not dup and data.aadhaar_number:
+        # Check phone number first (if present)
+        if data.phone_number:
+            cur.execute(
+                "SELECT id, driver_name FROM july_form_onboarding WHERE phone_number = %s LIMIT 1;",
+                (data.phone_number,)
+            )
+            dup = cur.fetchone()
+            if dup:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Already filled. A record for '{dup[1]}' (ID: {dup[0]}) already exists with phone {data.phone_number}."
+                )
+        if data.aadhaar_number:
             clean_aadhaar = data.aadhaar_number.replace(" ", "")
             cur.execute(
                 "SELECT id, driver_name FROM july_form_onboarding WHERE REPLACE(aadhaar_number, ' ', '') = %s LIMIT 1;",
                 (clean_aadhaar,)
             )
             dup = cur.fetchone()
-        if not dup and data.pan_number:
+            if dup:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Already filled. A record for '{dup[1]}' (ID: {dup[0]}) already exists with Aadhaar {data.aadhaar_number}."
+                )
+        if data.pan_number:
             cur.execute(
                 "SELECT id, driver_name FROM july_form_onboarding WHERE UPPER(pan_number) = UPPER(%s) LIMIT 1;",
                 (data.pan_number,)
             )
             dup = cur.fetchone()
-        if dup:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Already filled. A record for '{dup[1]}' (ID: {dup[0]}) already exists with the same phone, Aadhaar, or PAN."
-            )
+            if dup:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Already filled. A record for '{dup[1]}' (ID: {dup[0]}) already exists with PAN {data.pan_number}."
+                )
         # ────────────────────────────────────────────────────────────────────────
 
-        # Ensure cheque and new columns exist (migration guard)
-        for col in ["cheque2_photo", "cheque3_photo", "cheque4_photo", "security_cheques", "police_verification_status", "police_verification_doc", "reference_verified", "driver_manager_id", "driver_manager_name"]:
-            cur.execute(f"""
-                ALTER TABLE july_form_onboarding
-                ADD COLUMN IF NOT EXISTS {col} TEXT;
-            """)
+        # Ensure cheque, GST, and audit columns exist
+        for col in [
+            "cheque2_photo TEXT", "cheque3_photo TEXT", "cheque4_photo TEXT", "security_cheques TEXT",
+            "police_verification_status VARCHAR(100)", "police_verification_doc TEXT", "reference_verified BOOLEAN DEFAULT FALSE",
+            "driver_manager_id INTEGER", "driver_manager_name VARCHAR(255)",
+            "gst_number VARCHAR(100)", "gst_certificate TEXT", "incorporation_doc TEXT",
+            "created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP", "updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP"
+        ]:
+            cur.execute(f"ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS {col};")
 
         cur.execute("""
             INSERT INTO july_form_onboarding (
@@ -3836,20 +3926,42 @@ def create_onboarding(data: OnboardingData, authorization: Optional[str] = Heade
                 ref1_name, ref1_phone, ref1_address,
                 ref2_name, ref2_phone, ref2_address,
                 ref3_name, ref3_phone, ref3_address,
-                created_by, approval_status
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                created_by, updated_by, approval_status,
+                created_at, updated_at, gst_number, gst_certificate, incorporation_doc
+            ) VALUES (
+                %s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,
+                %s,%s,%s,
+                %s,%s,%s,
+                %s,%s,%s,%s,
+                %s,%s,%s,
+                %s,%s,%s,
+                %s,%s,%s,
+                %s,%s,%s,
+                %s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,
+                %s,%s,%s,
+                %s,%s,%s,%s,%s,
+                %s,%s,%s,%s,
+                %s,%s,%s,
+                %s,%s,%s,
+                %s,%s,%s,
+                %s,%s,%s,
+                NOW(),NOW(),%s,%s,%s
+            )
             RETURNING id;
         """, (
-            data.driver_name, data.phone_number, data.whatsapp_number, data.dob, data.city, data.operating_place,
-            data.present_address, data.permanent_address, data.emergency_name, data.emergency_phone,
+            data.driver_name or "", data.phone_number or "", data.whatsapp_number, data.dob or "", data.city or "Hyderabad", data.operating_place,
+            data.present_address or "", data.permanent_address or "", data.emergency_name or "", data.emergency_phone or "",
             data.dl_number, data.dl_expiry_date, data.lead_source,
-            data.pan_number, data.aadhaar_number, data.pan_aadhaar_linked,
+            data.pan_number or "", data.aadhaar_number or "", data.pan_aadhaar_linked,
             extract_image(data.selfie_photo), extract_image(data.dl_front), 
             extract_image(data.dl_back), extract_image(data.pan_card_photo),
             data.vendor_name, data.vendor_id, extract_image(data.aadhaar_card_photo),
-            data.father_name, data.bank_name, data.other_bank_name,
+            data.father_name or "", data.bank_name, data.other_bank_name,
             data.account_number, data.ifsc_code, data.upi_id,
-            data.vendor_type, data.driver_id, data.custom_rent_amount,
+            data.vendor_type or "Individual", data.driver_id, data.custom_rent_amount,
             data.walkin_id, data.emergency_relationship, json.dumps(data.platform_details) if data.platform_details else None, data.documents_verified,
             data.custom_rental_plan, extract_image(data.cancelled_cheque_photo),
             extract_image(data.cheque2_photo), extract_image(data.cheque3_photo), extract_image(data.cheque4_photo),
@@ -3859,18 +3971,19 @@ def create_onboarding(data: OnboardingData, authorization: Optional[str] = Heade
             data.driver_manager_name,
             extract_image(data.signature_photo),
             data.account_name, data.account_type,
-            data.candidate_role, data.rental_model, data.security_deposit, data.letzown_cheques, data.is_spring_verified,
+            data.candidate_role or "Driver", data.rental_model, data.security_deposit, data.letzown_cheques, data.is_spring_verified,
             extract_image(data.aadhaar_card_front), extract_image(data.aadhaar_card_back), data.driver_email,
             json.dumps(data.local_address_proof) if isinstance(data.local_address_proof, list) else extract_image(data.local_address_proof),
             data.ref1_name, data.ref1_phone, data.ref1_address,
             data.ref2_name, data.ref2_phone, data.ref2_address,
             data.ref3_name, data.ref3_phone, data.ref3_address,
-            creator_id, 'Draft'
+            creator_id, creator_id, data.approval_status or 'Draft',
+            data.gst_number, extract_image(data.gst_certificate), extract_image(data.incorporation_doc)
         ))
         new_id = cur.fetchone()[0]
         
         walkin_id = data.walkin_id
-        if not walkin_id:
+        if not walkin_id and data.phone_number:
             cur.execute("SELECT id FROM july_walkins WHERE REPLACE(person_number, ' ', '') = %s LIMIT 1;", (data.phone_number.replace(" ", ""),))
             row = cur.fetchone()
             if row:
@@ -3885,12 +3998,12 @@ def create_onboarding(data: OnboardingData, authorization: Optional[str] = Heade
                     ) VALUES (%s, CURRENT_DATE, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING id;
                 """, (
-                    "Individual",
-                    data.city,
-                    data.operating_place or data.city,
-                    data.driver_name,
+                    data.vendor_type if data.vendor_type in ("Individual", "Operator") else "Individual",
+                    data.city or "Hyderabad",
+                    data.operating_place or data.city or "Hyderabad",
+                    data.driver_name or "Partner",
                     data.phone_number,
-                    data.aadhaar_number,
+                    data.aadhaar_number or "",
                     data.dl_number or "",
                     "Onboarding",
                     "Successfully Onboarded",
@@ -3901,14 +4014,16 @@ def create_onboarding(data: OnboardingData, authorization: Optional[str] = Heade
                 ))
                 walkin_id = cur.fetchone()[0]
 
-        cur.execute("""
-            INSERT INTO july_walkin_form_links (walkin_id, onboarding_id)
-            VALUES (%s, %s);
-        """, (walkin_id, new_id))
-        
-        cur.execute("""
-            UPDATE july_walkins SET joined_status = 'Successfully Onboarded' WHERE id = %s;
-        """, (walkin_id,))
+        if walkin_id:
+            cur.execute("""
+                INSERT INTO july_walkin_form_links (walkin_id, onboarding_id)
+                VALUES (%s, %s)
+                ON CONFLICT DO NOTHING;
+            """, (walkin_id, new_id))
+            
+            cur.execute("""
+                UPDATE july_walkins SET joined_status = 'Successfully Onboarded' WHERE id = %s;
+            """, (walkin_id,))
 
         if data.vendor_type == "Operator" and data.operator_drivers:
             for drv in data.operator_drivers:
@@ -3918,15 +4033,31 @@ def create_onboarding(data: OnboardingData, authorization: Optional[str] = Heade
                         vendor_name, vendor_id, vendor_type,
                         whatsapp_number, dob, city, present_address, permanent_address, 
                         emergency_name, emergency_phone, pan_number, aadhaar_number, father_name,
-                        candidate_role
-                    ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                        candidate_role,
+                        selfie_photo, dl_front, dl_back, pan_card_photo, aadhaar_card_photo,
+                        created_by, updated_by, created_at, updated_at, approval_status
+                    ) VALUES (
+                        %s,%s,%s,%s,%s,
+                        %s,%s,%s,
+                        %s,%s,%s,%s,%s,
+                        %s,%s,%s,%s,%s,
+                        %s,
+                        %s,%s,%s,%s,%s,
+                        %s,%s,NOW(),NOW(),'Draft'
+                    )
                 """, (
                     drv.get('driver_name', ''), drv.get('phone_number', ''), drv.get('dl_number', ''), 
                     drv.get('custom_rent_amount', ''), drv.get('driver_id', ''),
-                    data.vendor_name, data.vendor_id, "Operator",
-                    data.whatsapp_number, data.dob, data.city, data.present_address, data.permanent_address,
-                    data.emergency_name, data.emergency_phone, data.pan_number, data.aadhaar_number, data.father_name,
-                    "Driver"
+                    data.vendor_name or data.driver_name, data.vendor_id, "Operator",
+                    drv.get('whatsapp_number', data.whatsapp_number), drv.get('dob', data.dob), data.city,
+                    drv.get('present_address', data.present_address), drv.get('permanent_address', data.permanent_address),
+                    drv.get('emergency_name', data.emergency_name), drv.get('emergency_phone', data.emergency_phone),
+                    drv.get('pan_number', ''), drv.get('aadhaar_number', ''), drv.get('father_name', ''),
+                    "Driver",
+                    extract_image(drv.get('selfie_photo')), extract_image(drv.get('dl_front')),
+                    extract_image(drv.get('dl_back')), extract_image(drv.get('pan_card_photo')),
+                    extract_image(drv.get('aadhaar_card_photo')),
+                    creator_id, creator_id
                 ))
 
         # ── Audit log ────────────────────────────────────────────────────────
@@ -4164,17 +4295,90 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
     try:
         cur = conn.cursor()
         if id == 0:
-            # New draft — minimal insert
+            # New draft — full insert with all provided fields
             cur.execute("""
-                INSERT INTO july_form_onboarding
-                  (driver_name, phone_number, city, vendor_type, candidate_role,
-                   approval_status, created_by)
-                VALUES (%s, %s, %s, %s, %s, 'Draft', %s)
+                INSERT INTO july_form_onboarding (
+                    driver_name, phone_number, whatsapp_number, dob, city, operating_place,
+                    present_address, permanent_address, emergency_name, emergency_phone, 
+                    emergency_relationship, dl_number, dl_expiry_date, lead_source, 
+                    pan_number, aadhaar_number, pan_aadhaar_linked, 
+                    vendor_name, vendor_id, vendor_type,
+                    father_name, bank_name, other_bank_name,
+                    account_number, ifsc_code, upi_id,
+                    account_name, account_type,
+                    candidate_role, rental_model, security_deposit,
+                    letzown_cheques, is_spring_verified,
+                    driver_email, platform_details, documents_verified, custom_rental_plan,
+                    ref1_name, ref1_phone, ref1_address,
+                    ref2_name, ref2_phone, ref2_address,
+                    ref3_name, ref3_phone, ref3_address,
+                    police_verification_status, reference_verified,
+                    driver_manager_id, driver_manager_name,
+                    gst_number,
+                    selfie_photo, dl_front, dl_back, pan_card_photo,
+                    aadhaar_card_photo, aadhaar_card_front, aadhaar_card_back,
+                    local_address_proof, cancelled_cheque_photo,
+                    cheque2_photo, cheque3_photo, cheque4_photo,
+                    security_cheques, police_verification_doc,
+                    signature_photo, gst_certificate, incorporation_doc,
+                    created_by, updated_by, approval_status,
+                    created_at, updated_at
+                ) VALUES (
+                    %s,%s,%s,%s,%s,%s,
+                    %s,%s,%s,%s,
+                    %s,%s,%s,%s,
+                    %s,%s,%s,
+                    %s,%s,%s,
+                    %s,%s,%s,
+                    %s,%s,%s,
+                    %s,%s,
+                    %s,%s,%s,
+                    %s,%s,
+                    %s,%s,%s,%s,
+                    %s,%s,%s,
+                    %s,%s,%s,
+                    %s,%s,%s,
+                    %s,%s,
+                    %s,%s,
+                    %s,
+                    %s,%s,%s,%s,
+                    %s,%s,%s,
+                    %s,%s,
+                    %s,%s,%s,
+                    %s,%s,
+                    %s,%s,%s,
+                    %s,%s,'Draft',
+                    NOW(),NOW()
+                )
                 RETURNING id;
             """, (
-                data.driver_name, data.phone_number,
-                data.city, data.vendor_type or 'Individual',
-                data.candidate_role or 'Driver', user_p_id
+                data.driver_name or "", data.phone_number or "", data.whatsapp_number, data.dob, data.city or "Hyderabad", data.operating_place,
+                data.present_address, data.permanent_address, data.emergency_name, data.emergency_phone,
+                data.emergency_relationship, data.dl_number, data.dl_expiry_date, data.lead_source,
+                data.pan_number, data.aadhaar_number, data.pan_aadhaar_linked,
+                data.vendor_name, data.vendor_id, data.vendor_type or "Individual",
+                data.father_name, data.bank_name, data.other_bank_name,
+                data.account_number, data.ifsc_code, data.upi_id,
+                data.account_name, data.account_type,
+                data.candidate_role or "Driver", data.rental_model, data.security_deposit,
+                data.letzown_cheques, data.is_spring_verified,
+                data.driver_email, json.dumps(data.platform_details) if data.platform_details else None, data.documents_verified, data.custom_rental_plan,
+                data.ref1_name, data.ref1_phone, data.ref1_address,
+                data.ref2_name, data.ref2_phone, data.ref2_address,
+                data.ref3_name, data.ref3_phone, data.ref3_address,
+                data.police_verification_status, data.reference_verified,
+                int(data.driver_manager_id) if data.driver_manager_id and str(data.driver_manager_id).isdigit() else None,
+                data.driver_manager_name,
+                data.gst_number,
+                extract_image(data.selfie_photo), extract_image(data.dl_front), extract_image(data.dl_back), extract_image(data.pan_card_photo),
+                extract_image(data.aadhaar_card_photo), extract_image(data.aadhaar_card_front), extract_image(data.aadhaar_card_back),
+                json.dumps(data.local_address_proof) if isinstance(data.local_address_proof, list) else extract_image(data.local_address_proof),
+                extract_image(data.cancelled_cheque_photo),
+                extract_image(data.cheque2_photo), extract_image(data.cheque3_photo), extract_image(data.cheque4_photo),
+                json.dumps(data.security_cheque_files) if isinstance(data.security_cheque_files, list) else extract_image(data.security_cheque_files),
+                extract_image(data.police_verification_doc),
+                extract_image(data.signature_photo), extract_image(data.gst_certificate), extract_image(data.incorporation_doc),
+                user_p_id, user_p_id
             ))
             new_id = cur.fetchone()[0]
             cur.execute("""
@@ -4188,19 +4392,19 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
             conn.commit()
             return {"success": True, "id": new_id, "approval_status": "Draft"}
         else:
-            # Existing record — update fields but preserve approval_status
+            # Existing record — update fields unconditionally (setting nulls to NULL)
             cur.execute("SELECT approval_status FROM july_form_onboarding WHERE id = %s;", (id,))
             rec = cur.fetchone()
             if not rec:
                 raise HTTPException(status_code=404, detail="Onboarding record not found")
-            current_status = rec[0]
+            current_status = rec[0] or "Draft"
             cur.execute("""
                 UPDATE july_form_onboarding SET
                     driver_name=%s, phone_number=%s, whatsapp_number=%s,
                     dob=%s, city=%s, operating_place=%s,
                     present_address=%s, permanent_address=%s,
                     emergency_name=%s, emergency_phone=%s, emergency_relationship=%s,
-                    dl_number=%s, dl_expiry_date=%s,
+                    dl_number=%s, dl_expiry_date=%s, lead_source=%s,
                     pan_number=%s, aadhaar_number=%s, pan_aadhaar_linked=%s,
                     vendor_name=%s, vendor_id=%s, vendor_type=%s,
                     father_name=%s, bank_name=%s, other_bank_name=%s,
@@ -4208,13 +4412,22 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
                     account_name=%s, account_type=%s,
                     candidate_role=%s, rental_model=%s, security_deposit=%s,
                     letzown_cheques=%s, is_spring_verified=%s,
-                    driver_email=%s, lead_source=%s, platform_details=%s,
+                    driver_email=%s, platform_details=%s,
                     documents_verified=%s, custom_rental_plan=%s,
                     ref1_name=%s, ref1_phone=%s, ref1_address=%s,
                     ref2_name=%s, ref2_phone=%s, ref2_address=%s,
                     ref3_name=%s, ref3_phone=%s, ref3_address=%s,
                     police_verification_status=%s, reference_verified=%s,
                     driver_manager_id=%s, driver_manager_name=%s,
+                    gst_number=%s,
+                    selfie_photo=%s, dl_front=%s, dl_back=%s,
+                    pan_card_photo=%s, aadhaar_card_photo=%s,
+                    aadhaar_card_front=%s, aadhaar_card_back=%s,
+                    local_address_proof=%s, cancelled_cheque_photo=%s,
+                    cheque2_photo=%s, cheque3_photo=%s, cheque4_photo=%s,
+                    security_cheques=%s, police_verification_doc=%s,
+                    signature_photo=%s, gst_certificate=%s,
+                    incorporation_doc=%s,
                     updated_by=%s, updated_at=NOW()
                 WHERE id=%s;
             """, (
@@ -4222,7 +4435,7 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
                 data.dob, data.city, data.operating_place,
                 data.present_address, data.permanent_address,
                 data.emergency_name, data.emergency_phone, data.emergency_relationship,
-                data.dl_number, data.dl_expiry_date,
+                data.dl_number, data.dl_expiry_date, data.lead_source,
                 data.pan_number, data.aadhaar_number, data.pan_aadhaar_linked,
                 data.vendor_name, data.vendor_id, data.vendor_type,
                 data.father_name, data.bank_name, data.other_bank_name,
@@ -4230,8 +4443,7 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
                 data.account_name, data.account_type,
                 data.candidate_role, data.rental_model, data.security_deposit,
                 data.letzown_cheques, data.is_spring_verified,
-                data.driver_email, data.lead_source,
-                json.dumps(data.platform_details) if data.platform_details else None,
+                data.driver_email, json.dumps(data.platform_details) if data.platform_details else None,
                 data.documents_verified, data.custom_rental_plan,
                 data.ref1_name, data.ref1_phone, data.ref1_address,
                 data.ref2_name, data.ref2_phone, data.ref2_address,
@@ -4239,31 +4451,26 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
                 data.police_verification_status, data.reference_verified,
                 int(data.driver_manager_id) if data.driver_manager_id and str(data.driver_manager_id).isdigit() else None,
                 data.driver_manager_name,
+                data.gst_number,
+                extract_image(data.selfie_photo),
+                extract_image(data.dl_front),
+                extract_image(data.dl_back),
+                extract_image(data.pan_card_photo),
+                extract_image(data.aadhaar_card_photo),
+                extract_image(data.aadhaar_card_front),
+                extract_image(data.aadhaar_card_back),
+                json.dumps(data.local_address_proof) if isinstance(data.local_address_proof, list) else extract_image(data.local_address_proof),
+                extract_image(data.cancelled_cheque_photo),
+                extract_image(data.cheque2_photo),
+                extract_image(data.cheque3_photo),
+                extract_image(data.cheque4_photo),
+                json.dumps(data.security_cheque_files) if isinstance(data.security_cheque_files, list) else extract_image(data.security_cheque_files),
+                extract_image(data.police_verification_doc),
+                extract_image(data.signature_photo),
+                extract_image(data.gst_certificate),
+                extract_image(data.incorporation_doc),
                 user_p_id, id
             ))
-            # Update photo fields only if new values provided
-            for field, val in [
-                ("selfie_photo",          extract_image(data.selfie_photo)),
-                ("dl_front",              extract_image(data.dl_front)),
-                ("dl_back",               extract_image(data.dl_back)),
-                ("pan_card_photo",        extract_image(data.pan_card_photo)),
-                ("aadhaar_card_photo",    extract_image(data.aadhaar_card_photo)),
-                ("aadhaar_card_front",    extract_image(data.aadhaar_card_front)),
-                ("aadhaar_card_back",     extract_image(data.aadhaar_card_back)),
-                ("local_address_proof",   json.dumps(data.local_address_proof) if isinstance(data.local_address_proof, list) else extract_image(data.local_address_proof)),
-                ("cancelled_cheque_photo",extract_image(data.cancelled_cheque_photo)),
-                ("cheque2_photo",         extract_image(data.cheque2_photo)),
-                ("cheque3_photo",         extract_image(data.cheque3_photo)),
-                ("cheque4_photo",         extract_image(data.cheque4_photo)),
-                ("security_cheques",      json.dumps(data.security_cheque_files) if isinstance(data.security_cheque_files, list) else extract_image(data.security_cheque_files)),
-                ("police_verification_doc", extract_image(data.police_verification_doc)),
-                ("signature_photo",       extract_image(data.signature_photo)),
-            ]:
-                if val:
-                    cur.execute(
-                        f"UPDATE july_form_onboarding SET {field}=%s WHERE id=%s;",
-                        (val, id)
-                    )
             cur.execute("""
                 INSERT INTO july_onboarding_logs
                   (onboarding_id, action, old_status, new_status,
@@ -4313,7 +4520,9 @@ def get_onboarding(id: int):
                 driver_manager_id,
                 driver_manager_name,
                 COALESCE(approval_status, 'Draft') AS approval_status,
-                created_at, updated_at
+                created_at, updated_at,
+                created_by, updated_by, current_approver_id, approved_by,
+                approval_note, gst_number, gst_certificate, incorporation_doc
             FROM july_form_onboarding
             WHERE id = %s;
         """, (id,))
@@ -4351,9 +4560,18 @@ def get_onboarding(id: int):
                 "driver_manager_name": r[67],
                 "approval_status": r[68],
                 "created_at": to_ist_iso(r[69]),
-                "updated_at": to_ist_iso(r[70] or r[69])
+                "updated_at": to_ist_iso(r[70] or r[69]),
+                "created_by": r[71],
+                "updated_by": r[72],
+                "current_approver_id": r[73],
+                "approved_by": r[74],
+                "approval_note": r[75],
+                "approval_remarks": r[75],
+                "gst_number": r[76],
+                "gst_certificate": r[77],
+                "incorporation_doc": r[78]
             }
-            if r[29] == "Operator" and r[17]:
+            if (r[29] == "Operator" or r[45] == "Operator") and (r[17] or r[16]):
                 cur.execute("""
                     SELECT 
                         driver_name, phone_number, dl_number, custom_rent_amount, driver_id,
@@ -4361,8 +4579,8 @@ def get_onboarding(id: int):
                         emergency_name, emergency_phone, pan_number, aadhaar_number, father_name,
                         selfie_photo, dl_front, dl_back, pan_card_photo, aadhaar_card_photo
                     FROM july_form_onboarding
-                    WHERE vendor_id = %s AND vendor_type = 'Operator' AND driver_id IS NOT NULL;
-                """, (r[17],))
+                    WHERE (vendor_id = %s OR vendor_name = %s) AND vendor_type = 'Operator' AND driver_id IS NOT NULL;
+                """, (r[17] or "", r[16] or ""))
                 drivers_rows = cur.fetchall()
                 res["operator_drivers"] = [
                     {
@@ -4404,7 +4622,7 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
         existing = cur.fetchone()
         if not existing:
             raise HTTPException(status_code=404, detail="Onboarding record not found")
-        old_approval_status = existing[1]
+        old_approval_status = existing[1] or "Draft"
             
         import json
         cur.execute("""
@@ -4415,7 +4633,7 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
                 present_address=%s, permanent_address=%s, emergency_name=%s, emergency_phone=%s, 
                 dl_number=%s, dl_expiry_date=%s, lead_source=%s, 
                 pan_number=%s, aadhaar_number=%s, pan_aadhaar_linked=%s,
-                vendor_name=%s, vendor_id=%s,
+                vendor_name=%s, vendor_id=%s, vendor_type=%s,
                 father_name=%s, bank_name=%s, other_bank_name=%s,
                 account_number=%s, ifsc_code=%s, upi_id=%s,
                 walkin_id=%s, emergency_relationship=%s, platform_details=%s, documents_verified=%s,
@@ -4427,6 +4645,15 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
                 ref3_name=%s, ref3_phone=%s, ref3_address=%s,
                 police_verification_status=%s, reference_verified=%s,
                 driver_manager_id=%s, driver_manager_name=%s,
+                gst_number=%s,
+                selfie_photo=%s, dl_front=%s, dl_back=%s,
+                pan_card_photo=%s, aadhaar_card_photo=%s,
+                aadhaar_card_front=%s, aadhaar_card_back=%s,
+                local_address_proof=%s, cancelled_cheque_photo=%s,
+                cheque2_photo=%s, cheque3_photo=%s, cheque4_photo=%s,
+                security_cheques=%s, police_verification_doc=%s,
+                signature_photo=%s, gst_certificate=%s,
+                incorporation_doc=%s,
                 updated_by=%s, updated_at=NOW()
             WHERE id=%s;
         """, (
@@ -4434,12 +4661,12 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
             data.present_address, data.permanent_address, data.emergency_name, data.emergency_phone,
             data.dl_number, data.dl_expiry_date, data.lead_source,
             data.pan_number, data.aadhaar_number, data.pan_aadhaar_linked,
-            data.vendor_name, data.vendor_id,
+            data.vendor_name, data.vendor_id, data.vendor_type or "Individual",
             data.father_name, data.bank_name, data.other_bank_name,
             data.account_number, data.ifsc_code, data.upi_id,
             data.walkin_id, data.emergency_relationship, json.dumps(data.platform_details) if data.platform_details else None, data.documents_verified,
             data.custom_rental_plan, data.account_name, data.account_type,
-            data.candidate_role, data.rental_model, data.security_deposit, data.letzown_cheques, data.is_spring_verified,
+            data.candidate_role or "Driver", data.rental_model, data.security_deposit, data.letzown_cheques, data.is_spring_verified,
             data.driver_email,
             data.ref1_name, data.ref1_phone, data.ref1_address,
             data.ref2_name, data.ref2_phone, data.ref2_address,
@@ -4447,6 +4674,24 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
             data.police_verification_status, data.reference_verified,
             int(data.driver_manager_id) if data.driver_manager_id and str(data.driver_manager_id).isdigit() else None,
             data.driver_manager_name,
+            data.gst_number,
+            extract_image(data.selfie_photo),
+            extract_image(data.dl_front),
+            extract_image(data.dl_back),
+            extract_image(data.pan_card_photo),
+            extract_image(data.aadhaar_card_photo),
+            extract_image(data.aadhaar_card_front),
+            extract_image(data.aadhaar_card_back),
+            json.dumps(data.local_address_proof) if isinstance(data.local_address_proof, list) else extract_image(data.local_address_proof),
+            extract_image(data.cancelled_cheque_photo),
+            extract_image(data.cheque2_photo),
+            extract_image(data.cheque3_photo),
+            extract_image(data.cheque4_photo),
+            json.dumps(data.security_cheque_files) if isinstance(data.security_cheque_files, list) else extract_image(data.security_cheque_files),
+            extract_image(data.police_verification_doc),
+            extract_image(data.signature_photo),
+            extract_image(data.gst_certificate),
+            extract_image(data.incorporation_doc),
             user_p_id,
             id
         ))
@@ -4461,65 +4706,47 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
                 updated_at = NOW()
             WHERE onboarding_id = %s;
         """, (data.driver_name, data.city, user_p_id, id))
-        
-        new_selfie = extract_image(data.selfie_photo)
-        new_dl_front = extract_image(data.dl_front)
-        new_dl_back = extract_image(data.dl_back)
-        new_pan = extract_image(data.pan_card_photo)
-        new_aadhaar_img = extract_image(data.aadhaar_card_photo)
-        new_aadhaar_front = extract_image(data.aadhaar_card_front)
-        new_aadhaar_back = extract_image(data.aadhaar_card_back)
-        new_local_address_proof = json.dumps(data.local_address_proof) if isinstance(data.local_address_proof, list) else extract_image(data.local_address_proof)
-        new_cancelled_cheque = extract_image(data.cancelled_cheque_photo)
-        new_cheque2 = extract_image(data.cheque2_photo)
-        new_cheque3 = extract_image(data.cheque3_photo)
-        new_cheque4 = extract_image(data.cheque4_photo)
-        new_security_cheques = json.dumps(data.security_cheque_files) if isinstance(data.security_cheque_files, list) else extract_image(data.security_cheque_files)
-        new_police_doc = extract_image(data.police_verification_doc)
-        new_signature = extract_image(data.signature_photo)
-        
-        # Always update image fields — even if null (to allow clearing/replacing images)
-        cur.execute("""
-            UPDATE july_form_onboarding SET
-                selfie_photo=%s,
-                dl_front=%s,
-                dl_back=%s,
-                pan_card_photo=%s,
-                aadhaar_card_photo=%s,
-                aadhaar_card_front=%s,
-                aadhaar_card_back=%s,
-                local_address_proof=%s,
-                cancelled_cheque_photo=%s,
-                cheque2_photo=%s,
-                cheque3_photo=%s,
-                cheque4_photo=%s,
-                security_cheques=%s,
-                police_verification_doc=%s,
-                signature_photo=%s
-            WHERE id=%s;
-        """, (
-            new_selfie,
-            new_dl_front,
-            new_dl_back,
-            new_pan,
-            new_aadhaar_img,
-            new_aadhaar_front,
-            new_aadhaar_back,
-            new_local_address_proof,
-            new_cancelled_cheque,
-            new_cheque2,
-            new_cheque3,
-            new_cheque4,
-            new_security_cheques,
-            new_police_doc,
-            new_signature,
-            id
-        ))
-            
+
         if data.walkin_id:
             cur.execute("DELETE FROM july_walkin_form_links WHERE onboarding_id = %s;", (id,))
             cur.execute("INSERT INTO july_walkin_form_links (walkin_id, onboarding_id) VALUES (%s, %s);", (data.walkin_id, id))
             cur.execute("UPDATE july_walkins SET joined_status = 'Onboarded' WHERE id = %s;", (data.walkin_id,))
+
+        if data.vendor_type == "Operator" and data.operator_drivers:
+            cur.execute("DELETE FROM july_form_onboarding WHERE vendor_id = %s AND vendor_type = 'Operator' AND driver_id IS NOT NULL AND id != %s;", (data.vendor_id or "", id))
+            for drv in data.operator_drivers:
+                cur.execute("""
+                    INSERT INTO july_form_onboarding (
+                        driver_name, phone_number, dl_number, custom_rent_amount, driver_id,
+                        vendor_name, vendor_id, vendor_type,
+                        whatsapp_number, dob, city, present_address, permanent_address, 
+                        emergency_name, emergency_phone, pan_number, aadhaar_number, father_name,
+                        candidate_role,
+                        selfie_photo, dl_front, dl_back, pan_card_photo, aadhaar_card_photo,
+                        created_by, updated_by, created_at, updated_at, approval_status
+                    ) VALUES (
+                        %s,%s,%s,%s,%s,
+                        %s,%s,%s,
+                        %s,%s,%s,%s,%s,
+                        %s,%s,%s,%s,%s,
+                        %s,
+                        %s,%s,%s,%s,%s,
+                        %s,%s,NOW(),NOW(),'Draft'
+                    )
+                """, (
+                    drv.get('driver_name', ''), drv.get('phone_number', ''), drv.get('dl_number', ''), 
+                    drv.get('custom_rent_amount', ''), drv.get('driver_id', ''),
+                    data.vendor_name or data.driver_name, data.vendor_id, "Operator",
+                    drv.get('whatsapp_number', data.whatsapp_number), drv.get('dob', data.dob), data.city,
+                    drv.get('present_address', data.present_address), drv.get('permanent_address', data.permanent_address),
+                    drv.get('emergency_name', data.emergency_name), drv.get('emergency_phone', data.emergency_phone),
+                    drv.get('pan_number', ''), drv.get('aadhaar_number', ''), drv.get('father_name', ''),
+                    "Driver",
+                    extract_image(drv.get('selfie_photo')), extract_image(drv.get('dl_front')),
+                    extract_image(drv.get('dl_back')), extract_image(drv.get('pan_card_photo')),
+                    extract_image(drv.get('aadhaar_card_photo')),
+                    user_p_id, user_p_id
+                ))
 
         # ── Audit log ────────────────────────────────────────────────────────
         new_status = data.approval_status if hasattr(data, 'approval_status') and data.approval_status else old_approval_status
@@ -4537,6 +4764,30 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
         return {"success": True}
     finally:
         postgreSQL_pool.putconn(conn)
+
+
+# ─────────────────────────────────────────────────────────
+# Operator Onboarding Dedicated Endpoints
+# ─────────────────────────────────────────────────────────
+@app.get("/api/operator-onboarding")
+def get_all_operator_onboarding(search: Optional[str] = None, city: Optional[str] = None, status: Optional[str] = None, limit: Optional[int] = 100):
+    return get_all_onboarding(search=search, city=city, status=status, vendor_type="Operator", limit=limit)
+
+@app.post("/api/operator-onboarding")
+def create_operator_onboarding(data: OnboardingData, authorization: Optional[str] = Header(None)):
+    data.vendor_type = "Operator"
+    data.candidate_role = "Operator"
+    return create_onboarding(data, authorization)
+
+@app.get("/api/operator-onboarding/{id}")
+def get_operator_onboarding(id: int):
+    return get_onboarding(id)
+
+@app.put("/api/operator-onboarding/{id}")
+def update_operator_onboarding(id: int, data: OnboardingData, authorization: Optional[str] = Header(None)):
+    data.vendor_type = "Operator"
+    data.candidate_role = "Operator"
+    return update_onboarding(id, data, authorization)
 
 @app.get("/api/stats/onboarding")
 def get_onboarding_stats():
@@ -4708,15 +4959,28 @@ def create_adjustment(data: AdjustmentData, authorization: Optional[str] = Heade
                 partner_type, adjustment_level, adjustment_nature, time_duration, adjustment_type, adjustment_date, enter_amount, 
                 remittance_towards, adjustment_related_to, remarks, first_level_approval_by, 
                 finance_team_status, finance_team_remarks, final_level_approval_by, status, photo,
-                approval_status, created_by
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,'Draft',%s)
+                hisaab_number, contested_line_items, severity_level, cost_level, escalate_to,
+                submitter_comments, sent_for_approval,
+                approval_status, created_by, created_at, updated_at, updated_by
+            ) VALUES (
+                %s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,
+                %s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,
+                %s,%s,
+                'Draft',%s, NOW(), NOW(), %s
+            )
             RETURNING id;
         """, (
             data.partner_name, data.partner_code, data.driver_id, data.partner_number, data.vehicle_number, data.city_name,
             data.partner_type, data.adjustment_level, data.adjustment_nature, data.time_duration, data.adjustment_type, data.adjustment_date, data.enter_amount,
             data.remittance_towards, data.adjustment_related_to, data.remarks, data.first_level_approval_by,
             data.finance_team_status, data.finance_team_remarks, data.final_level_approval_by, data.status,
-            extract_image(data.photo), uid
+            extract_image(data.photo),
+            data.hisaab_number, data.contested_line_items, data.severity_level, data.cost_level, str(data.escalate_to) if data.escalate_to else None,
+            data.submitter_comments, data.sent_for_approval,
+            uid, uid
         ))
         new_id = cur.fetchone()[0]
         conn.commit()
@@ -4800,8 +5064,15 @@ def send_adjustment_for_approval(id: int, authorization: Optional[str] = Header(
 
 
 @app.put("/api/adjustment/{id}")
-def update_adjustment(id: int, data: AdjustmentData):
+def update_adjustment(id: int, data: AdjustmentData, authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
+    uid = None
+    if authorization:
+        try:
+            _u = get_current_user(authorization)
+            uid = _u.get("portal_user_id") or _u.get("user_id")
+        except Exception:
+            pass
     try:
         cur = conn.cursor()
         cur.execute("""
@@ -4809,7 +5080,9 @@ def update_adjustment(id: int, data: AdjustmentData):
                 partner_name=%s, partner_code=%s, driver_id=%s, partner_number=%s, vehicle_number=%s, city_name=%s, 
                 partner_type=%s, adjustment_level=%s, adjustment_nature=%s, time_duration=%s, adjustment_type=%s, adjustment_date=%s, enter_amount=%s, 
                 remittance_towards=%s, adjustment_related_to=%s, remarks=%s, first_level_approval_by=%s, 
-                finance_team_status=%s, finance_team_remarks=%s, final_level_approval_by=%s, status=%s, photo=%s
+                finance_team_status=%s, finance_team_remarks=%s, final_level_approval_by=%s, status=%s, photo=%s,
+                hisaab_number=%s, contested_line_items=%s, severity_level=%s, cost_level=%s, escalate_to=%s,
+                submitter_comments=%s, sent_for_approval=%s, updated_at=NOW(), updated_by=%s
             WHERE id=%s RETURNING id;
         """, (
             data.partner_name, data.partner_code, data.driver_id, data.partner_number, data.vehicle_number, data.city_name,
@@ -4817,6 +5090,8 @@ def update_adjustment(id: int, data: AdjustmentData):
             data.remittance_towards, data.adjustment_related_to, data.remarks, data.first_level_approval_by,
             data.finance_team_status, data.finance_team_remarks, data.final_level_approval_by, data.status,
             extract_image(data.photo),
+            data.hisaab_number, data.contested_line_items, data.severity_level, data.cost_level, str(data.escalate_to) if data.escalate_to else None,
+            data.submitter_comments, data.sent_for_approval, uid,
             id
         ))
         row = cur.fetchone()
@@ -5269,6 +5544,9 @@ def get_allocation_record(id: int, authorization: Optional[str] = Header(None)):
             raise HTTPException(status_code=404, detail="Allocation record not found")
         cols = [d[0] for d in cur.description]
         rec = dict(zip(cols, r))
+        for dt_field in ["allocation_date", "created_at", "updated_at"]:
+            if rec.get(dt_field) and hasattr(rec[dt_field], "isoformat"):
+                rec[dt_field] = rec[dt_field].isoformat()
         return _clean_dict_decimals(rec)
     finally:
         postgreSQL_pool.putconn(conn)
@@ -5298,25 +5576,37 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
                 photo_lh_side, photo_rh_side, photo_front_side, photo_back_side,
                 odometer_reading, odometer_photo, battery_photo,
                 insp_jack, insp_jack_rod, insp_spanner, insp_parking_triangle, insp_fire_extinguishers,
-                insp_seat_cover, insp_floor_carpet, insp_music_system, insp_remarks,
+                insp_seat_cover, insp_floor_carpet, insp_music_system, insp_stepney, insp_stepney_photo, insp_remarks,
+                hub_name, customer_address, jama_form_filled, pdi_completed,
                 old_vehicle_number, dropoff_odometer, dropoff_remarks, dropoff_photo,
-                dropoff_location, duplicate_key_status,
+                dropoff_location, manual_dropoff_location, duplicate_key_status,
                 fastag_balance_amount, fastag_balance_proof,
+                damage_penalty, deposit_refund_status, pending_dues,
                 status, approval_status, created_by, created_at
             ) VALUES (
-                %s,%s,%s,%s, %s,%s,%s, %s,%s,%s, %s,%s,
-                %s,%s, %s,%s,%s,%s,
+                %s,%s,%s,%s,
                 %s,%s,%s,
-                %s,%s,%s,%s,%s, %s,%s,%s,%s,
-                %s,%s,%s,%s, %s,%s, %s,%s,
-                %s, %s, %s, NOW()
+                %s,%s,%s,
+                %s,%s,
+                %s,%s,
+                %s,%s,%s,%s,
+                %s,%s,%s,
+                %s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,
+                %s,%s,%s,%s,
+                %s,%s,%s,
+                %s,%s,
+                %s,%s,%s,
+                %s,%s,%s, NOW()
             ) RETURNING id;
         """, (
             data.allocation_date, data.allocation_type, data.sub_type, data.city_name,
             data.driver_id, data.driver_name, data.driver_phone,
             data.driver_plan, data.type_of_plan, data.car_model,
             data.vehicle_number, data.gps_active,
-            data.ola_negative_balance, extract_image(data.ola_negative_balance_proof),
+            float(data.ola_negative_balance) if data.ola_negative_balance is not None and str(data.ola_negative_balance).strip() != "" else None,
+            extract_image(data.ola_negative_balance_proof),
             extract_image(data.photo_lh_side), extract_image(data.photo_rh_side),
             extract_image(data.photo_front_side), extract_image(data.photo_back_side),
             float(data.odometer_reading) if data.odometer_reading is not None and str(data.odometer_reading).strip() != "" else None,
@@ -5324,13 +5614,18 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
             data.insp_jack or "Available", data.insp_jack_rod or "Available", data.insp_spanner or "Available",
             data.insp_parking_triangle or "Available", data.insp_fire_extinguishers or "Available",
             data.insp_seat_cover or "Available", data.insp_floor_carpet or "Available",
-            data.insp_music_system or "Available", data.insp_remarks,
+            data.insp_music_system or "Available", data.insp_stepney or "Available",
+            extract_image(data.insp_stepney_photo), data.insp_remarks,
+            data.hub_name, data.customer_address, bool(data.jama_form_filled), bool(data.pdi_completed),
             data.old_vehicle_number,
-            float(data.dropoff_odometer) if data.dropoff_odometer else None,
+            float(data.dropoff_odometer) if data.dropoff_odometer is not None and str(data.dropoff_odometer).strip() != "" else None,
             data.dropoff_remarks, extract_image(data.dropoff_photo),
-            data.dropoff_location, data.duplicate_key_status,
-            float(data.fastag_balance_amount) if data.fastag_balance_amount else None,
+            data.dropoff_location, data.manual_dropoff_location, data.duplicate_key_status,
+            float(data.fastag_balance_amount) if data.fastag_balance_amount is not None and str(data.fastag_balance_amount).strip() != "" else None,
             extract_image(data.fastag_balance_proof),
+            float(data.damage_penalty) if data.damage_penalty is not None and str(data.damage_penalty).strip() != "" else None,
+            data.deposit_refund_status or "Pending Assessment",
+            float(data.pending_dues) if data.pending_dues is not None and str(data.pending_dues).strip() != "" else None,
             data.status or "Submitted",
             data.status or "Submitted",
             data.created_by or uid
@@ -5374,43 +5669,6 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
         postgreSQL_pool.putconn(conn)
 
 
-class DropOffData(BaseModel):
-    dropoff_date: Optional[str] = None
-    dropoff_reason: Optional[str] = None
-    city_name: Optional[str] = "Hyderabad"
-    dropoff_location: Optional[str] = "Hub"
-    manual_dropoff_location: Optional[str] = None
-    customer_address: Optional[str] = None
-    driver_id: Optional[str] = None
-    driver_name: Optional[str] = None
-    driver_phone: Optional[str] = None
-    vehicle_number: Optional[str] = None
-    odometer_reading: Optional[Union[float, str]] = None
-    odometer_photo: Optional[Any] = None
-    battery_photo: Optional[Any] = None
-    photo_lh_side: Optional[Any] = None
-    photo_rh_side: Optional[Any] = None
-    photo_front_side: Optional[Any] = None
-    photo_back_side: Optional[Any] = None
-    ola_negative_balance: Optional[Any] = None
-    ola_negative_balance_proof: Optional[Any] = None
-    pending_dues: Optional[Union[float, str]] = 0
-    damage_penalty: Optional[Union[float, str]] = 0
-    deposit_refund_status: Optional[str] = "Pending"
-    insp_jack: Optional[str] = "Available"
-    insp_jack_rod: Optional[str] = "Available"
-    insp_spanner: Optional[str] = "Available"
-    insp_parking_triangle: Optional[str] = "Available"
-    insp_fire_extinguishers: Optional[str] = "Available"
-    insp_seat_cover: Optional[str] = "Available"
-    insp_floor_carpet: Optional[str] = "Available"
-    insp_music_system: Optional[str] = "Available"
-    insp_stepney: Optional[str] = "Available"
-    insp_stepney_photo: Optional[Any] = None
-    dropoff_notes: Optional[str] = None
-    status: Optional[str] = "Submitted"
-
-
 @app.get("/api/dropoffs")
 def get_dropoffs(status: Optional[str] = None, authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
@@ -5421,10 +5679,10 @@ def get_dropoffs(status: Optional[str] = None, authorization: Optional[str] = He
         if status in ("all", "all_including_draft"):
             pass
         elif status:
-            where += " AND a.status = %s"
-            params.append(status)
+            where += " AND (LOWER(a.status) = LOWER(%s) OR LOWER(a.approval_status) = LOWER(%s))"
+            params.extend([status, status])
         else:
-            where += " AND a.status != 'Draft'"
+            where += " AND (a.status IS NULL OR LOWER(a.status) != 'draft') AND (a.approval_status IS NULL OR LOWER(a.approval_status) != 'draft')"
         cur.execute(f"""
             SELECT
                 a.id,
@@ -5435,17 +5693,21 @@ def get_dropoffs(status: Optional[str] = None, authorization: Optional[str] = He
                 a.manual_dropoff_location,
                 a.customer_address,
                 a.driver_id, a.driver_name, a.driver_phone, a.vehicle_number,
-                a.dropoff_odometer AS odometer_reading,
+                COALESCE(a.odometer_reading::text, a.dropoff_odometer::text) AS odometer_reading,
                 a.dropoff_remarks  AS dropoff_notes,
                 a.photo_lh_side,
                 a.photo_rh_side,
                 a.photo_front_side,
                 a.photo_back_side,
-                a.dropoff_photo    AS odometer_photo,
+                COALESCE(a.odometer_photo, a.dropoff_photo) AS odometer_photo,
                 a.battery_photo,
                 a.ola_negative_balance,
                 a.ola_negative_balance_proof,
-                a.fastag_balance_amount AS pending_dues,
+                COALESCE(a.pending_dues, a.fastag_balance_amount) AS pending_dues,
+                a.damage_penalty,
+                a.deposit_refund_status,
+                a.fastag_balance_amount,
+                a.fastag_balance_proof,
                 a.insp_jack,
                 a.insp_jack_rod,
                 a.insp_spanner,
@@ -5458,7 +5720,7 @@ def get_dropoffs(status: Optional[str] = None, authorization: Optional[str] = He
                 a.insp_stepney_photo,
                 a.status,
                 a.created_by,
-                COALESCE(u.username, '') AS created_by_name,
+                COALESCE(u.username, 'Executive') AS created_by_name,
                 a.created_at,
                 a.updated_at
             FROM july_allocation_form a
@@ -5471,7 +5733,7 @@ def get_dropoffs(status: Optional[str] = None, authorization: Optional[str] = He
         res = []
         for r in rows:
             rec = dict(zip(cols, r))
-            for dt_field in ["created_at", "updated_at"]:
+            for dt_field in ["created_at", "updated_at", "dropoff_date"]:
                 if rec.get(dt_field) and hasattr(rec[dt_field], "isoformat"):
                     rec[dt_field] = rec[dt_field].isoformat()
             res.append(_clean_dict_decimals(rec))
@@ -5481,6 +5743,7 @@ def get_dropoffs(status: Optional[str] = None, authorization: Optional[str] = He
         return []
     finally:
         postgreSQL_pool.putconn(conn)
+
 
 @app.get("/api/dropoffs/{id}")
 def get_single_dropoff(id: int, authorization: Optional[str] = Header(None)):
@@ -5497,17 +5760,21 @@ def get_single_dropoff(id: int, authorization: Optional[str] = Header(None)):
                 a.manual_dropoff_location,
                 a.customer_address,
                 a.driver_id, a.driver_name, a.driver_phone, a.vehicle_number,
-                a.dropoff_odometer AS odometer_reading,
+                COALESCE(a.odometer_reading::text, a.dropoff_odometer::text) AS odometer_reading,
                 a.dropoff_remarks  AS dropoff_notes,
                 a.photo_lh_side,
                 a.photo_rh_side,
                 a.photo_front_side,
                 a.photo_back_side,
-                a.dropoff_photo    AS odometer_photo,
+                COALESCE(a.odometer_photo, a.dropoff_photo) AS odometer_photo,
                 a.battery_photo,
                 a.ola_negative_balance,
                 a.ola_negative_balance_proof,
-                a.fastag_balance_amount AS pending_dues,
+                COALESCE(a.pending_dues, a.fastag_balance_amount) AS pending_dues,
+                a.damage_penalty,
+                a.deposit_refund_status,
+                a.fastag_balance_amount,
+                a.fastag_balance_proof,
                 a.insp_jack,
                 a.insp_jack_rod,
                 a.insp_spanner,
@@ -5520,7 +5787,7 @@ def get_single_dropoff(id: int, authorization: Optional[str] = Header(None)):
                 a.insp_stepney_photo,
                 a.status,
                 a.created_by,
-                COALESCE(u.username, '') AS created_by_name,
+                COALESCE(u.username, 'Executive') AS created_by_name,
                 a.created_at,
                 a.updated_at
             FROM july_allocation_form a
@@ -5532,7 +5799,7 @@ def get_single_dropoff(id: int, authorization: Optional[str] = Header(None)):
             raise HTTPException(status_code=404, detail="Drop-off record not found")
         cols = [d[0] for d in cur.description]
         rec = dict(zip(cols, row))
-        for dt_field in ["created_at", "updated_at"]:
+        for dt_field in ["created_at", "updated_at", "dropoff_date"]:
             if rec.get(dt_field) and hasattr(rec[dt_field], "isoformat"):
                 rec[dt_field] = rec[dt_field].isoformat()
         return _clean_dict_decimals(rec)
@@ -5558,43 +5825,53 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
                 allocation_date, allocation_type, sub_type, city_name,
                 dropoff_location, manual_dropoff_location, customer_address,
                 driver_id, driver_name, driver_phone,
-                vehicle_number, dropoff_odometer, dropoff_remarks,
+                vehicle_number, dropoff_odometer, odometer_reading, dropoff_remarks,
                 photo_lh_side, photo_rh_side, photo_front_side, photo_back_side,
-                dropoff_photo, battery_photo,
+                dropoff_photo, odometer_photo, battery_photo,
                 ola_negative_balance, ola_negative_balance_proof,
-                fastag_balance_amount,
+                fastag_balance_amount, pending_dues, damage_penalty, deposit_refund_status,
+                fastag_balance_proof,
                 insp_jack, insp_jack_rod, insp_spanner, insp_parking_triangle,
                 insp_fire_extinguishers, insp_seat_cover, insp_floor_carpet, insp_music_system,
-                insp_stepney, insp_stepney_photo, status, created_by,
+                insp_stepney, insp_stepney_photo, status, approval_status, created_by,
                 created_at
             ) VALUES (
                 %s, 'Drop-Off', %s, %s,
                 %s, %s, %s,
                 %s, %s, %s,
-                %s, %s, %s,
                 %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s,
                 %s, %s,
-                %s, %s,
+                %s, %s, %s, %s,
                 %s,
                 %s, %s, %s, %s,
                 %s, %s, %s, %s,
-                %s, %s, %s, %s,
+                %s, %s, %s, %s, %s,
                 NOW()
             ) RETURNING id;
         """, (
             data.dropoff_date, data.dropoff_reason, data.city_name,
             data.dropoff_location, data.manual_dropoff_location, data.customer_address,
             data.driver_id, data.driver_name, data.driver_phone,
-            data.vehicle_number, data.odometer_reading, data.dropoff_notes,
+            data.vehicle_number,
+            float(data.odometer_reading) if data.odometer_reading is not None and str(data.odometer_reading).strip() != "" else None,
+            float(data.odometer_reading) if data.odometer_reading is not None and str(data.odometer_reading).strip() != "" else None,
+            data.dropoff_notes,
             extract_image(data.photo_lh_side), extract_image(data.photo_rh_side),
             extract_image(data.photo_front_side), extract_image(data.photo_back_side),
-            extract_image(data.odometer_photo), extract_image(data.battery_photo),
-            data.ola_negative_balance, extract_image(data.ola_negative_balance_proof),
-            data.pending_dues,
-            data.insp_jack, data.insp_jack_rod, data.insp_spanner, data.insp_parking_triangle,
-            data.insp_fire_extinguishers, data.insp_seat_cover, data.insp_floor_carpet, data.insp_music_system,
-            data.insp_stepney, extract_image(data.insp_stepney_photo),
-            data.status or "Submitted", uid
+            extract_image(data.odometer_photo), extract_image(data.odometer_photo), extract_image(data.battery_photo),
+            float(data.ola_negative_balance) if data.ola_negative_balance is not None and str(data.ola_negative_balance).strip() != "" else None,
+            extract_image(data.ola_negative_balance_proof),
+            float(data.fastag_balance_amount) if data.fastag_balance_amount is not None and str(data.fastag_balance_amount).strip() != "" else (float(data.pending_dues) if data.pending_dues is not None and str(data.pending_dues).strip() != "" else None),
+            float(data.pending_dues) if data.pending_dues is not None and str(data.pending_dues).strip() != "" else None,
+            float(data.damage_penalty) if data.damage_penalty is not None and str(data.damage_penalty).strip() != "" else None,
+            data.deposit_refund_status or "Pending Assessment",
+            extract_image(data.fastag_balance_proof),
+            data.insp_jack or "Available", data.insp_jack_rod or "Available", data.insp_spanner or "Available", data.insp_parking_triangle or "Available",
+            data.insp_fire_extinguishers or "Available", data.insp_seat_cover or "Available", data.insp_floor_carpet or "Available", data.insp_music_system or "Available",
+            data.insp_stepney or "Available", extract_image(data.insp_stepney_photo),
+            data.status or "Submitted", data.status or "Submitted", uid
         ))
         new_id = cur.fetchone()[0]
 
@@ -5609,7 +5886,7 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
             # Close active allocation entry for this vehicle
             cur.execute("""
                 UPDATE july_allocation_form 
-                SET status = 'Returned' 
+                SET status = 'Returned', approval_status = 'Returned'
                 WHERE UPPER(vehicle_number) = UPPER(%s) 
                   AND allocation_type = 'Allocation' 
                   AND (status IS NULL OR status NOT IN ('Returned', 'Completed'));
@@ -5623,42 +5900,60 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
     finally:
         postgreSQL_pool.putconn(conn)
 
+
 @app.put("/api/dropoffs/{id}")
 def update_dropoff(id: int, data: DropOffData, authorization: Optional[str] = Header(None)):
+    user = None
+    if authorization:
+        try:
+            user = get_july_user(authorization)
+        except Exception:
+            pass
+    uid = user["portal_user_id"] if user else None
+
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
         cur.execute("""
             UPDATE july_allocation_form SET
-                allocation_date=%s, sub_type=%s, city_name=%s,
+                allocation_date=%s, allocation_type='Drop-Off', sub_type=%s, city_name=%s,
                 dropoff_location=%s, manual_dropoff_location=%s, customer_address=%s,
                 driver_id=%s, driver_name=%s, driver_phone=%s,
-                vehicle_number=%s, dropoff_odometer=%s, dropoff_remarks=%s,
+                vehicle_number=%s, dropoff_odometer=%s, odometer_reading=%s, dropoff_remarks=%s,
                 photo_lh_side=%s, photo_rh_side=%s, photo_front_side=%s, photo_back_side=%s,
-                dropoff_photo=%s, battery_photo=%s,
+                dropoff_photo=%s, odometer_photo=%s, battery_photo=%s,
                 ola_negative_balance=%s, ola_negative_balance_proof=%s,
-                fastag_balance_amount=%s,
+                fastag_balance_amount=%s, pending_dues=%s, damage_penalty=%s, deposit_refund_status=%s,
+                fastag_balance_proof=%s,
                 insp_jack=%s, insp_jack_rod=%s, insp_spanner=%s, insp_parking_triangle=%s,
                 insp_fire_extinguishers=%s, insp_seat_cover=%s, insp_floor_carpet=%s, insp_music_system=%s,
-                insp_stepney=%s, insp_stepney_photo=%s, status=%s,
-                updated_at=NOW()
-            WHERE id=%s AND allocation_type='Drop-Off'
+                insp_stepney=%s, insp_stepney_photo=%s, status=%s, approval_status=%s,
+                updated_by=%s, updated_at=NOW()
+            WHERE id=%s
             RETURNING id;
         """, (
             data.dropoff_date, data.dropoff_reason, data.city_name,
             data.dropoff_location, data.manual_dropoff_location, data.customer_address,
             data.driver_id, data.driver_name, data.driver_phone,
-            data.vehicle_number, data.odometer_reading, data.dropoff_notes,
+            data.vehicle_number,
+            float(data.odometer_reading) if data.odometer_reading is not None and str(data.odometer_reading).strip() != "" else None,
+            float(data.odometer_reading) if data.odometer_reading is not None and str(data.odometer_reading).strip() != "" else None,
+            data.dropoff_notes,
             extract_image(data.photo_lh_side), extract_image(data.photo_rh_side),
             extract_image(data.photo_front_side), extract_image(data.photo_back_side),
-            extract_image(data.odometer_photo), extract_image(data.battery_photo),
-            data.ola_negative_balance, extract_image(data.ola_negative_balance_proof),
-            data.pending_dues,
-            data.insp_jack, data.insp_jack_rod, data.insp_spanner, data.insp_parking_triangle,
-            data.insp_fire_extinguishers, data.insp_seat_cover, data.insp_floor_carpet, data.insp_music_system,
-            data.insp_stepney, extract_image(data.insp_stepney_photo),
-            data.status or "Submitted",
-            id
+            extract_image(data.odometer_photo), extract_image(data.odometer_photo), extract_image(data.battery_photo),
+            float(data.ola_negative_balance) if data.ola_negative_balance is not None and str(data.ola_negative_balance).strip() != "" else None,
+            extract_image(data.ola_negative_balance_proof),
+            float(data.fastag_balance_amount) if data.fastag_balance_amount is not None and str(data.fastag_balance_amount).strip() != "" else (float(data.pending_dues) if data.pending_dues is not None and str(data.pending_dues).strip() != "" else None),
+            float(data.pending_dues) if data.pending_dues is not None and str(data.pending_dues).strip() != "" else None,
+            float(data.damage_penalty) if data.damage_penalty is not None and str(data.damage_penalty).strip() != "" else None,
+            data.deposit_refund_status or "Pending Assessment",
+            extract_image(data.fastag_balance_proof),
+            data.insp_jack or "Available", data.insp_jack_rod or "Available", data.insp_spanner or "Available", data.insp_parking_triangle or "Available",
+            data.insp_fire_extinguishers or "Available", data.insp_seat_cover or "Available", data.insp_floor_carpet or "Available", data.insp_music_system or "Available",
+            data.insp_stepney or "Available", extract_image(data.insp_stepney_photo),
+            data.status or "Submitted", data.status or "Submitted",
+            uid, id
         ))
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Drop-off record not found")
@@ -5672,12 +5967,13 @@ def update_dropoff(id: int, data: DropOffData, authorization: Optional[str] = He
     finally:
         postgreSQL_pool.putconn(conn)
 
+
 @app.delete("/api/dropoffs/{id}")
 def delete_dropoff(id: int, authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("DELETE FROM july_allocation_form WHERE id=%s AND allocation_type='Drop-Off' RETURNING id;", (id,))
+        cur.execute("DELETE FROM july_allocation_form WHERE id=%s RETURNING id;", (id,))
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Drop-off record not found")
         conn.commit()
@@ -5689,6 +5985,7 @@ def delete_dropoff(id: int, authorization: Optional[str] = Header(None)):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         postgreSQL_pool.putconn(conn)
+
 
 @app.put("/api/allocation/{id}")
 def update_allocation_record(id: int, data: AllocationData, authorization: Optional[str] = Header(None)):
@@ -5728,10 +6025,12 @@ def update_allocation_record(id: int, data: AllocationData, authorization: Optio
                 photo_lh_side=%s, photo_rh_side=%s, photo_front_side=%s, photo_back_side=%s,
                 odometer_reading=%s, odometer_photo=%s, battery_photo=%s,
                 insp_jack=%s, insp_jack_rod=%s, insp_spanner=%s, insp_parking_triangle=%s, insp_fire_extinguishers=%s,
-                insp_seat_cover=%s, insp_floor_carpet=%s, insp_music_system=%s, insp_remarks=%s,
+                insp_seat_cover=%s, insp_floor_carpet=%s, insp_music_system=%s, insp_stepney=%s, insp_stepney_photo=%s, insp_remarks=%s,
+                hub_name=%s, customer_address=%s, jama_form_filled=%s, pdi_completed=%s,
                 old_vehicle_number=%s, dropoff_odometer=%s, dropoff_remarks=%s, dropoff_photo=%s,
-                dropoff_location=%s, duplicate_key_status=%s,
+                dropoff_location=%s, manual_dropoff_location=%s, duplicate_key_status=%s,
                 fastag_balance_amount=%s, fastag_balance_proof=%s,
+                damage_penalty=%s, deposit_refund_status=%s, pending_dues=%s,
                 status=%s, approval_status=%s, updated_by=%s, updated_at=NOW()
             WHERE id=%s RETURNING id;
         """, (
@@ -5739,7 +6038,8 @@ def update_allocation_record(id: int, data: AllocationData, authorization: Optio
             data.driver_id, data.driver_name, data.driver_phone,
             data.driver_plan, data.type_of_plan, data.car_model,
             data.vehicle_number, data.gps_active,
-            data.ola_negative_balance, extract_image(data.ola_negative_balance_proof),
+            float(data.ola_negative_balance) if data.ola_negative_balance is not None and str(data.ola_negative_balance).strip() != "" else None,
+            extract_image(data.ola_negative_balance_proof),
             extract_image(data.photo_lh_side), extract_image(data.photo_rh_side),
             extract_image(data.photo_front_side), extract_image(data.photo_back_side),
             float(data.odometer_reading) if data.odometer_reading is not None and str(data.odometer_reading).strip() != "" else None,
@@ -5747,13 +6047,18 @@ def update_allocation_record(id: int, data: AllocationData, authorization: Optio
             data.insp_jack or "Available", data.insp_jack_rod or "Available", data.insp_spanner or "Available",
             data.insp_parking_triangle or "Available", data.insp_fire_extinguishers or "Available",
             data.insp_seat_cover or "Available", data.insp_floor_carpet or "Available",
-            data.insp_music_system or "Available", data.insp_remarks,
+            data.insp_music_system or "Available", data.insp_stepney or "Available",
+            extract_image(data.insp_stepney_photo), data.insp_remarks,
+            data.hub_name, data.customer_address, bool(data.jama_form_filled), bool(data.pdi_completed),
             data.old_vehicle_number,
-            float(data.dropoff_odometer) if data.dropoff_odometer else None,
+            float(data.dropoff_odometer) if data.dropoff_odometer is not None and str(data.dropoff_odometer).strip() != "" else None,
             data.dropoff_remarks, extract_image(data.dropoff_photo),
-            data.dropoff_location, data.duplicate_key_status,
-            float(data.fastag_balance_amount) if data.fastag_balance_amount else None,
+            data.dropoff_location, data.manual_dropoff_location, data.duplicate_key_status,
+            float(data.fastag_balance_amount) if data.fastag_balance_amount is not None and str(data.fastag_balance_amount).strip() != "" else None,
             extract_image(data.fastag_balance_proof),
+            float(data.damage_penalty) if data.damage_penalty is not None and str(data.damage_penalty).strip() != "" else None,
+            data.deposit_refund_status or "Pending Assessment",
+            float(data.pending_dues) if data.pending_dues is not None and str(data.pending_dues).strip() != "" else None,
             data.status or "Submitted",
             data.status or "Submitted",
             uid, id
@@ -5999,7 +6304,17 @@ def get_all_vehicles(search: Optional[str] = None, city: Optional[str] = None, t
         query += " ORDER BY id DESC"
         cur.execute(query, params)
         cols = [d[0] for d in cur.description]
-        return [dict(zip(cols, row)) for row in cur.fetchall()]
+        import datetime as dt_module
+        results = []
+        for row in cur.fetchall():
+            item = {}
+            for col, val in zip(cols, row):
+                if isinstance(val, (dt_module.datetime, dt_module.date)):
+                    item[col] = val.isoformat()
+                else:
+                    item[col] = val
+            results.append(item)
+        return results
     finally:
         postgreSQL_pool.putconn(conn)
 
@@ -6037,7 +6352,14 @@ def get_single_vehicle(id: int, authorization: Optional[str] = Header(None)):
         if not row:
             raise HTTPException(status_code=404, detail="Vehicle record not found")
         cols = [d[0] for d in cur.description]
-        return dict(zip(cols, row))
+        import datetime as dt_module
+        item = {}
+        for col, val in zip(cols, row):
+            if isinstance(val, (dt_module.datetime, dt_module.date)):
+                item[col] = val.isoformat()
+            else:
+                item[col] = val
+        return item
     finally:
         postgreSQL_pool.putconn(conn)
 
@@ -6094,7 +6416,11 @@ def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[s
             extract_image(data.rh_rear_tyre_img), extract_image(data.lh_rear_tyre_img), extract_image(data.spare_wheel_img),
             extract_image(data.rc_document), extract_image(data.insurance_document), extract_image(data.authorization_certificate_doc), extract_image(data.rto_tax_receipt),
             data.fuel_type,
-            data.insurance_idv, str(data.cover_engine_protect), str(data.cover_consumables), str(data.cover_zero_dep), str(data.cover_rsa),
+            data.insurance_idv,
+            bool(data.cover_engine_protect) if data.cover_engine_protect is not None else False,
+            bool(data.cover_consumables) if data.cover_consumables is not None else False,
+            bool(data.cover_zero_dep) if data.cover_zero_dep is not None else False,
+            bool(data.cover_rsa) if data.cover_rsa is not None else False,
             data.chassis_number, data.engine_number, data.cng_tank_number, data.fast_tag_number, data.fast_tag_vendor,
             data.approval_status or "Draft", data.current_approver_id, data.approval_remarks, data.created_by or uid
         ))
@@ -6134,13 +6460,14 @@ def update_vehicle_record(id: int, data: VehicleOnboardingData, authorization: O
         if id == 0:
             return create_vehicle_record(data, authorization)
 
-        cur.execute("SELECT approval_status, vehicle_number FROM july_vehicle_onboarding WHERE id=%s;", (id,))
+        cur.execute("SELECT approval_status, vehicle_number, approval_remarks FROM july_vehicle_onboarding WHERE id=%s;", (id,))
         old_veh = cur.fetchone()
         if not old_veh:
             return create_vehicle_record(data, authorization)
         
         old_veh_status = old_veh[0]
         old_veh_number = old_veh[1] or data.vehicle_number
+        old_approval_remarks = old_veh[2]
 
         cur.execute("""
             UPDATE july_vehicle_onboarding SET
@@ -6149,11 +6476,11 @@ def update_vehicle_record(id: int, data: VehicleOnboardingData, authorization: O
                 insurance_broker=%s, insurance_underwriter=%s, insurance_start_date=%s,
                 authorization_certificate=%s, insurance_mapping=%s,
                 kms_reading=%s, tracking_device_vendor=%s, tracking_device_type=%s, cng_installed=%s, cng_plate=%s, cng_installation_date=%s, jack=%s, jack_rod=%s, spanner=%s, parking_triangle=%s, fire_extinguishers=%s, seat_cover=%s, floor_carpet=%s, key_quantity=%s,
-                image_front=COALESCE(%s, image_front), image_lh=COALESCE(%s, image_lh), image_back=COALESCE(%s, image_back), image_rh=COALESCE(%s, image_rh), 
-                engine_chasis_no_img=COALESCE(%s, engine_chasis_no_img), battery_sl_no_img=COALESCE(%s, battery_sl_no_img), engine_compartment_img=COALESCE(%s, engine_compartment_img), fast_tag_img=COALESCE(%s, fast_tag_img),
-                music_system_img=COALESCE(%s, music_system_img), rh_fr_tyre_img=COALESCE(%s, rh_fr_tyre_img), lh_fr_tyre_img=COALESCE(%s, lh_fr_tyre_img),
-                rh_rear_tyre_img=COALESCE(%s, rh_rear_tyre_img), lh_rear_tyre_img=COALESCE(%s, lh_rear_tyre_img), spare_wheel_img=COALESCE(%s, spare_wheel_img),
-                rc_document=COALESCE(%s, rc_document), insurance_document=COALESCE(%s, insurance_document), authorization_certificate_doc=COALESCE(%s, authorization_certificate_doc), rto_tax_receipt=COALESCE(%s, rto_tax_receipt),
+                image_front=%s, image_lh=%s, image_back=%s, image_rh=%s, 
+                engine_chasis_no_img=%s, battery_sl_no_img=%s, engine_compartment_img=%s, fast_tag_img=%s,
+                music_system_img=%s, rh_fr_tyre_img=%s, lh_fr_tyre_img=%s,
+                rh_rear_tyre_img=%s, lh_rear_tyre_img=%s, spare_wheel_img=%s,
+                rc_document=%s, insurance_document=%s, authorization_certificate_doc=%s, rto_tax_receipt=%s,
                 fuel_type=%s,
                 insurance_idv=%s, cover_engine_protect=%s, cover_consumables=%s, cover_zero_dep=%s, cover_rsa=%s,
                 chassis_number=%s, engine_number=%s, cng_tank_number=%s, fast_tag_number=%s, fast_tag_vendor=%s,
@@ -6172,9 +6499,13 @@ def update_vehicle_record(id: int, data: VehicleOnboardingData, authorization: O
             extract_image(data.rh_rear_tyre_img), extract_image(data.lh_rear_tyre_img), extract_image(data.spare_wheel_img),
             extract_image(data.rc_document), extract_image(data.insurance_document), extract_image(data.authorization_certificate_doc), extract_image(data.rto_tax_receipt),
             data.fuel_type,
-            data.insurance_idv, str(data.cover_engine_protect), str(data.cover_consumables), str(data.cover_zero_dep), str(data.cover_rsa),
+            data.insurance_idv,
+            bool(data.cover_engine_protect) if data.cover_engine_protect is not None else False,
+            bool(data.cover_consumables) if data.cover_consumables is not None else False,
+            bool(data.cover_zero_dep) if data.cover_zero_dep is not None else False,
+            bool(data.cover_rsa) if data.cover_rsa is not None else False,
             data.chassis_number, data.engine_number, data.cng_tank_number, data.fast_tag_number, data.fast_tag_vendor,
-            data.approval_status or old_veh_status or 'Draft', data.current_approver_id, data.approval_remarks,
+            data.approval_status or old_veh_status or 'Draft', data.current_approver_id, data.approval_remarks if data.approval_remarks is not None else old_approval_remarks,
             uid,
             id
         ))
@@ -6774,7 +7105,8 @@ def get_accident(id: int, authorization: Optional[str] = Header(None)):
 
 @app.post("/api/accident")
 def create_accident(data: AccidentData, authorization: Optional[str] = Header(None)):
-    get_current_user(authorization)
+    user = get_current_user(authorization)
+    uid = user.get("portal_user_id") or user.get("user_id")
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
@@ -6783,18 +7115,21 @@ def create_accident(data: AccidentData, authorization: Optional[str] = Header(No
                 vehicle_number, vendor_id, vendor_name, city_name, date_of_accident, time_of_accident, place_of_accident, vehicle_status,
                 driver_id, driver_name, no_of_persons, third_party_involvement, fir_filed,
                 accident_reason, accident_inspection, insurance_status, repair_cost, toeing_cost, challan_amount, fine_amount, comments,
-                front_vehicle_photo, back_vehicle_photo, right_vehicle_photo, left_vehicle_photo, fir_document_copy
+                front_vehicle_photo, back_vehicle_photo, right_vehicle_photo, left_vehicle_photo, fir_document_copy,
+                created_by, created_at, updated_at, updated_by
             ) VALUES (
                 %s,%s,%s,%s,%s,%s,%s,%s,
                 %s,%s,%s,%s,%s,
                 %s,%s,%s,%s,%s,%s,%s,%s,
-                %s,%s,%s,%s,%s
+                %s,%s,%s,%s,%s,
+                %s, NOW(), NOW(), %s
             ) RETURNING id;
         """, (
             data.vehicle_number, data.vendor_id, data.vendor_name, data.city_name, data.date_of_accident, data.time_of_accident, data.place_of_accident, data.vehicle_status,
             data.driver_id, data.driver_name, data.no_of_persons, data.third_party_involvement, data.fir_filed,
             data.accident_reason, data.accident_inspection, data.insurance_status, data.repair_cost, data.toeing_cost, data.challan_amount, data.fine_amount, data.comments,
-            extract_image(data.front_vehicle_photo), extract_image(data.back_vehicle_photo), extract_image(data.right_vehicle_photo), extract_image(data.left_vehicle_photo), extract_image(data.fir_document_copy)
+            extract_image(data.front_vehicle_photo), extract_image(data.back_vehicle_photo), extract_image(data.right_vehicle_photo), extract_image(data.left_vehicle_photo), extract_image(data.fir_document_copy),
+            uid, uid
         ))
         new_id = cur.fetchone()[0]
         conn.commit()
@@ -6807,7 +7142,8 @@ def create_accident(data: AccidentData, authorization: Optional[str] = Header(No
 
 @app.put("/api/accident/{id}")
 def update_accident(id: int, data: AccidentData, authorization: Optional[str] = Header(None)):
-    get_current_user(authorization)
+    user = get_current_user(authorization)
+    uid = user.get("portal_user_id") or user.get("user_id")
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
@@ -6816,13 +7152,15 @@ def update_accident(id: int, data: AccidentData, authorization: Optional[str] = 
                 vehicle_number=%s, vendor_id=%s, vendor_name=%s, city_name=%s, date_of_accident=%s, time_of_accident=%s, place_of_accident=%s, vehicle_status=%s,
                 driver_id=%s, driver_name=%s, no_of_persons=%s, third_party_involvement=%s, fir_filed=%s,
                 accident_reason=%s, accident_inspection=%s, insurance_status=%s, repair_cost=%s, toeing_cost=%s, challan_amount=%s, fine_amount=%s, comments=%s,
-                front_vehicle_photo=%s, back_vehicle_photo=%s, right_vehicle_photo=%s, left_vehicle_photo=%s, fir_document_copy=%s
+                front_vehicle_photo=%s, back_vehicle_photo=%s, right_vehicle_photo=%s, left_vehicle_photo=%s, fir_document_copy=%s,
+                updated_at=NOW(), updated_by=%s
             WHERE id = %s RETURNING id;
         """, (
             data.vehicle_number, data.vendor_id, data.vendor_name, data.city_name, data.date_of_accident, data.time_of_accident, data.place_of_accident, data.vehicle_status,
             data.driver_id, data.driver_name, data.no_of_persons, data.third_party_involvement, data.fir_filed,
             data.accident_reason, data.accident_inspection, data.insurance_status, data.repair_cost, data.toeing_cost, data.challan_amount, data.fine_amount, data.comments,
             extract_image(data.front_vehicle_photo), extract_image(data.back_vehicle_photo), extract_image(data.right_vehicle_photo), extract_image(data.left_vehicle_photo), extract_image(data.fir_document_copy),
+            uid,
             id
         ))
         row = cur.fetchone()

@@ -287,7 +287,34 @@ export default function OperatorOnboardingForm({
       setAccountNumber(data.account_number || "");
       setIfscCode(data.ifsc_code || "");
       setUpiId(data.upi_id || "");
-      setDrivers([]); // Drivers fetching logic would ideally hit a /drivers endpoint
+      if (data.operator_drivers && Array.isArray(data.operator_drivers) && data.operator_drivers.length > 0) {
+        setDrivers(data.operator_drivers.map((d: any) => ({
+          driver_name: d.driver_name || "",
+          father_name: d.father_name || "",
+          phone_number: d.phone_number || "",
+          whatsapp_number: d.whatsapp_number || d.phone_number || "",
+          dob: d.dob || "",
+          present_address: d.present_address || "",
+          permanent_address: d.permanent_address || "",
+          sameAsPresentAddress: d.present_address === d.permanent_address,
+          emergency_name: d.emergency_name || "",
+          emergency_phone: d.emergency_phone || "",
+          dl_number: d.dl_number || "",
+          dl_expiry_date: d.dl_expiry_date || "",
+          pan_number: d.pan_number || "",
+          aadhaar_number: d.aadhaar_number || "",
+          pan_aadhaar_linked: d.pan_aadhaar_linked || "Yes",
+          custom_rent_amount: d.custom_rent_amount || "",
+          driver_id: d.driver_id || "",
+          selfie_photo: d.selfie_photo || null,
+          dl_front: d.dl_front || null,
+          dl_back: d.dl_back || null,
+          pan_card_photo: d.pan_card_photo || null,
+          aadhaar_card_photo: d.aadhaar_card_photo || null
+        })));
+      } else {
+        setDrivers([]);
+      }
 
       setActiveTab("form");
       setCurrentStep(1);
@@ -430,17 +457,18 @@ export default function OperatorOnboardingForm({
         emergency_phone: "0000000000",
         pan_number: operatorPan || "PENDING",
         aadhaar_number: operatorAadhaar || "PENDING",
-        selfie_photo: operatorSelfie || undefined,
-        pan_card_photo: operatorPanPhoto || undefined,
-        aadhaar_card_photo: operatorAadhaarPhoto || undefined,
+        selfie_photo: operatorSelfie || null,
+        pan_card_photo: operatorPanPhoto || null,
+        aadhaar_card_photo: operatorAadhaarPhoto || null,
         vendor_name: vendorName,
         vendor_id: vendorId,
         vendor_type: "Operator",
+        candidate_role: "Operator",
         father_name: "N/A",
         bank_name: bankName,
-        account_number: accountNumber || undefined,
-        ifsc_code: ifscCode || undefined,
-        upi_id: upiId || undefined,
+        account_number: accountNumber || null,
+        ifsc_code: ifscCode || null,
+        upi_id: upiId || null,
         operator_drivers: drivers.map(d => ({
           driver_name: d.driver_name,
           phone_number: d.phone_number,
@@ -457,7 +485,12 @@ export default function OperatorOnboardingForm({
           aadhaar_number: d.aadhaar_number,
           father_name: d.father_name,
           dl_expiry_date: d.dl_expiry_date,
-          pan_aadhaar_linked: d.pan_aadhaar_linked
+          pan_aadhaar_linked: d.pan_aadhaar_linked,
+          selfie_photo: d.selfie_photo || null,
+          dl_front: d.dl_front || null,
+          dl_back: d.dl_back || null,
+          pan_card_photo: d.pan_card_photo || null,
+          aadhaar_card_photo: d.aadhaar_card_photo || null
         }))
       };
 
@@ -1163,7 +1196,7 @@ export default function OperatorOnboardingForm({
                           {(r as any).account_number ? ` (${String((r as any).account_number).slice(-4).padStart(String((r as any).account_number).length, '*')})` : ""}
                         </td>
                         <td className="px-5 py-4 text-xs text-text-muted">
-                          {r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN") : "—"}
+                          {r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { timeZone: "Asia/Kolkata" }) : "—"}
                         </td>
                         <td className="px-5 py-4 text-right">
                           <button
