@@ -16,3 +16,4 @@ bcrypt==4.0.1                 # pinned – newer bcrypt breaks passlib compat
 
 # ── Utilities ─────────────────────────────────────────────
 python-dateutil==2.9.0.post0  # used in date parsing helpers
+google-cloud-storage==3.13.1  # Google Cloud Storage bucket SDK

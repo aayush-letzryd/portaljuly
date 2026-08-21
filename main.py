@@ -13,6 +13,7 @@ import secrets
 import traceback
 import json
 import uuid
+import base64
 import uvicorn
 import asyncio
 from datetime import datetime
@@ -1897,15 +1898,60 @@ class InspectionData(BaseModel):
     remarks: Optional[str] = None
     music_system: Optional[str] = None
 
-def extract_image(val: Any) -> Optional[str]:
+GCS_BUCKET_NAME = os.environ.get("GCS_BUCKET_NAME", "letzryd-portal-media")
+_gcs_client = None
+
+def get_gcs_bucket():
+    global _gcs_client
+    try:
+        from google.cloud import storage
+        if _gcs_client is None:
+            _gcs_client = storage.Client()
+        return _gcs_client.bucket(GCS_BUCKET_NAME)
+    except Exception as e:
+        return None
+
+def upload_b64_to_gcs(b64_str: str, folder: str = "uploads") -> str:
+    if not b64_str or not isinstance(b64_str, str) or not b64_str.startswith("data:"):
+        return b64_str
+    try:
+        bucket = get_gcs_bucket()
+        if not bucket:
+            return b64_str
+        
+        header, encoded = b64_str.split(",", 1)
+        file_bytes = base64.b64decode(encoded)
+        ext = "png" if "png" in header.lower() else "jpg"
+        content_type = "image/png" if ext == "png" else "image/jpeg"
+        file_key = f"{folder}/{uuid.uuid4().hex}.{ext}"
+        
+        blob = bucket.blob(file_key)
+        blob.upload_from_string(file_bytes, content_type=content_type)
+        return f"https://storage.googleapis.com/{GCS_BUCKET_NAME}/{file_key}"
+    except Exception as e:
+        print(f"[WARN] Failed to upload to GCS: {e}")
+        return b64_str
+
+def extract_image(val: Any, folder: str = "uploads") -> Optional[str]:
     if val is None:
         return None
+    raw_str = None
     if isinstance(val, list) and len(val) > 0:
         first = val[0]
-        return first.get("content") if isinstance(first, dict) else str(first)
-    if isinstance(val, str) and val.startswith("data:"):
-        return val
-    return None
+        raw_str = first.get("content") if isinstance(first, dict) else str(first)
+    elif isinstance(val, str):
+        raw_str = val
+
+    if not raw_str:
+        return None
+
+    if raw_str.startswith("http://") or raw_str.startswith("https://"):
+        return raw_str
+
+    if raw_str.startswith("data:"):
+        return upload_b64_to_gcs(raw_str, folder)
+
+    return raw_str
 
 
 # ─────────────────────────────────────────────────────────
