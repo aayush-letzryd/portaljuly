@@ -401,13 +401,20 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
   );
 
   const RegistryTable = ({ rows, isLoading }: { rows: any[]; isLoading?: boolean }) => (
-    <div className="overflow-x-auto">
-      <table className="w-full text-left border-collapse whitespace-nowrap">
+    <div className="overflow-x-auto w-full">
+      <table className="w-full text-left border-collapse min-w-[900px]">
         <thead>
-          <tr className="bg-slate-50 border-b border-slate-200">
-            {["ID", "DRIVER NAME", "DRIVER ID", "CONTACT", "CITY", "VEHICLE NO", "REASON", "RECORDED BY", "DATE & TIME", "ACTION"].map((h) => (
-              <th key={h} className={`px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 ${h === "ACTION" ? "text-center" : "text-left"}`}>{h}</th>
-            ))}
+          <tr className="bg-slate-50 border-b border-slate-200 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+            <th className="px-3.5 py-3 w-12">ID</th>
+            <th className="px-3.5 py-3">Driver Name</th>
+            <th className="px-3.5 py-3">Driver ID</th>
+            <th className="px-3.5 py-3">Contact</th>
+            <th className="px-3.5 py-3">City</th>
+            <th className="px-3.5 py-3">Vehicle No</th>
+            <th className="px-3.5 py-3">Reason</th>
+            <th className="px-3.5 py-3">Recorded By</th>
+            <th className="px-3.5 py-3">Date & Time</th>
+            <th className="px-3.5 py-3 text-center w-20">Action</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
@@ -421,28 +428,28 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
               const recBy = r.created_by_name || user.name || "Executive";
               const reasonColor = REASON_COLORS[r.dropoff_reason] || REASON_COLORS["Other"];
               return (
-                <tr key={r.id} className="hover:bg-slate-50/80 transition-colors">
-                  <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-700">#{r.id}</td>
-                  <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">{r.driver_name || "—"}</td>
-                  <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-600">{r.driver_id || "—"}</td>
-                  <td className="px-4 py-3.5 font-sans text-xs text-slate-600">{r.driver_phone || "—"}</td>
-                  <td className="px-4 py-3.5 font-sans text-xs font-semibold text-slate-800">{r.city_name || "—"}</td>
-                  <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">{r.vehicle_number || "—"}</td>
-                  <td className="px-4 py-3.5">
-                    <span className={`px-2.5 py-1 rounded-lg border font-semibold text-[11px] ${reasonColor}`}>
+                <tr key={r.id} className="hover:bg-slate-50/80 transition-colors text-xs">
+                  <td className="px-3.5 py-3 font-semibold text-slate-700">#{r.id}</td>
+                  <td className="px-3.5 py-3 font-bold text-slate-900">{r.driver_name || "—"}</td>
+                  <td className="px-3.5 py-3 font-medium text-slate-600">{r.driver_id || "—"}</td>
+                  <td className="px-3.5 py-3 text-slate-600 font-mono">{r.driver_phone || "—"}</td>
+                  <td className="px-3.5 py-3 font-semibold text-slate-800">{r.city_name || "—"}</td>
+                  <td className="px-3.5 py-3 font-bold text-slate-900 font-mono">{r.vehicle_number || "—"}</td>
+                  <td className="px-3.5 py-3">
+                    <span className={`inline-block px-2.5 py-0.5 rounded-md border font-semibold text-[10px] whitespace-nowrap ${reasonColor}`}>
                       {r.dropoff_reason || "Voluntary Return"}
                     </span>
                   </td>
-                  <td className="px-4 py-3.5 font-sans text-xs text-slate-800">
-                    <span className="font-bold text-slate-900 block">{recBy}</span>
+                  <td className="px-3.5 py-3 text-slate-800">
+                    <span className="font-bold text-slate-900 block truncate max-w-[130px]" title={recBy}>{recBy}</span>
                     <span className="text-[10px] text-slate-400 font-medium block">ID: {r.created_by || "—"}</span>
                   </td>
-                  <td className="px-4 py-3.5 font-sans text-xs text-slate-800">
+                  <td className="px-3.5 py-3 text-slate-800 whitespace-nowrap">
                     <span className="font-bold text-slate-900 block">{datePart}</span>
                     <span className="text-[10px] text-slate-400 font-medium block">{timePart}</span>
                   </td>
-                  <td className="px-4 py-3.5 text-center">
-                    <div className="flex items-center justify-center gap-1.5">
+                  <td className="px-3.5 py-3 text-center">
+                    <div className="flex items-center justify-center gap-1">
                       <button onClick={() => loadForEdit(r.id)}
                         className="h-7 w-7 rounded-lg flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer border border-slate-200" title="Edit">
                         <Edit className="h-3.5 w-3.5" />
