@@ -1,3 +1,4 @@
+import { compressImage } from "../utils/imageCompressor";
 import React, { useState, useEffect, useMemo } from "react";
 import {
   Calendar, MapPin, User, Phone, FileText, CheckCircle,
@@ -694,7 +695,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                             <button type="button" onClick={() => { setActiveCameraTarget("ola"); setCameraActive(true); }} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-800 text-xs font-bold py-2.5 cursor-pointer"><Camera className="h-3.5 w-3.5" /> Capture</button>
                             <label className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-slate-800 text-xs font-bold py-2.5 hover:bg-slate-50 cursor-pointer">
                               <Upload className="h-3.5 w-3.5 text-primary" /> Upload
-                              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onloadend = () => { if (typeof r.result === "string") setOlaNegativeBalanceProof(r.result); }; r.readAsDataURL(f); } }} />
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { compressImage(f).then(setOlaNegativeBalanceProof); } }} />
                             </label>
                           </div>
                         )}
@@ -729,7 +730,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                           <button type="button" onClick={() => { setActiveCameraTarget("odometer"); setCameraActive(true); }} className="flex-1 flex items-center justify-center gap-1.5 rounded-xl bg-primary text-white text-xs font-bold py-2.5 hover:bg-primary-hover cursor-pointer"><Camera className="h-3.5 w-3.5" /> Capture</button>
                           <label className="flex-1 flex items-center justify-center gap-1.5 rounded-xl border border-slate-300 bg-white text-slate-800 text-xs font-bold py-2.5 hover:bg-slate-50 cursor-pointer">
                             <Upload className="h-3.5 w-3.5 text-primary" /> Upload
-                            <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onloadend = () => { if (typeof r.result === "string") setOdometerPhoto(r.result); }; r.readAsDataURL(f); } }} />
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { compressImage(f).then(setOdometerPhoto); } }} />
                           </label>
                         </div>
                       )}
@@ -767,7 +768,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                             <button type="button" onClick={() => { setActiveCameraTarget(ph.target as any); setCameraActive(true); }} className="w-full flex items-center justify-center gap-1 rounded-lg bg-primary text-white text-[11px] font-bold py-2 hover:bg-primary-hover cursor-pointer"><Camera className="h-3.5 w-3.5" /> Capture</button>
                             <label className="w-full flex items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white text-slate-700 text-[11px] font-bold py-2 hover:bg-slate-100 cursor-pointer">
                               <Upload className="h-3.5 w-3.5 text-primary" /> Upload
-                              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onloadend = () => { if (typeof r.result === "string") ph.setState(r.result); }; r.readAsDataURL(f); } }} />
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { compressImage(f).then(ph.setState); } }} />
                             </label>
                           </div>
                         )}
@@ -843,7 +844,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                             <button type="button" onClick={() => { setActiveCameraTarget("stepney"); setCameraActive(true); }} className="flex items-center gap-1.5 rounded-lg bg-emerald-700 text-white text-[11px] font-bold px-3 py-1.5 hover:bg-emerald-800 cursor-pointer shadow-2xs"><Camera className="h-3.5 w-3.5" /> Capture</button>
                             <label className="flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 text-[11px] font-bold px-3 py-1.5 hover:bg-slate-100 cursor-pointer shadow-2xs">
                               <Upload className="h-3.5 w-3.5 text-emerald-700" /> Upload
-                              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { const r = new FileReader(); r.onloadend = () => { if (typeof r.result === "string") setStepneyPhoto(r.result); }; r.readAsDataURL(f); } }} />
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { compressImage(f).then(setStepneyPhoto); } }} />
                             </label>
                           </div>
                         )}

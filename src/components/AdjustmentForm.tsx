@@ -1,3 +1,4 @@
+import { compressImage } from "../utils/imageCompressor";
 import React, { useState, useMemo } from "react";
 import { 
   Calendar, MapPin, User, Phone, FileText, CheckCircle, 
@@ -165,13 +166,7 @@ export default function AdjustmentForm({
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          setPhoto(reader.result);
-        }
-      };
-      reader.readAsDataURL(file);
+      compressImage(file).then(setPhoto);
     }
   };
 

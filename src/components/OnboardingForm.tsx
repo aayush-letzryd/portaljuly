@@ -1059,41 +1059,39 @@ export default function OnboardingForm({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: "selfie" | "dl_front" | "dl_back" | "pan" | "aadhaar" | "aadhaar_front" | "aadhaar_back" | "local_address_proof" | "security_cheque" | "police_doc" | "cheque" | "cheque2" | "cheque3" | "cheque4" | "signature" | string) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          if (field === "selfie") setSelfiePhoto(reader.result);
-          if (field === "dl_front") setDlFront(reader.result);
-          if (field === "dl_back") setDlBack(reader.result);
-          if (field === "pan") setPanCardPhoto(reader.result);
-          if (field === "aadhaar") setAadhaarPhoto(reader.result);
-          if (field === "aadhaar_front") setAadhaarCardFront(reader.result);
-          if (field === "aadhaar_back") setAadhaarCardBack(reader.result);
+      compressImage(file).then((result) => {
+        if (typeof result === "string") {
+          if (field === "selfie") setSelfiePhoto(result);
+          if (field === "dl_front") setDlFront(result);
+          if (field === "dl_back") setDlBack(result);
+          if (field === "pan") setPanCardPhoto(result);
+          if (field === "aadhaar") setAadhaarPhoto(result);
+          if (field === "aadhaar_front") setAadhaarCardFront(result);
+          if (field === "aadhaar_back") setAadhaarCardBack(result);
           if (field === "local_address_proof") {
             if (localAddressProofFiles.length < 4) {
-              setLocalAddressProofFiles(prev => [...prev, reader.result as string]);
+              setLocalAddressProofFiles(prev => [...prev, result]);
             } else {
               alert("Maximum 4 files allowed for Local Address Proof.");
             }
           }
           if (field === "security_cheque") {
             if (securityChequeFiles.length < 4) {
-              setSecurityChequeFiles(prev => [...prev, reader.result as string]);
+              setSecurityChequeFiles(prev => [...prev, result]);
             } else {
               alert("Maximum 4 security cheques allowed.");
             }
           }
           if (field === "police_doc" || field === "police_verification_doc") {
-            setPoliceVerificationDoc(reader.result);
+            setPoliceVerificationDoc(result);
           }
-          if (field === "cheque") setCancelledChequePhoto(reader.result);
-          if (field === "cheque2") setCheque2Photo(reader.result);
-          if (field === "cheque3") setCheque3Photo(reader.result);
-          if (field === "cheque4") setCheque4Photo(reader.result);
-          if (field === "signature") setSignaturePhoto(reader.result);
+          if (field === "cheque") setCancelledChequePhoto(result);
+          if (field === "cheque2") setCheque2Photo(result);
+          if (field === "cheque3") setCheque3Photo(result);
+          if (field === "cheque4") setCheque4Photo(result);
+          if (field === "signature") setSignaturePhoto(result);
         }
-      };
-      reader.readAsDataURL(file);
+      });
     }
   };
 

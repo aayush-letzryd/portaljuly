@@ -1,3 +1,4 @@
+import { compressImage } from "../utils/imageCompressor";
 import React, { useState, useMemo, useEffect } from "react";
 import { 
   Calendar, MapPin, User, Phone, FileText, CheckCircle, 

@@ -78,7 +78,7 @@ export default function CameraCapture({ onCapture, onClose, title }: CameraCaptu
         }
         
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+        const dataUrl = canvas.toDataURL("image/jpeg", 0.78);
         setCapturedImage(dataUrl);
         stopCamera();
       }

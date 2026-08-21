@@ -452,9 +452,8 @@ export default function VehicleOnboardingForm({
   const triggerUpload = (field: string, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
+      compressImage(file).then((result) => {
+        if (typeof result === "string") {
           const setters: Record<string, React.Dispatch<React.SetStateAction<string | null>>> = {
             image_front: setImageFront,
             image_lh: setImageLh,
@@ -476,12 +475,11 @@ export default function VehicleOnboardingForm({
             rto_tax_receipt: setRtoTaxReceipt
           };
           if (setters[field]) {
-            setters[field](reader.result);
+            setters[field](result);
             simulateOCR(field); // Triggers date extraction for insurance
           }
         }
-      };
-      reader.readAsDataURL(file);
+      });
     }
   };
 
