@@ -32,7 +32,7 @@ const ensureISOIST = (dateStr?: string): string | undefined => {
     str = str.replace(" ", "T");
   }
   if (!str.endsWith("Z") && !/[+-]\d{2}:?\d{2}$/.test(str)) {
-    str = str + "+05:30";
+    str = str + "Z";
   }
   return str;
 };
