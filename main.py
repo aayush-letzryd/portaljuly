@@ -5335,9 +5335,11 @@ def get_dropoffs(status: Optional[str] = None, authorization: Optional[str] = He
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        where = "(allocation_type = 'Drop-Off' OR sub_type IN ('Drop-Off','Voluntary Return','Contract Completion','Non-payment / Default','Vehicle Breakdown / Maintenance','Other'))"
+        where = "(a.allocation_type = 'Drop-Off' OR a.sub_type IN ('Drop-Off','Voluntary Return','Contract Completion','Non-payment / Default','Vehicle Breakdown / Maintenance','Other'))"
         params = []
-        if status:
+        if status in ("all", "all_including_draft"):
+            pass
+        elif status:
             where += " AND a.status = %s"
             params.append(status)
         else:
@@ -5348,10 +5350,31 @@ def get_dropoffs(status: Optional[str] = None, authorization: Optional[str] = He
                 a.allocation_date  AS dropoff_date,
                 a.sub_type         AS dropoff_reason,
                 a.city_name,
+                a.dropoff_location,
+                a.manual_dropoff_location,
+                a.customer_address,
                 a.driver_id, a.driver_name, a.driver_phone, a.vehicle_number,
                 a.dropoff_odometer AS odometer_reading,
                 a.dropoff_remarks  AS dropoff_notes,
+                a.photo_lh_side,
+                a.photo_rh_side,
+                a.photo_front_side,
+                a.photo_back_side,
+                a.dropoff_photo    AS odometer_photo,
+                a.battery_photo,
+                a.ola_negative_balance,
+                a.ola_negative_balance_proof,
                 a.fastag_balance_amount AS pending_dues,
+                a.insp_jack,
+                a.insp_jack_rod,
+                a.insp_spanner,
+                a.insp_parking_triangle,
+                a.insp_fire_extinguishers,
+                a.insp_seat_cover,
+                a.insp_floor_carpet,
+                a.insp_music_system,
+                a.insp_stepney,
+                a.insp_stepney_photo,
                 a.status,
                 a.created_by,
                 COALESCE(u.username, '') AS created_by_name,
@@ -5375,6 +5398,63 @@ def get_dropoffs(status: Optional[str] = None, authorization: Optional[str] = He
     except Exception as e:
         print(f"Error fetching dropoffs: {e}")
         return []
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+@app.get("/api/dropoffs/{id}")
+def get_single_dropoff(id: int, authorization: Optional[str] = Header(None)):
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT
+                a.id,
+                a.allocation_date  AS dropoff_date,
+                a.sub_type         AS dropoff_reason,
+                a.city_name,
+                a.dropoff_location,
+                a.manual_dropoff_location,
+                a.customer_address,
+                a.driver_id, a.driver_name, a.driver_phone, a.vehicle_number,
+                a.dropoff_odometer AS odometer_reading,
+                a.dropoff_remarks  AS dropoff_notes,
+                a.photo_lh_side,
+                a.photo_rh_side,
+                a.photo_front_side,
+                a.photo_back_side,
+                a.dropoff_photo    AS odometer_photo,
+                a.battery_photo,
+                a.ola_negative_balance,
+                a.ola_negative_balance_proof,
+                a.fastag_balance_amount AS pending_dues,
+                a.insp_jack,
+                a.insp_jack_rod,
+                a.insp_spanner,
+                a.insp_parking_triangle,
+                a.insp_fire_extinguishers,
+                a.insp_seat_cover,
+                a.insp_floor_carpet,
+                a.insp_music_system,
+                a.insp_stepney,
+                a.insp_stepney_photo,
+                a.status,
+                a.created_by,
+                COALESCE(u.username, '') AS created_by_name,
+                a.created_at,
+                a.updated_at
+            FROM july_allocation_form a
+            LEFT JOIN july_portal_users u ON u.portal_user_id = a.created_by
+            WHERE a.id = %s;
+        """, (id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Drop-off record not found")
+        cols = [d[0] for d in cur.description]
+        rec = dict(zip(cols, row))
+        for dt_field in ["created_at", "updated_at"]:
+            if rec.get(dt_field) and hasattr(rec[dt_field], "isoformat"):
+                rec[dt_field] = rec[dt_field].isoformat()
+        return _clean_dict_decimals(rec)
     finally:
         postgreSQL_pool.putconn(conn)
 
@@ -5418,7 +5498,7 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
                 %s, %s, %s, %s,
                 %s, %s, %s, %s,
                 %s, %s, %s, %s,
-                NOW() AT TIME ZONE 'Asia/Kolkata'
+                NOW()
             ) RETURNING id;
         """, (
             data.dropoff_date, data.dropoff_reason, data.city_name,
@@ -5480,7 +5560,7 @@ def update_dropoff(id: int, data: DropOffData, authorization: Optional[str] = He
                 insp_jack=%s, insp_jack_rod=%s, insp_spanner=%s, insp_parking_triangle=%s,
                 insp_fire_extinguishers=%s, insp_seat_cover=%s, insp_floor_carpet=%s, insp_music_system=%s,
                 insp_stepney=%s, insp_stepney_photo=%s, status=%s,
-                updated_at=NOW() AT TIME ZONE 'Asia/Kolkata'
+                updated_at=NOW()
             WHERE id=%s AND allocation_type='Drop-Off'
             RETURNING id;
         """, (

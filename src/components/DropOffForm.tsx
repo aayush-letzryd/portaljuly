@@ -209,11 +209,23 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
   const loadForEdit = async (id: number) => {
     try {
       const token = localStorage.getItem("lr_token");
-      // Fetch single record from all dropoffs
-      const res = await fetch("/api/dropoffs?status=all_including_draft", { headers: { Authorization: `Bearer ${token}` } });
-      const all = res.ok ? await res.json() : [...records, ...draftRecords];
-      const r = (all as any[]).find((x) => x.id === id) || [...records, ...draftRecords].find((x) => x.id === id);
+      // Fetch single record directly
+      let r: any = null;
+      try {
+        const resSingle = await fetch(`/api/dropoffs/${id}`, { headers: { Authorization: `Bearer ${token}` } });
+        if (resSingle.ok) {
+          r = await resSingle.json();
+        }
+      } catch {
+        /* fallback */
+      }
+      if (!r) {
+        const res = await fetch("/api/dropoffs?status=all_including_draft", { headers: { Authorization: `Bearer ${token}` } });
+        const all = res.ok ? await res.json() : [...records, ...draftRecords];
+        r = (all as any[]).find((x) => x.id === id) || [...records, ...draftRecords].find((x) => x.id === id);
+      }
       if (!r) { alert("Could not load record."); return; }
+
       setEditingId(id);
       setDropoffDate(r.dropoff_date?.split("T")[0] || new Date().toISOString().split("T")[0]);
       setDropoffReason(r.dropoff_reason || "Voluntary Return");
@@ -226,8 +238,28 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
       setDriverPhone(r.driver_phone || "");
       setVehicleNumber(r.vehicle_number || "");
       setOdometerReading(r.odometer_reading ? String(r.odometer_reading) : "");
-      setPendingDues(r.pending_dues ? String(r.pending_dues) : "");
-      setDropoffNotes(r.dropoff_notes || "");
+      setOdometerPhoto(r.odometer_photo || r.dropoff_photo || null);
+      setBatteryPhoto(r.battery_photo || null);
+      setPhotoLhSide(r.photo_lh_side || null);
+      setPhotoRhSide(r.photo_rh_side || null);
+      setPhotoFrontSide(r.photo_front_side || null);
+      setPhotoBackSide(r.photo_back_side || null);
+      setOlaNegativeBalance(r.ola_negative_balance ? String(r.ola_negative_balance) : "");
+      setOlaNegativeBalanceProof(r.ola_negative_balance_proof || null);
+      setPendingDues(r.pending_dues ? String(r.pending_dues) : (r.fastag_balance_amount ? String(r.fastag_balance_amount) : ""));
+      setFastagBalanceAmount(r.fastag_balance_amount ? String(r.fastag_balance_amount) : "");
+      setFastagBalanceProof(r.fastag_balance_proof || null);
+      setDamagePenalty(r.damage_penalty ? String(r.damage_penalty) : "");
+      setDepositRefundStatus(r.deposit_refund_status || "Pending Assessment");
+      setDropoffNotes(r.dropoff_notes || r.dropoff_remarks || "");
+      setJack(r.insp_jack || "Available");
+      setJackRod(r.insp_jack_rod || "Available");
+      setSpanner(r.insp_spanner || "Available");
+      setParkingTriangle(r.insp_parking_triangle || "Available");
+      setFireExtinguishers(r.insp_fire_extinguishers || "Available");
+      setSeatCover(r.insp_seat_cover || "Available");
+      setFloorCarpet(r.insp_floor_carpet || "Available");
+      setMusicSystem(r.insp_music_system || "Available");
       setStepney(r.insp_stepney || "Available");
       setStepneyPhoto(r.insp_stepney_photo || null);
       setActiveTab("form");
