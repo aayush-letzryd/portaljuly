@@ -146,7 +146,8 @@ export default function AccidentsForm({
         if (field === "left") setLeftPhoto(url);
         if (field === "fir") setFirDoc(url);
       }
-    });
+    })
+    .catch((err) => { alert("Photo upload failed: " + (err && err.message ? err.message : "Check your connection and retry.")); })
   };
 
   const loadRecordForEdit = async (id: number) => {

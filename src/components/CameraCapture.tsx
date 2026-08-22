@@ -80,7 +80,8 @@ export default function CameraCapture({ onCapture, onClose, title }: CameraCaptu
         }
         
         context.drawImage(video, 0, 0, canvas.width, canvas.height);
-        const dataUrl = canvas.toDataURL("image/jpeg", 0.78);
+        // Use quality 1.0 (no compression) to preserve full camera quality
+        const dataUrl = canvas.toDataURL("image/jpeg", 1.0);
         setCapturedImage(dataUrl);
         stopCamera();
       }
@@ -96,9 +97,10 @@ export default function CameraCapture({ onCapture, onClose, title }: CameraCaptu
       setUploading(true);
       try {
         const url = await uploadDirectToGCS(capturedImage, "camera-captures");
-        onCapture(url || capturedImage);
-      } catch (err) {
-        onCapture(capturedImage);
+        onCapture(url);
+      } catch (err: any) {
+        // Show a clear error — never silently pass base64 back (would cause 413 on submit)
+        alert(`Photo upload to cloud storage failed: ${err?.message || "Unknown error"}. Please check your internet connection and try again.`);
       } finally {
         setUploading(false);
       }

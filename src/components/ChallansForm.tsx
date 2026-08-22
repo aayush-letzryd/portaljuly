@@ -167,7 +167,8 @@ export default function ChallansForm({
         if (typeof url === "string") {
           setChallanPhoto(url);
         }
-      });
+      })
+    .catch((err) => { alert("Photo upload failed: " + (err && err.message ? err.message : "Check your connection and retry.")); })
     }
   };
 

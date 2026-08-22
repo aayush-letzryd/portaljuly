@@ -129,7 +129,8 @@ export default function InspectionForm({
       if (typeof url === "string") {
         setPhotoByField(field, url);
       }
-    });
+    })
+    .catch((err) => { alert("Photo upload failed: " + (err && err.message ? err.message : "Check your connection and retry.")); })
   };
 
   const setPhotoByField = (field: string, val: string | null) => {

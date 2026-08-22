@@ -1092,7 +1092,8 @@ export default function OnboardingForm({
           if (field === "cheque4") setCheque4Photo(result);
           if (field === "signature") setSignaturePhoto(result);
         }
-      });
+      })
+    .catch((err) => { alert("Photo upload failed: " + (err && err.message ? err.message : "Check your connection and retry.")); })
     }
   };
 

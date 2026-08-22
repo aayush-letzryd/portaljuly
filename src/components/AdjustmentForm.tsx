@@ -168,7 +168,7 @@ export default function AdjustmentForm({
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      compressImage(file).then(setPhoto);
+      compressImage(file).then(setPhoto).catch((err) => alert('Photo upload failed: ' + (err?.message || 'Please check your connection and try again.')));
     }
   };
 

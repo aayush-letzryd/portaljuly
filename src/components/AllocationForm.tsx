@@ -265,7 +265,7 @@ export default function AllocationForm({
     if (file) {
       compressImage(file).then((b64) => {
         if (b64) setDropoffPhoto(b64);
-      });
+      }).catch((err) => alert('Photo upload failed: ' + (err?.message || 'Please check your connection and try again.')));
     }
   };
 
@@ -991,7 +991,7 @@ export default function AllocationForm({
                                 <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                                   const file = e.target.files?.[0];
                                   if (file) {
-                                    compressImage(file).then(setOlaNegativeBalanceProof);
+                                    compressImage(file).then(setOlaNegativeBalanceProof).catch((err) => alert('Photo upload failed: ' + (err?.message || 'Please check your connection and try again.')));
                                   }
                                 }} />
                               </label>
@@ -1029,7 +1029,7 @@ export default function AllocationForm({
                                 <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                                   const file = e.target.files?.[0];
                                   if (file) {
-                                    compressImage(file).then(setFastagBalanceProof);
+                                    compressImage(file).then(setFastagBalanceProof).catch((err) => alert('Photo upload failed: ' + (err?.message || 'Please check your connection and try again.')));
                                   }
                                 }} />
                               </label>
@@ -1136,7 +1136,7 @@ export default function AllocationForm({
                               <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                                 const file = e.target.files?.[0];
                                 if (file) {
-                                  compressImage(file).then(setOdometerPhoto);
+                                  compressImage(file).then(setOdometerPhoto).catch((err) => alert('Photo upload failed: ' + (err?.message || 'Please check your connection and try again.')));
                                 }
                               }} />
                             </label>
@@ -1206,7 +1206,7 @@ export default function AllocationForm({
                                     onChange={(e) => {
                                       const file = e.target.files?.[0];
                                       if (file) {
-                                        compressImage(file).then(ph.setState);
+                                        compressImage(file).then(ph.setState).catch((err) => alert('Photo upload failed: ' + (err?.message || 'Please check your connection and try again.')));
                                       }
                                     }} 
                                     className="hidden" 
@@ -1313,7 +1313,7 @@ export default function AllocationForm({
                                 <input type="file" accept="image/*" className="hidden" onChange={(e) => {
                                   const file = e.target.files?.[0];
                                   if (file) {
-                                    compressImage(file).then(setStepneyPhoto);
+                                    compressImage(file).then(setStepneyPhoto).catch((err) => alert('Photo upload failed: ' + (err?.message || 'Please check your connection and try again.')));
                                   }
                                 }} />
                               </label>
@@ -1387,7 +1387,7 @@ export default function AllocationForm({
                           <button type="button" onClick={() => { setActiveCameraTarget("dropoffPhoto"); setCameraActive(true); }} className="flex-1 flex items-center justify-center gap-1.5 rounded-lg bg-emerald-600 text-white text-xs font-bold py-2 hover:bg-emerald-700 cursor-pointer shadow-2xs transition-colors"><Camera className="h-3.5 w-3.5" /> Capture</button>
                           <label className="flex-1 flex items-center justify-center gap-1.5 rounded-lg border border-slate-300 bg-white text-slate-800 text-xs font-bold py-2 hover:bg-slate-50 cursor-pointer transition-colors">
                             <Upload className="h-3.5 w-3.5 text-primary" /> Upload
-                            <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { compressImage(f).then(setDropoffPhoto); } }} />
+                            <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) { compressImage(f).then(setDropoffPhoto).catch((err) => alert('Photo upload failed: ' + (err?.message || 'Please check your connection and try again.'))); } }} />
                           </label>
                         </div>
                       )}

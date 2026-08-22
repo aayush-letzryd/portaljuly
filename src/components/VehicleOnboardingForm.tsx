@@ -529,7 +529,8 @@ export default function VehicleOnboardingForm({
             simulateOCR(field); // Triggers date extraction for insurance
           }
         }
-      });
+      })
+    .catch((err) => { alert("Photo upload failed: " + (err && err.message ? err.message : "Check your connection and retry.")); })
     }
   };
 

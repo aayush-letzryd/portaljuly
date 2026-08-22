@@ -129,7 +129,8 @@ export default function HubsParkingForm({
         if (typeof url === "string") {
           setHubPhoto(url);
         }
-      });
+      })
+    .catch((err) => { alert("Photo upload failed: " + (err && err.message ? err.message : "Check your connection and retry.")); })
     }
   };
 
