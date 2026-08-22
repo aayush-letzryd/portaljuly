@@ -144,11 +144,9 @@ export default function InspectionForm({
     else if (field === "music_system") setPhotoMusicSystem(val);
     else if (field === "tyre_rh_fr") setPhotoTyreRhFr(val);
     else if (field === "tyre_lh_fr") setPhotoTyreLhFr(val);
-    else if (field === "tyre_rh_re") setPhotoTyreRhFr(val); // mapping check
+    else if (field === "tyre_rh_re") setPhotoTyreRhRe(val);
     else if (field === "tyre_lh_re") setPhotoTyreLhRe(val);
     else if (field === "tyre_spare") setPhotoTyreSpare(val);
-    // Correct mapping for tyre_rh_re
-    if (field === "tyre_rh_re") setPhotoTyreRhRe(val);
   };
 
   const loadRecordForEdit = async (id: number) => {
