@@ -2014,11 +2014,6 @@ async def upload_direct_file(file: UploadFile = File(...), folder: Optional[str]
         file_key = f"{folder}/{uuid.uuid4().hex}.{ext}"
         blob = bucket.blob(file_key)
         blob.upload_from_string(content, content_type=file.content_type or "image/jpeg")
-        try:
-            blob.make_public()
-        except Exception:
-            # Bucket uses Uniform Bucket-Level Access (UBLA), where object-level ACLs are disabled.
-            pass
         return {"url": f"https://storage.googleapis.com/{GCS_BUCKET_NAME}/{file_key}"}
     except HTTPException:
         raise
