@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { ExpenseRecord, User as UserSession } from "../types";
 import CameraCapture from "./CameraCapture";
+import { compressImage } from "../utils/imageCompressor";
 
 interface ExpensesFormProps {
   user: UserSession;
@@ -109,13 +110,11 @@ export default function ExpensesForm({
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          setReferencePhoto(reader.result);
+      compressImage(file, 1920, 1920, 0.85, "expenses").then((url) => {
+        if (typeof url === "string") {
+          setReferencePhoto(url);
         }
-      };
-      reader.readAsDataURL(file);
+      });
     }
   };
 

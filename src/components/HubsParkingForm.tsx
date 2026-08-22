@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { HubRecord, User as UserSession, CITIES } from "../types";
 import CameraCapture from "./CameraCapture";
+import { compressImage } from "../utils/imageCompressor";
 
 interface HubsParkingFormProps {
   user: UserSession;
@@ -124,13 +125,11 @@ export default function HubsParkingForm({
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          setHubPhoto(reader.result);
+      compressImage(file, 1920, 1920, 0.85, "hubs").then((url) => {
+        if (typeof url === "string") {
+          setHubPhoto(url);
         }
-      };
-      reader.readAsDataURL(file);
+      });
     }
   };
 

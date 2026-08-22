@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { WorkshopRecord, User as UserSession, CITIES } from "../types";
 import CameraCapture from "./CameraCapture";
+import { compressImage } from "../utils/imageCompressor";
 
 interface WorkshopsFormProps {
   user: UserSession;
@@ -129,13 +130,11 @@ export default function WorkshopsForm({
   const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          setWorkshopPhoto(reader.result);
+      compressImage(file, 1920, 1920, 0.85, "workshops").then((url) => {
+        if (typeof url === "string") {
+          setWorkshopPhoto(url);
         }
-      };
-      reader.readAsDataURL(file);
+      });
     }
   };
 

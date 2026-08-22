@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { WalkInRecord, User as UserSession, CITIES, OnboardingOutcome } from "../types";
 import CameraCapture from "./CameraCapture";
+import { compressImage } from "../utils/imageCompressor";
 
 interface WalkInFormProps {
   user: UserSession;
@@ -766,11 +767,11 @@ export default function WalkInForm({
     setActiveTab("form");
   };
 
-  const handlePhotoCaptured = (base64: string) => {
+  const handlePhotoCaptured = (urlOrBase64: string) => {
     if (cameraActiveField === "aadhaar") {
-      setAadhaarImage(base64);
+      setAadhaarImage(urlOrBase64);
     } else if (cameraActiveField === "dl") {
-      setDlImage(base64);
+      setDlImage(urlOrBase64);
     }
     setCameraActiveField(null);
   };
@@ -778,17 +779,13 @@ export default function WalkInForm({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: "aadhaar" | "dl") => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        if (typeof reader.result === "string") {
-          if (field === "aadhaar") {
-            setAadhaarImage(reader.result);
-          } else {
-            setDlImage(reader.result);
-          }
+      compressImage(file, 1920, 1920, 0.85, "walkin-docs").then((url) => {
+        if (field === "aadhaar") {
+          setAadhaarImage(url);
+        } else {
+          setDlImage(url);
         }
-      };
-      reader.readAsDataURL(file);
+      });
     }
   };
 

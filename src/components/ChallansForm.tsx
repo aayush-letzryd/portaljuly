@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { ChallanRecord, User as UserSession, CITIES } from "../types";
 import CameraCapture from "./CameraCapture";
+import { compressImage } from "../utils/imageCompressor";
 
 interface ChallansFormProps {
   user: UserSession;
@@ -162,11 +163,11 @@ export default function ChallansForm({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setChallanPhoto(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      compressImage(file, 1920, 1920, 0.85, "challans").then((url) => {
+        if (typeof url === "string") {
+          setChallanPhoto(url);
+        }
+      });
     }
   };
 

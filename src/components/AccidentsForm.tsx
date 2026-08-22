@@ -138,17 +138,15 @@ export default function AccidentsForm({
   }, []);
 
   const handleImageUpload = (field: "front" | "back" | "right" | "left" | "fir", file: File) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === "string") {
-        if (field === "front") setFrontPhoto(reader.result);
-        if (field === "back") setBackPhoto(reader.result);
-        if (field === "right") setRightPhoto(reader.result);
-        if (field === "left") setLeftPhoto(reader.result);
-        if (field === "fir") setFirDoc(reader.result);
+    compressImage(file, 1920, 1920, 0.85, "accidents").then((url) => {
+      if (typeof url === "string") {
+        if (field === "front") setFrontPhoto(url);
+        if (field === "back") setBackPhoto(url);
+        if (field === "right") setRightPhoto(url);
+        if (field === "left") setLeftPhoto(url);
+        if (field === "fir") setFirDoc(url);
       }
-    };
-    reader.readAsDataURL(file);
+    });
   };
 
   const loadRecordForEdit = async (id: number) => {

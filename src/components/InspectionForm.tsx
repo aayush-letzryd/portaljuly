@@ -6,6 +6,7 @@ import {
 } from "lucide-react";
 import { User as UserSession, CITIES } from "../types";
 import CameraCapture from "./CameraCapture";
+import { compressImage } from "../utils/imageCompressor";
 
 interface InspectionFormProps {
   user: UserSession;
@@ -124,13 +125,11 @@ export default function InspectionForm({
   }, []);
 
   const handleImageUpload = (field: string, file: File) => {
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      if (typeof reader.result === "string") {
-        setPhotoByField(field, reader.result);
+    compressImage(file, 1920, 1920, 0.85, "inspections").then((url) => {
+      if (typeof url === "string") {
+        setPhotoByField(field, url);
       }
-    };
-    reader.readAsDataURL(file);
+    });
   };
 
   const setPhotoByField = (field: string, val: string | null) => {

@@ -208,11 +208,11 @@ export default function OperatorOnboardingForm({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string | null) => void) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      setter(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    compressImage(file, 1920, 1920, 0.85, "operator-docs").then((url) => {
+      if (typeof url === "string") {
+        setter(url);
+      }
+    });
   };
 
   const resetOperatorForm = () => {

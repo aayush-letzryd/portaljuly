@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from "react";
-import { Camera, X, Check, RotateCw } from "lucide-react";
+import { Camera, X, Check, RotateCw, Loader2 } from "lucide-react";
+import { uploadDirectToGCS } from "../utils/imageCompressor";
 
 interface CameraCaptureProps {
-  onCapture: (base64Data: string) => void;
+  onCapture: (urlOrBase64: string) => void;
   onClose: () => void;
   title: string;
 }
@@ -14,6 +15,7 @@ export default function CameraCapture({ onCapture, onClose, title }: CameraCaptu
   const [capturedImage, setCapturedImage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [uploading, setUploading] = useState(false);
   const [facingMode, setFacingMode] = useState<"user" | "environment">("user");
 
   useEffect(() => {
@@ -89,9 +91,17 @@ export default function CameraCapture({ onCapture, onClose, title }: CameraCaptu
     setFacingMode((prev) => (prev === "user" ? "environment" : "user"));
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (capturedImage) {
-      onCapture(capturedImage);
+      setUploading(true);
+      try {
+        const url = await uploadDirectToGCS(capturedImage, "camera-captures");
+        onCapture(url || capturedImage);
+      } catch (err) {
+        onCapture(capturedImage);
+      } finally {
+        setUploading(false);
+      }
     }
   };
 
@@ -108,8 +118,9 @@ export default function CameraCapture({ onCapture, onClose, title }: CameraCaptu
           <h3 className="font-sans font-semibold tracking-tight text-white">{title}</h3>
           <button 
             type="button" 
+            disabled={uploading}
             onClick={() => { stopCamera(); onClose(); }}
-            className="rounded-lg p-1 text-white/80 hover:bg-white/10 hover:text-white transition-colors"
+            className="rounded-lg p-1 text-white/80 hover:bg-white/10 hover:text-white transition-colors disabled:opacity-50"
           >
             <X className="h-5 w-5" />
           </button>
@@ -135,11 +146,19 @@ export default function CameraCapture({ onCapture, onClose, title }: CameraCaptu
               <span className="text-xs font-sans">Initializing Camera...</span>
             </div>
           ) : capturedImage ? (
-            <img 
-              src={capturedImage} 
-              alt="Captured document" 
-              className="h-full w-full object-contain"
-            />
+            <div className="relative w-full h-full">
+              <img 
+                src={capturedImage} 
+                alt="Captured document" 
+                className="h-full w-full object-contain"
+              />
+              {uploading && (
+                <div className="absolute inset-0 bg-black/60 flex flex-col items-center justify-center gap-2 text-white">
+                  <Loader2 className="w-8 h-8 animate-spin text-emerald-400" />
+                  <span className="text-xs font-medium">Uploading to cloud storage...</span>
+                </div>
+              )}
+            </div>
           ) : null}
           
           <video
@@ -157,19 +176,21 @@ export default function CameraCapture({ onCapture, onClose, title }: CameraCaptu
             <>
               <button
                 type="button"
+                disabled={uploading}
                 onClick={handleRetake}
-                className="flex items-center gap-2 rounded-xl bg-white border border-border px-4 py-2.5 text-xs font-semibold text-text-muted hover:bg-slate-100 transition-all shadow-xs"
+                className="flex items-center gap-2 rounded-xl bg-white border border-border px-4 py-2.5 text-xs font-semibold text-text-muted hover:bg-slate-100 transition-all shadow-xs disabled:opacity-50"
               >
                 <RotateCw className="h-4 w-4" />
                 Retake Photo
               </button>
               <button
                 type="button"
+                disabled={uploading}
                 onClick={handleConfirm}
-                className="flex items-center gap-2 rounded-xl bg-green px-5 py-2.5 text-xs font-semibold text-white hover:bg-green/95 transition-all shadow-md shadow-green-500/10"
+                className="flex items-center gap-2 rounded-xl bg-green px-5 py-2.5 text-xs font-semibold text-white hover:bg-green/95 transition-all shadow-md shadow-green-500/10 disabled:opacity-50 cursor-pointer"
               >
-                <Check className="h-4 w-4" />
-                Use Photo
+                {uploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />}
+                {uploading ? "Saving..." : "Use Photo"}
               </button>
             </>
           ) : (

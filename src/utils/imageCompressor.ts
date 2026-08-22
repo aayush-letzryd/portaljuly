@@ -1,84 +1,90 @@
 /**
- * High-Resolution Image Compressor for LetzRyd Fleet Portal
- * Resizes high-resolution mobile camera shots (12MP-48MP / 10MB+) to 1920px Full HD at 82% quality.
- * Reduces photo size from ~10MB to ~300KB-400KB in the browser, preventing Cloud Run 413 Payload Too Large errors
- * while keeping odometer digits and vehicle condition crystal-clear.
+ * Direct Cloud Image Uploader for LetzRyd Fleet Portal
+ * Uploads raw image files directly to Google Cloud Storage bucket via /api/storage/upload.
+ * Storing clean bucket URLs prevents Cloud Run 413 Payload Too Large errors,
+ * preserves 100% uncompressed raw camera quality, and eliminates database bloat.
  */
 
-export async function compressImage(
-  fileOrBase64: File | string,
-  maxWidth = 1920,
-  maxHeight = 1920,
-  quality = 0.82
+export async function uploadDirectToGCS(
+  fileOrBase64: File | Blob | string,
+  folder = "uploads"
 ): Promise<string> {
   if (!fileOrBase64) return "";
 
-  return new Promise((resolve) => {
-    const img = new Image();
+  // If already an HTTP/HTTPS URL, return as-is
+  if (typeof fileOrBase64 === "string" && (fileOrBase64.startsWith("http://") || fileOrBase64.startsWith("https://"))) {
+    return fileOrBase64;
+  }
 
-    img.onload = () => {
-      let width = img.width;
-      let height = img.height;
+  try {
+    let fileToSend: File | Blob;
 
-      // Constrain proportionally if exceeding bounds
-      if (width > height) {
-        if (width > maxWidth) {
-          height = Math.round((height * maxWidth) / width);
-          width = maxWidth;
-        }
-      } else {
-        if (height > maxHeight) {
-          width = Math.round((width * maxHeight) / height);
-          height = maxHeight;
-        }
+    if (typeof fileOrBase64 === "string" && fileOrBase64.startsWith("data:")) {
+      const arr = fileOrBase64.split(",");
+      const mimeMatch = arr[0].match(/:(.*?);/);
+      const mime = mimeMatch ? mimeMatch[1] : "image/jpeg";
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while (n--) {
+        u8arr[n] = bstr.charCodeAt(n);
       }
-
-      const canvas = document.createElement("canvas");
-      canvas.width = width;
-      canvas.height = height;
-
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        // Fallback to original string/reader
-        if (typeof fileOrBase64 === "string") {
-          resolve(fileOrBase64);
-        } else {
-          const reader = new FileReader();
-          reader.onloadend = () => resolve((reader.result as string) || "");
-          reader.onerror = () => resolve("");
-          reader.readAsDataURL(fileOrBase64);
-        }
-        return;
-      }
-
-      ctx.imageSmoothingEnabled = true;
-      ctx.imageSmoothingQuality = "high";
-      ctx.drawImage(img, 0, 0, width, height);
-
-      const compressedDataUrl = canvas.toDataURL("image/jpeg", quality);
-      resolve(compressedDataUrl);
-    };
-
-    img.onerror = () => {
-      if (typeof fileOrBase64 === "string") {
-        resolve(fileOrBase64);
-      } else {
-        const reader = new FileReader();
-        reader.onloadend = () => resolve((reader.result as string) || "");
-        reader.onerror = () => resolve("");
-        reader.readAsDataURL(fileOrBase64);
-      }
-    };
-
-    if (typeof fileOrBase64 === "string") {
-      img.src = fileOrBase64;
+      fileToSend = new Blob([u8arr], { type: mime });
+    } else if (fileOrBase64 instanceof File || fileOrBase64 instanceof Blob) {
+      fileToSend = fileOrBase64;
     } else {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        img.src = (e.target?.result as string) || "";
-      };
-      reader.onerror = () => resolve("");
-      reader.readAsDataURL(fileOrBase64);
+      return String(fileOrBase64);
     }
+
+    const formData = new FormData();
+    const filename = (fileToSend as File).name || `photo_${Date.now()}.jpg`;
+    formData.append("file", fileToSend, filename);
+
+    const token = localStorage.getItem("lr_token");
+    const headers: Record<string, string> = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const res = await fetch(`/api/storage/upload?folder=${encodeURIComponent(folder)}`, {
+      method: "POST",
+      headers,
+      body: formData,
+    });
+
+    if (res.ok) {
+      const data = await res.json();
+      if (data.url && (data.url.startsWith("http://") || data.url.startsWith("https://"))) {
+        return data.url;
+      }
+    }
+  } catch (err) {
+    console.warn("Direct storage upload fallback to local dataURL:", err);
+  }
+
+  // Graceful fallback to dataURL if upload fails (e.g. offline)
+  if (typeof fileOrBase64 === "string") {
+    return fileOrBase64;
+  }
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve((reader.result as string) || "");
+    reader.onerror = () => resolve("");
+    reader.readAsDataURL(fileOrBase64 as Blob);
   });
 }
+
+/**
+ * Drop-in compatible function used across all form components.
+ * Automatically routes raw files to Google Cloud Storage.
+ */
+export async function compressImage(
+  fileOrBase64: File | Blob | string,
+  _maxWidth?: number,
+  _maxHeight?: number,
+  _quality?: number,
+  folder = "uploads"
+): Promise<string> {
+  return uploadDirectToGCS(fileOrBase64, folder);
+}
+
