@@ -1950,6 +1950,10 @@ def get_gcs_bucket():
             _gcs_client = storage.Client()
         return _gcs_client.bucket(GCS_BUCKET_NAME)
     except Exception as e:
+        print(f"[ERROR] GCS bucket initialization failed: {e}")
+        print(f"[ERROR] Bucket name: {GCS_BUCKET_NAME}")
+        print(f"[ERROR] Make sure GOOGLE_APPLICATION_CREDENTIALS is set or ADC is configured.")
+        _gcs_client = None  # reset so next call tries again
         return None
 
 def upload_b64_to_gcs(b64_str: str, folder: str = "uploads") -> str:
@@ -2000,16 +2004,20 @@ from fastapi import UploadFile, File
 async def upload_direct_file(file: UploadFile = File(...), folder: Optional[str] = "uploads"):
     try:
         bucket = get_gcs_bucket()
+        if not bucket:
+            raise HTTPException(
+                status_code=500,
+                detail="Cloud storage is not available. Please ensure GCS credentials are configured correctly (run `gcloud auth application-default login` locally, or verify the Cloud Run service account has Storage Object Creator role)."
+            )
         content = await file.read()
         ext = file.filename.split(".")[-1] if file.filename and "." in file.filename else "jpg"
         file_key = f"{folder}/{uuid.uuid4().hex}.{ext}"
-        if bucket:
-            blob = bucket.blob(file_key)
-            blob.upload_from_string(content, content_type=file.content_type or "image/jpeg")
-            return {"url": f"https://storage.googleapis.com/{GCS_BUCKET_NAME}/{file_key}"}
-        else:
-            b64 = f"data:{file.content_type or 'image/jpeg'};base64," + base64.b64encode(content).decode("utf-8")
-            return {"url": b64}
+        blob = bucket.blob(file_key)
+        blob.upload_from_string(content, content_type=file.content_type or "image/jpeg")
+        blob.make_public()
+        return {"url": f"https://storage.googleapis.com/{GCS_BUCKET_NAME}/{file_key}"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
