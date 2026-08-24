@@ -432,7 +432,7 @@ export default function AllocationForm({
             inspection_date: allocationDate,
             odometer_reading: odometerReading || "0",
             jack,
-            jack_rod,
+            jack_rod: jackRod,
             spanner,
             parking_triangle: parkingTriangle,
             fire_extinguishers: fireExtinguishers,
