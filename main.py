@@ -8498,9 +8498,21 @@ def get_record_details(module: str, record_id: int, authorization: Optional[str]
 
 
 # ─────────────────────────────────────────────────────────
-# Static files — only mounted when dist/ exists (production build)
-# During development the React dev server (npm run dev) serves the frontend
+# Cache-Control Middleware & Static files
+# Ensures index.html and APIs are never cached by browsers, preventing stale JS execution
 # ─────────────────────────────────────────────────────────
+@app.middleware("http")
+async def add_cache_control_headers(request: Request, call_next):
+    response = await call_next(request)
+    path = request.url.path
+    if path == "/" or path.endswith(".html") or path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate, max-age=0"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
+    elif path.startswith("/assets/"):
+        response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+    return response
+
 if os.path.isdir("dist"):
     app.mount("/", StaticFiles(directory="dist", html=True), name="static")
 else:
