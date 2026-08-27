@@ -39,8 +39,19 @@ export async function uploadDirectToGCS(
     throw new Error("Invalid input: expected a File, Blob, or dataURL string.");
   }
 
-  const formData = new FormData();
-  const filename = (fileToSend as File).name || `photo_${Date.now()}.jpg`;
+  let defaultExt = "jpg";
+  const fileType = fileToSend.type ? fileToSend.type.toLowerCase() : "";
+  const existingName = (fileToSend as File).name || "";
+  
+  if (fileType.includes("pdf") || existingName.toLowerCase().endsWith(".pdf")) {
+    defaultExt = "pdf";
+  } else if (fileType.includes("png") || existingName.toLowerCase().endsWith(".png")) {
+    defaultExt = "png";
+  } else if (fileType.includes("webp") || existingName.toLowerCase().endsWith(".webp")) {
+    defaultExt = "webp";
+  }
+
+  const filename = existingName || `document_${Date.now()}.${defaultExt}`;
   formData.append("file", fileToSend, filename);
 
   const token = localStorage.getItem("lr_token");

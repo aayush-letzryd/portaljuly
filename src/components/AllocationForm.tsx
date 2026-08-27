@@ -314,14 +314,53 @@ export default function AllocationForm({
     }
   };
 
+  const viewPdfDocument = (docUrl: string | null) => {
+    if (!docUrl) return;
+    if (docUrl.startsWith("http://") || docUrl.startsWith("https://")) {
+      window.open(docUrl, "_blank");
+      return;
+    }
+    if (docUrl.startsWith("data:")) {
+      try {
+        const arr = docUrl.split(",");
+        const mimeMatch = arr[0].match(/:(.*?);/);
+        const mime = mimeMatch ? mimeMatch[1] : "application/pdf";
+        const byteCharacters = atob(arr[1]);
+        const byteNumbers = new Array(byteCharacters.length);
+        for (let i = 0; i < byteCharacters.length; i++) {
+          byteNumbers[i] = byteCharacters.charCodeAt(i);
+        }
+        const byteArray = new Uint8Array(byteNumbers);
+        const blob = new Blob([byteArray], { type: mime });
+        const blobUrl = URL.createObjectURL(blob);
+        window.open(blobUrl, "_blank");
+      } catch (e) {
+        console.error("Error opening PDF blob", e);
+        const win = window.open();
+        if (win) {
+          win.document.write(`<iframe src="${docUrl}" frameborder="0" style="border:0; top:0px; left:0px; bottom:0px; right:0px; width:100%; height:100%;" allowfullscreen></iframe>`);
+        }
+      }
+    } else {
+      window.open(docUrl, "_blank");
+    }
+  };
+
   const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string | null) => void) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      setter(reader.result as string);
-    };
-    reader.readAsDataURL(file);
+    compressImage(file, 1920, 1920, 0.85, "agreements")
+      .then((url) => {
+        if (url) setter(url);
+      })
+      .catch((err) => {
+        console.warn("Direct cloud upload failed, converting locally:", err);
+        const reader = new FileReader();
+        reader.onload = () => {
+          setter(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      });
   };
 
   const loadRecordForEdit = async (id: number) => {
@@ -1242,19 +1281,19 @@ export default function AllocationForm({
                               <span className="block text-[10px] text-slate-500">PDF / Document attached</span>
                             </div>
                           </div>
-                          <div className="flex items-center gap-1 shrink-0">
-                            <a
-                              href={driverAgreementDoc}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium transition-colors"
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => viewPdfDocument(driverAgreementDoc)}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 text-[11px] font-bold transition-colors cursor-pointer border border-emerald-200"
                             >
-                              View
-                            </a>
+                              View PDF
+                            </button>
                             <button
                               type="button"
                               onClick={() => setDriverAgreementDoc(null)}
-                              className="p-1 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                              className="p-1 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors cursor-pointer"
+                              title="Remove document"
                             >
                               <X className="h-4 w-4" />
                             </button>

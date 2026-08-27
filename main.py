@@ -428,9 +428,17 @@ def startup_event():
             "police_verification_doc TEXT",
             "reference_verified BOOLEAN DEFAULT FALSE",
             "driver_manager_id INTEGER",
-            "driver_manager_name VARCHAR(255)"
+            "driver_manager_name VARCHAR(255)",
+            "emergency_contact_aadhaar_doc TEXT",
+            "emergency_contact_aadhaar_number VARCHAR(50)"
         ]:
             cur.execute(f"ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS {col};")
+
+        for col in [
+            "emergency_contact_aadhaar_doc TEXT",
+            "emergency_contact_aadhaar_number VARCHAR(50)"
+        ]:
+            cur.execute(f"ALTER TABLE july_onboarding ADD COLUMN IF NOT EXISTS {col};")
 
         for col in [
             "lead_channel VARCHAR(100)",
@@ -1642,6 +1650,7 @@ class OnboardingData(BaseModel):
     driver_manager_name: Optional[str] = None
     signature_photo: Optional[Any] = None
     emergency_contact_aadhaar_doc: Optional[Any] = None
+    emergency_contact_aadhaar_number: Optional[str] = None
     candidate_role: Optional[str] = "Driver"
     rental_model: Optional[str] = None
     security_deposit: Optional[str] = None
@@ -2012,10 +2021,21 @@ def upload_b64_to_gcs(b64_str: str, folder: str = "uploads") -> str:
         
         header, encoded = b64_str.split(",", 1)
         file_bytes = base64.b64decode(encoded)
-        ext = "png" if "png" in header.lower() else "jpg"
-        content_type = "image/png" if ext == "png" else "image/jpeg"
+        h_lower = header.lower()
+        if "pdf" in h_lower:
+            ext = "pdf"
+            content_type = "application/pdf"
+        elif "png" in h_lower:
+            ext = "png"
+            content_type = "image/png"
+        elif "webp" in h_lower:
+            ext = "webp"
+            content_type = "image/webp"
+        else:
+            ext = "jpg"
+            content_type = "image/jpeg"
+
         file_key = f"{folder}/{uuid.uuid4().hex}.{ext}"
-        
         blob = bucket.blob(file_key)
         blob.upload_from_string(file_bytes, content_type=content_type)
         return f"https://storage.googleapis.com/{GCS_BUCKET_NAME}/{file_key}"
@@ -2053,13 +2073,27 @@ async def upload_direct_file(file: UploadFile = File(...), folder: Optional[str]
         if not bucket:
             raise HTTPException(
                 status_code=500,
-                detail="Cloud storage is not available. Please ensure GCS credentials are configured correctly (run `gcloud auth application-default login` locally, or verify the Cloud Run service account has Storage Object Creator role)."
+                detail="Cloud storage is not available. Please ensure GCS credentials are configured correctly."
             )
         content = await file.read()
-        ext = file.filename.split(".")[-1] if file.filename and "." in file.filename else "jpg"
+        filename_lower = (file.filename or "").lower()
+        content_type = file.content_type
+        if filename_lower.endswith(".pdf") or (content_type and "pdf" in content_type.lower()):
+            ext = "pdf"
+            content_type = "application/pdf"
+        elif filename_lower.endswith(".png") or (content_type and "png" in content_type.lower()):
+            ext = "png"
+            content_type = "image/png"
+        elif filename_lower.endswith(".webp") or (content_type and "webp" in content_type.lower()):
+            ext = "webp"
+            content_type = "image/webp"
+        else:
+            ext = filename_lower.split(".")[-1] if "." in filename_lower else "jpg"
+            content_type = content_type or "image/jpeg"
+
         file_key = f"{folder}/{uuid.uuid4().hex}.{ext}"
         blob = bucket.blob(file_key)
-        blob.upload_from_string(content, content_type=file.content_type or "image/jpeg")
+        blob.upload_from_string(content, content_type=content_type)
         return {"url": f"https://storage.googleapis.com/{GCS_BUCKET_NAME}/{file_key}"}
     except HTTPException:
         raise
@@ -2702,6 +2736,38 @@ def delete_vehicle_model(id: int, authorization: Optional[str] = Header(None)):
         if isinstance(e, HTTPException):
             raise e
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+
+# ─────────────────────────────────────────────────────────
+# Driver Managers (filtered by city for onboarding forms)
+# ─────────────────────────────────────────────────────────
+@app.get("/api/driver-managers")
+def get_driver_managers(city: Optional[str] = None, authorization: Optional[str] = Header(None)):
+    get_current_user(authorization)
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        query = """
+            SELECT e.employee_id, CONCAT(e.first_name, ' ', COALESCE(e.last_name, '')) AS name,
+                   e.city, COALESCE(r.role_name, pu.role, 'Driver Manager') AS role_name,
+                   COALESCE(r.role_code, 'DM') AS role_code
+            FROM july_employees e
+            LEFT JOIN july_portal_users pu ON pu.employee_id = e.employee_id
+            LEFT JOIN july_roles r ON r.role_id = COALESCE(pu.role_id, e.role_id)
+            WHERE (r.role_code = 'DM' OR LOWER(r.role_name) = 'driver manager' OR LOWER(r.role_name) LIKE '%driver manager%' OR LOWER(pu.role) LIKE '%driver manager%')
+              AND e.is_active != FALSE
+        """
+        params = []
+        if city and city.strip() and city.lower() != "all":
+            query += " AND LOWER(TRIM(e.city)) = LOWER(TRIM(%s))"
+            params.append(city.strip())
+            
+        query += " ORDER BY e.first_name;"
+        cur.execute(query, tuple(params))
+        rows = cur.fetchall()
+        return [{"id": r[0], "name": r[1].strip(), "city": r[2] or "", "role": r[3] or "Driver Manager", "role_code": r[4] or "DM"} for r in rows]
     finally:
         postgreSQL_pool.putconn(conn)
 
@@ -4386,7 +4452,8 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
                     signature_photo, gst_certificate, incorporation_doc,
                     created_by, updated_by, approval_status,
                     created_at, updated_at,
-                    emergency_contact_aadhaar_doc
+                    emergency_contact_aadhaar_doc,
+                    emergency_contact_aadhaar_number
                 ) VALUES (
                     %s,%s,%s,%s,%s,%s,
                     %s,%s,%s,%s,
@@ -4413,7 +4480,7 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
                     %s,%s,%s,
                     %s,%s,'Draft',
                     NOW(),NOW(),
-                    %s
+                    %s,%s
                 )
                 RETURNING id;
             """, (
@@ -4444,7 +4511,8 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
                 extract_image(data.police_verification_doc),
                 extract_image(data.signature_photo), extract_image(data.gst_certificate), extract_image(data.incorporation_doc),
                 user_p_id, user_p_id,
-                extract_image(data.emergency_contact_aadhaar_doc)
+                extract_image(data.emergency_contact_aadhaar_doc),
+                data.emergency_contact_aadhaar_number
             ))
             new_id = cur.fetchone()[0]
             cur.execute("""
@@ -4495,6 +4563,7 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
                     signature_photo=%s, gst_certificate=%s,
                     incorporation_doc=%s,
                     emergency_contact_aadhaar_doc=%s,
+                    emergency_contact_aadhaar_number=%s,
                     updated_by=%s, updated_at=NOW()
                 WHERE id=%s;
             """, (
@@ -4537,6 +4606,7 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
                 extract_image(data.gst_certificate),
                 extract_image(data.incorporation_doc),
                 extract_image(data.emergency_contact_aadhaar_doc),
+                data.emergency_contact_aadhaar_number,
                 user_p_id, id
             ))
             cur.execute("""
@@ -4591,7 +4661,7 @@ def get_onboarding(id: int):
                 created_at, updated_at,
                 created_by, updated_by, current_approver_id, approved_by,
                 approval_note, gst_number, gst_certificate, incorporation_doc,
-                emergency_contact_aadhaar_doc
+                emergency_contact_aadhaar_doc, emergency_contact_aadhaar_number
             FROM july_form_onboarding
             WHERE id = %s;
         """, (id,))
@@ -4639,7 +4709,8 @@ def get_onboarding(id: int):
                 "gst_number": r[76],
                 "gst_certificate": r[77],
                 "incorporation_doc": r[78],
-                "emergency_contact_aadhaar_doc": r[79]
+                "emergency_contact_aadhaar_doc": r[79],
+                "emergency_contact_aadhaar_number": r[80] if len(r) > 80 else None
             }
             if (r[29] == "Operator" or r[45] == "Operator") and (r[17] or r[16]):
                 cur.execute("""
@@ -4647,7 +4718,8 @@ def get_onboarding(id: int):
                         driver_name, phone_number, dl_number, custom_rent_amount, driver_id,
                         whatsapp_number, dob, present_address, permanent_address, 
                         emergency_name, emergency_phone, pan_number, aadhaar_number, father_name,
-                        selfie_photo, dl_front, dl_back, pan_card_photo, aadhaar_card_photo
+                        selfie_photo, dl_front, dl_back, pan_card_photo, aadhaar_card_photo,
+                        emergency_contact_aadhaar_number, emergency_contact_aadhaar_doc
                     FROM july_form_onboarding
                     WHERE (vendor_id = %s OR vendor_name = %s) AND vendor_type = 'Operator' AND driver_id IS NOT NULL;
                 """, (r[17] or "", r[16] or ""))
@@ -4657,7 +4729,9 @@ def get_onboarding(id: int):
                         "driver_name": d[0], "phone_number": d[1], "dl_number": d[2], "custom_rent_amount": d[3], "driver_id": d[4],
                         "whatsapp_number": d[5], "dob": d[6], "present_address": d[7], "permanent_address": d[8],
                         "emergency_name": d[9], "emergency_phone": d[10], "pan_number": d[11], "aadhaar_number": d[12], "father_name": d[13],
-                        "selfie_photo": d[14], "dl_front": d[15], "dl_back": d[16], "pan_card_photo": d[17], "aadhaar_card_photo": d[18]
+                        "selfie_photo": d[14], "dl_front": d[15], "dl_back": d[16], "pan_card_photo": d[17], "aadhaar_card_photo": d[18],
+                        "emergency_contact_aadhaar_number": d[19] if len(d) > 19 else None,
+                        "emergency_contact_aadhaar_doc": d[20] if len(d) > 20 else None
                     } for d in drivers_rows
                 ]
             else:
@@ -4725,6 +4799,7 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
                 signature_photo=%s, gst_certificate=%s,
                 incorporation_doc=%s,
                 emergency_contact_aadhaar_doc=%s,
+                emergency_contact_aadhaar_number=%s,
                 updated_by=%s, updated_at=NOW()
             WHERE id=%s;
         """, (
@@ -4764,6 +4839,7 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
             extract_image(data.gst_certificate),
             extract_image(data.incorporation_doc),
             extract_image(data.emergency_contact_aadhaar_doc),
+            data.emergency_contact_aadhaar_number,
             user_p_id,
             id
         ))
@@ -4795,6 +4871,7 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
                         emergency_name, emergency_phone, pan_number, aadhaar_number, father_name,
                         candidate_role,
                         selfie_photo, dl_front, dl_back, pan_card_photo, aadhaar_card_photo,
+                        emergency_contact_aadhaar_number, emergency_contact_aadhaar_doc,
                         created_by, updated_by, created_at, updated_at, approval_status
                     ) VALUES (
                         %s,%s,%s,%s,%s,
@@ -4803,6 +4880,7 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
                         %s,%s,%s,%s,%s,
                         %s,
                         %s,%s,%s,%s,%s,
+                        %s,%s,
                         %s,%s,NOW(),NOW(),'Draft'
                     )
                 """, (
@@ -4817,6 +4895,8 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
                     extract_image(drv.get('selfie_photo')), extract_image(drv.get('dl_front')),
                     extract_image(drv.get('dl_back')), extract_image(drv.get('pan_card_photo')),
                     extract_image(drv.get('aadhaar_card_photo')),
+                    drv.get('emergency_contact_aadhaar_number') or drv.get('emergency_aadhaar_number'),
+                    extract_image(drv.get('emergency_contact_aadhaar_doc') or drv.get('emergency_aadhaar_doc')),
                     user_p_id, user_p_id
                 ))
 

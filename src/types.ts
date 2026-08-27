@@ -97,6 +97,7 @@ export interface OnboardingRecord {
   is_spring_verified?: boolean;
   signature_photo?: string;
   emergency_contact_aadhaar_doc?: string;
+  emergency_contact_aadhaar_number?: string;
   platform_details?: string | Record<string, any>;
   approval_status?: string;
   approver_name?: string;

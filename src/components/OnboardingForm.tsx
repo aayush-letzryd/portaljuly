@@ -347,18 +347,50 @@ export default function OnboardingForm({
   const [driverManagerName, setDriverManagerName] = useState<string>("");
   const [driverManagersList, setDriverManagersList] = useState<any[]>([]);
 
-  // Emergency Contact Aadhaar Card
+  // Emergency Contact Aadhaar Card & Number
   const [emergencyContactAadhaarDoc, setEmergencyContactAadhaarDoc] = useState<string | null>(null);
+  const [emergencyContactAadhaarNumber, setEmergencyContactAadhaarNumber] = useState<string>("");
+  const [showEmergencyAadhaar, setShowEmergencyAadhaar] = useState<boolean>(false);
 
-  // Dynamic City-filtered Driver Managers (S.No 24)
+  // Dynamic City-filtered Driver Managers (strictly matching selected city)
   const filteredDriverManagers = useMemo(() => {
     if (!city) return driverManagersList;
-    const list = driverManagersList.filter((dm: any) => {
-      if (!dm.city) return true;
-      return dm.city.trim().toLowerCase() === city.trim().toLowerCase();
+    const cleanCity = city.trim().toLowerCase();
+    return driverManagersList.filter((dm: any) => {
+      const dmCity = (dm.city || "").trim().toLowerCase();
+      return !dmCity || dmCity === cleanCity;
     });
-    return list.length > 0 ? list : driverManagersList;
   }, [driverManagersList, city]);
+
+  const fetchDriverManagersForCity = async (selectedCity: string) => {
+    try {
+      const token = localStorage.getItem("lr_token");
+      const res = await fetch(`/api/driver-managers?city=${encodeURIComponent(selectedCity)}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDriverManagersList(data);
+        if (data.length > 0) {
+          if (!data.some((d: any) => d.id === driverManagerId)) {
+            setDriverManagerId(data[0].id);
+            setDriverManagerName(data[0].name);
+          }
+        } else {
+          setDriverManagerId(null);
+          setDriverManagerName("");
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching driver managers", e);
+    }
+  };
+
+  useEffect(() => {
+    if (city) {
+      fetchDriverManagersForCity(city);
+    }
+  }, [city]);
 
   // Police Verification
   const [policeVerificationStatus, setPoliceVerificationStatus] = useState<string>("Not Required");
@@ -557,21 +589,6 @@ export default function OnboardingForm({
         const currentUserId = user.portal_user_id || user.id || user.executive_id;
         const validApprovers = appData.filter((a: any) => a.id !== currentUserId);
         setApproversList(validApprovers);
-        
-        // Populate Driver Managers list
-        const dms = appData.filter((a: any) =>
-          a.role?.toLowerCase().includes("driver manager") ||
-          a.role?.toLowerCase().includes("fleet") ||
-          a.role?.toLowerCase().includes("manager") ||
-          ["DM", "FL", "CM", "GM", "BH"].includes(a.role_code)
-        );
-        const finalList = dms.length > 0 ? dms : appData;
-        setDriverManagersList(finalList);
-        if (finalList.length > 0 && !driverManagerId) {
-          const firstDM = finalList.find((d: any) => d.role?.toLowerCase().includes("driver manager") || d.role_code === "DM") || finalList[0];
-          setDriverManagerId(firstDM.id);
-          setDriverManagerName(firstDM.name);
-        }
 
         // Auto-set default to first City Manager or General Manager
         if (validApprovers.length > 0) {
@@ -845,6 +862,7 @@ export default function OnboardingForm({
       emergency_relationship: emergencyRelationship.trim(),
       emergency_phone: emergencyPhone.trim(),
       emergency_contact_aadhaar_doc: emergencyContactAadhaarDoc || null,
+      emergency_contact_aadhaar_number: emergencyContactAadhaarNumber.trim() || null,
       dl_number: dlNumber.trim().toUpperCase() || null,
       dl_expiry_date: dlExpiryDate || null,
       lead_source: leadSource ? `${leadSource}${sourceDetails ? ' - ' + sourceDetails : ''}` : null,
@@ -1012,6 +1030,7 @@ export default function OnboardingForm({
     setEmergencyRelationship("Spouse");
     setEmergencyPhone("");
     setEmergencyContactAadhaarDoc(null);
+    setEmergencyContactAadhaarNumber("");
     setDlNumber("");
     setDlExpiryDate("");
     setLeadSource("Direct Lead");
@@ -1149,6 +1168,7 @@ export default function OnboardingForm({
       setEmergencyRelationship(data.emergency_relationship || "Spouse");
       setEmergencyPhone(data.emergency_phone || "");
       setEmergencyContactAadhaarDoc(data.emergency_contact_aadhaar_doc || null);
+      setEmergencyContactAadhaarNumber(data.emergency_contact_aadhaar_number || "");
       setDlNumber(data.dl_number || data.driving_license || "");
       setDlExpiryDate(data.dl_expiry_date || "");
       const [lsource, ...lsdetails] = (data.lead_source || "").split(" - ");
@@ -1936,7 +1956,7 @@ export default function OnboardingForm({
                     <div className="pt-6 border-t border-border/60 space-y-6">
                       <div>
                         <h4 className="font-sans text-sm font-bold text-text-dim mb-4">Emergency Contact Details</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
                           <div className="space-y-2">
                             <label className="text-xs font-bold text-text-muted">Emergency Contact Name *</label>
                             <input type="text" required={currentStep === 1} value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" placeholder="Name" />
@@ -1957,8 +1977,29 @@ export default function OnboardingForm({
                             <label className="text-xs font-bold text-text-muted">Emergency Phone *</label>
                             <input type="tel" required={currentStep === 1} value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" placeholder="10-digit number" />
                           </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-text-muted flex items-center justify-between">
+                              <span>Emergency Aadhaar No. {rentalModel === "LetzOwn" ? <span className="text-amber-700 font-bold">*</span> : <span className="text-slate-400 font-normal">(Optional)</span>}</span>
+                            </label>
+                            <div className="relative">
+                              <input 
+                                type={showEmergencyAadhaar ? "text" : "password"} 
+                                value={emergencyContactAadhaarNumber} 
+                                onChange={(e) => setEmergencyContactAadhaarNumber(e.target.value.replace(/\D/g, '').slice(0, 12))} 
+                                className="w-full h-11 pl-4 pr-10 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all font-mono" 
+                                placeholder="12-digit Aadhaar No." 
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowEmergencyAadhaar(!showEmergencyAadhaar)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                              >
+                                {showEmergencyAadhaar ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
 
-                          <div className="space-y-2 md:col-span-3">
+                          <div className="space-y-2 md:col-span-2 lg:col-span-4">
                             <label className="text-xs font-bold text-text-muted flex items-center justify-between">
                               <span>Emergency Contact Aadhaar Card {rentalModel === "LetzOwn" ? <span className="text-amber-700 font-bold">* (Mandatory for LetzOwn)</span> : <span className="text-slate-400 font-normal">(Optional)</span>}</span>
                               {emergencyContactAadhaarDoc && <span className="text-[10px] text-emerald-600 font-semibold">✓ Document Uploaded</span>}

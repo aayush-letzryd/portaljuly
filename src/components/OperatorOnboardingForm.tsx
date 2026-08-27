@@ -28,6 +28,8 @@ interface DriverSubForm {
   sameAsPresentAddress: boolean;
   emergency_name: string;
   emergency_phone: string;
+  emergency_contact_aadhaar_number?: string;
+  emergency_contact_aadhaar_doc?: string | null;
   dl_number: string;
   dl_expiry_date: string;
   pan_number: string;
@@ -89,6 +91,41 @@ export default function OperatorOnboardingForm({
   const [city, setCity] = useState("Hyderabad");
   const [operatingPlace, setOperatingPlace] = useState("");
   
+  // Driver Manager Assignment (City-filtered)
+  const [driverManagerId, setDriverManagerId] = useState<number | null>(null);
+  const [driverManagerName, setDriverManagerName] = useState("");
+  const [driverManagersList, setDriverManagersList] = useState<any[]>([]);
+
+  const fetchDriverManagersForCity = async (selectedCity: string) => {
+    try {
+      const token = localStorage.getItem("lr_token");
+      const res = await fetch(`/api/driver-managers?city=${encodeURIComponent(selectedCity)}`, {
+        headers: { "Authorization": `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setDriverManagersList(data);
+        if (data.length > 0) {
+          if (!data.some((d: any) => d.id === driverManagerId)) {
+            setDriverManagerId(data[0].id);
+            setDriverManagerName(data[0].name);
+          }
+        } else {
+          setDriverManagerId(null);
+          setDriverManagerName("");
+        }
+      }
+    } catch (e) {
+      console.error("Error fetching driver managers", e);
+    }
+  };
+
+  useEffect(() => {
+    if (city) {
+      fetchDriverManagersForCity(city);
+    }
+  }, [city]);
+  
   // Business Address State
   const [businessLine1, setBusinessLine1] = useState("");
   const [businessLine2, setBusinessLine2] = useState("");
@@ -134,6 +171,9 @@ export default function OperatorOnboardingForm({
   const [dSameAsPresent, setDSameAsPresent] = useState(false);
   const [dEmergName, setDEmergName] = useState("");
   const [dEmergPhone, setDEmergPhone] = useState("");
+  const [dEmergAadhaarNum, setDEmergAadhaarNum] = useState("");
+  const [showDEmergAadhaarNum, setShowDEmergAadhaarNum] = useState(false);
+  const [dEmergAadhaarDoc, setDEmergAadhaarDoc] = useState<string | null>(null);
   const [dDlNum, setDDlNum] = useState("");
   const [dDlExpiry, setDDlExpiry] = useState("");
   const [dPanNum, setDPanNum] = useState("");
@@ -240,6 +280,8 @@ export default function OperatorOnboardingForm({
     setAccountNumber("");
     setIfscCode("");
     setUpiId("");
+    setDriverManagerId(null);
+    setDriverManagerName("");
     setDrivers([]);
     setEditingId(null);
     setCurrentStep(1);
@@ -269,6 +311,10 @@ export default function OperatorOnboardingForm({
       setIsWhatsappSame(data.phone_number === data.whatsapp_number);
       setCity(data.city || "Hyderabad");
       setOperatingPlace(data.operating_place || "");
+      if (data.driver_manager_id) {
+        setDriverManagerId(data.driver_manager_id);
+        setDriverManagerName(data.driver_manager_name || "");
+      }
       
       // Attempt to split address back into fields
       if (data.present_address) {
@@ -300,6 +346,8 @@ export default function OperatorOnboardingForm({
           sameAsPresentAddress: d.present_address === d.permanent_address,
           emergency_name: d.emergency_name || "",
           emergency_phone: d.emergency_phone || "",
+          emergency_contact_aadhaar_number: d.emergency_contact_aadhaar_number || "",
+          emergency_contact_aadhaar_doc: d.emergency_contact_aadhaar_doc || null,
           dl_number: d.dl_number || "",
           dl_expiry_date: d.dl_expiry_date || "",
           pan_number: d.pan_number || "",
@@ -347,6 +395,8 @@ export default function OperatorOnboardingForm({
       sameAsPresentAddress: dSameAsPresent,
       emergency_name: dEmergName,
       emergency_phone: dEmergPhone,
+      emergency_contact_aadhaar_number: dEmergAadhaarNum,
+      emergency_contact_aadhaar_doc: dEmergAadhaarDoc,
       dl_number: dDlNum,
       dl_expiry_date: dDlExpiry,
       pan_number: dPanNum,
@@ -385,6 +435,8 @@ export default function OperatorOnboardingForm({
     setDSameAsPresent(d.sameAsPresentAddress);
     setDEmergName(d.emergency_name);
     setDEmergPhone(d.emergency_phone);
+    setDEmergAadhaarNum(d.emergency_contact_aadhaar_number || "");
+    setDEmergAadhaarDoc(d.emergency_contact_aadhaar_doc || null);
     setDDlNum(d.dl_number);
     setDDlExpiry(d.dl_expiry_date);
     setDPanNum(d.pan_number);
@@ -412,6 +464,8 @@ export default function OperatorOnboardingForm({
     setDSameAsPresent(false);
     setDEmergName("");
     setDEmergPhone("");
+    setDEmergAadhaarNum("");
+    setDEmergAadhaarDoc(null);
     setDDlNum("");
     setDDlExpiry("");
     setDPanNum("");
@@ -465,6 +519,8 @@ export default function OperatorOnboardingForm({
         vendor_id: vendorId,
         vendor_type: "Operator",
         candidate_role: "Operator",
+        driver_manager_id: driverManagerId || null,
+        driver_manager_name: driverManagerName || null,
         father_name: "N/A",
         bank_name: bankName,
         account_number: accountNumber || null,
@@ -482,6 +538,8 @@ export default function OperatorOnboardingForm({
           permanent_address: d.permanent_address,
           emergency_name: d.emergency_name,
           emergency_phone: d.emergency_phone,
+          emergency_contact_aadhaar_number: d.emergency_contact_aadhaar_number || null,
+          emergency_contact_aadhaar_doc: d.emergency_contact_aadhaar_doc || null,
           pan_number: d.pan_number,
           aadhaar_number: d.aadhaar_number,
           father_name: d.father_name,
@@ -759,6 +817,26 @@ export default function OperatorOnboardingForm({
                         <label className="text-xs font-bold text-text-muted">Operating Place / Hub</label>
                         <input type="text" value={operatingPlace} onChange={(e) => setOperatingPlace(e.target.value)} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" placeholder="e.g. HITEC Hub" />
                       </div>
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-text-muted">Assigned Driver Manager *</label>
+                        <select
+                          value={driverManagerId || ""}
+                          onChange={(e) => {
+                            const id = e.target.value ? Number(e.target.value) : null;
+                            setDriverManagerId(id);
+                            const dm = driverManagersList.find(d => d.id === id);
+                            setDriverManagerName(dm ? dm.name : "");
+                          }}
+                          className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer"
+                        >
+                          <option value="">Select Driver Manager for {city}...</option>
+                          {driverManagersList.map((dm: any) => (
+                            <option key={dm.id} value={dm.id}>
+                              {dm.name} ({dm.city} - {dm.role})
+                            </option>
+                          ))}
+                        </select>
+                      </div>
                     </div>
 
                     <div className="border-t border-border pt-6 mt-6">
@@ -932,6 +1010,10 @@ export default function OperatorOnboardingForm({
                             <input type="text" value={dName} onChange={(e) => setDName(e.target.value)} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary outline-none" placeholder="Full Name" />
                           </div>
                           <div className="space-y-2">
+                            <label className="text-xs font-bold text-text-muted">Father's Name</label>
+                            <input type="text" value={dFather} onChange={(e) => setDFather(e.target.value)} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary outline-none" placeholder="Father's Name" />
+                          </div>
+                          <div className="space-y-2">
                             <label className="text-xs font-bold text-text-muted">Phone Number *</label>
                             <input type="tel" value={dPhone} onChange={(e) => setDPhone(e.target.value)} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary outline-none" placeholder="10-digit phone" />
                           </div>
@@ -956,7 +1038,7 @@ export default function OperatorOnboardingForm({
                               <button
                                 type="button"
                                 onClick={() => setShowDDlNum(!showDDlNum)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
                               >
                                 {showDDlNum ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                               </button>
@@ -975,7 +1057,7 @@ export default function OperatorOnboardingForm({
                               <button
                                 type="button"
                                 onClick={() => setShowDPanNum(!showDPanNum)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
                               >
                                 {showDPanNum ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                               </button>
@@ -994,9 +1076,36 @@ export default function OperatorOnboardingForm({
                               <button
                                 type="button"
                                 onClick={() => setShowDAadhaarNum(!showDAadhaarNum)}
-                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none"
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
                               >
                                 {showDAadhaarNum ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                              </button>
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-text-muted">Emergency Contact Name</label>
+                            <input type="text" value={dEmergName} onChange={(e) => setDEmergName(e.target.value)} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary outline-none" placeholder="Contact Person" />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-text-muted">Emergency Phone</label>
+                            <input type="tel" value={dEmergPhone} onChange={(e) => setDEmergPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary outline-none" placeholder="10-digit number" />
+                          </div>
+                          <div className="space-y-2">
+                            <label className="text-xs font-bold text-text-muted">Emergency Aadhaar No.</label>
+                            <div className="relative">
+                              <input
+                                type={showDEmergAadhaarNum ? "text" : "password"}
+                                value={dEmergAadhaarNum}
+                                onChange={(e) => setDEmergAadhaarNum(e.target.value.replace(/\D/g, '').slice(0, 12))}
+                                className="w-full h-11 pl-4 pr-10 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary outline-none font-mono"
+                                placeholder="12-digit Aadhaar No."
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowDEmergAadhaarNum(!showDEmergAadhaarNum)}
+                                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 focus:outline-none cursor-pointer"
+                              >
+                                {showDEmergAadhaarNum ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
                               </button>
                             </div>
                           </div>
@@ -1004,12 +1113,13 @@ export default function OperatorOnboardingForm({
 
                         {/* Driver KYC Images */}
                         <div className="border-t border-border pt-4 relative z-10">
-                          <label className="text-xs font-bold text-text-muted block mb-3">Driver KYC Documents</label>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                          <label className="text-xs font-bold text-text-muted block mb-3">Driver KYC & Emergency Documents</label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
                             {renderDocCard("d_selfie", "Driver Selfie", dSelfie, setDSelfie)}
                             {renderDocCard("d_dl_front", "DL Front", dDlFront, setDDlFront, true)}
                             {renderDocCard("d_pan", "PAN Card", dPanPhoto, setDPanPhoto, true)}
                             {renderDocCard("d_aadhaar", "Aadhaar Card", dAadhaarPhoto, setDAadhaarPhoto, true)}
+                            {renderDocCard("d_emerg_aadhaar", "Emergency Aadhaar", dEmergAadhaarDoc, setDEmergAadhaarDoc, true)}
                           </div>
                         </div>
 
