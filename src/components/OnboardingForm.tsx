@@ -347,6 +347,19 @@ export default function OnboardingForm({
   const [driverManagerName, setDriverManagerName] = useState<string>("");
   const [driverManagersList, setDriverManagersList] = useState<any[]>([]);
 
+  // Emergency Contact Aadhaar Card
+  const [emergencyContactAadhaarDoc, setEmergencyContactAadhaarDoc] = useState<string | null>(null);
+
+  // Dynamic City-filtered Driver Managers (S.No 24)
+  const filteredDriverManagers = useMemo(() => {
+    if (!city) return driverManagersList;
+    const list = driverManagersList.filter((dm: any) => {
+      if (!dm.city) return true;
+      return dm.city.trim().toLowerCase() === city.trim().toLowerCase();
+    });
+    return list.length > 0 ? list : driverManagersList;
+  }, [driverManagersList, city]);
+
   // Police Verification
   const [policeVerificationStatus, setPoliceVerificationStatus] = useState<string>("Not Required");
   const [policeVerificationDoc, setPoliceVerificationDoc] = useState<string | null>(null);
@@ -800,16 +813,12 @@ export default function OnboardingForm({
           alert("Reference addresses for Reference 1 and Reference 2 are mandatory for the LetzOwn rental model.");
           return;
         }
-        if (securityChequeFiles.length < 4) {
-          alert("For the LetzOwn rental model, 4 Security Cheque documents are required.");
-          return;
-        }
         if (localAddressProofFiles.length === 0) {
           alert("For the LetzOwn rental model, Local Address Proof document is mandatory.");
           return;
         }
-        if (!policeVerificationDoc) {
-          alert("For the LetzOwn rental model, Police Verification Document is mandatory.");
+        if (!emergencyContactAadhaarDoc) {
+          alert("For the LetzOwn rental model, Emergency Contact Aadhaar Card is mandatory.");
           return;
         }
       }
@@ -835,6 +844,7 @@ export default function OnboardingForm({
       emergency_name: emergencyName.trim(),
       emergency_relationship: emergencyRelationship.trim(),
       emergency_phone: emergencyPhone.trim(),
+      emergency_contact_aadhaar_doc: emergencyContactAadhaarDoc || null,
       dl_number: dlNumber.trim().toUpperCase() || null,
       dl_expiry_date: dlExpiryDate || null,
       lead_source: leadSource ? `${leadSource}${sourceDetails ? ' - ' + sourceDetails : ''}` : null,
@@ -999,11 +1009,12 @@ export default function OnboardingForm({
     setPermanentPincode("");
     setSameAsPresentAddress(false);
     setEmergencyName("");
-    setEmergencyRelationship("");
+    setEmergencyRelationship("Spouse");
     setEmergencyPhone("");
+    setEmergencyContactAadhaarDoc(null);
     setDlNumber("");
     setDlExpiryDate("");
-    setLeadSource("");
+    setLeadSource("Direct Lead");
     setSourceDetails("");
     setPanNumber("");
     setAadhaarNumber("");
@@ -1057,7 +1068,7 @@ export default function OnboardingForm({
     setAutoFillBanner("");
   };
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: "selfie" | "dl_front" | "dl_back" | "pan" | "aadhaar" | "aadhaar_front" | "aadhaar_back" | "local_address_proof" | "security_cheque" | "police_doc" | "cheque" | "cheque2" | "cheque3" | "cheque4" | "signature" | string) => {
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>, field: "selfie" | "dl_front" | "dl_back" | "pan" | "aadhaar" | "aadhaar_front" | "aadhaar_back" | "local_address_proof" | "security_cheque" | "police_doc" | "cheque" | "cheque2" | "cheque3" | "cheque4" | "signature" | "emergency_contact_aadhaar" | string) => {
     const file = e.target.files?.[0];
     if (file) {
       compressImage(file).then((result) => {
@@ -1069,6 +1080,7 @@ export default function OnboardingForm({
           if (field === "aadhaar") setAadhaarPhoto(result);
           if (field === "aadhaar_front") setAadhaarCardFront(result);
           if (field === "aadhaar_back") setAadhaarCardBack(result);
+          if (field === "emergency_contact_aadhaar") setEmergencyContactAadhaarDoc(result);
           if (field === "local_address_proof") {
             if (localAddressProofFiles.length < 4) {
               setLocalAddressProofFiles(prev => [...prev, result]);
@@ -1136,6 +1148,7 @@ export default function OnboardingForm({
       setEmergencyName(data.emergency_name || "");
       setEmergencyRelationship(data.emergency_relationship || "Spouse");
       setEmergencyPhone(data.emergency_phone || "");
+      setEmergencyContactAadhaarDoc(data.emergency_contact_aadhaar_doc || null);
       setDlNumber(data.dl_number || data.driving_license || "");
       setDlExpiryDate(data.dl_expiry_date || "");
       const [lsource, ...lsdetails] = (data.lead_source || "").split(" - ");
@@ -1391,6 +1404,7 @@ export default function OnboardingForm({
     if (field === "aadhaar") setAadhaarPhoto(null);
     if (field === "aadhaar_front") setAadhaarCardFront(null);
     if (field === "aadhaar_back") setAadhaarCardBack(null);
+    if (field === "emergency_contact_aadhaar") setEmergencyContactAadhaarDoc(null);
     if (field === "police_doc" || field === "police_verification_doc") setPoliceVerificationDoc(null);
     if (field === "cheque") setCancelledChequePhoto(null);
     if (field === "cheque2") setCheque2Photo(null);
@@ -1774,7 +1788,7 @@ export default function OnboardingForm({
                             className="w-full h-11 px-3.5 bg-white border border-border rounded-xl text-xs font-semibold text-slate-800 outline-none focus:border-primary cursor-pointer"
                           >
                             <option value="">Select Driver Manager...</option>
-                            {driverManagersList.map((dm: any) => (
+                            {filteredDriverManagers.map((dm: any) => (
                               <option key={dm.id} value={dm.id}>
                                 {dm.name} ({dm.role || 'Manager'})
                               </option>
@@ -1942,6 +1956,64 @@ export default function OnboardingForm({
                           <div className="space-y-2">
                             <label className="text-xs font-bold text-text-muted">Emergency Phone *</label>
                             <input type="tel" required={currentStep === 1} value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value.replace(/\D/g, '').slice(0, 10))} className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all" placeholder="10-digit number" />
+                          </div>
+
+                          <div className="space-y-2 md:col-span-3">
+                            <label className="text-xs font-bold text-text-muted flex items-center justify-between">
+                              <span>Emergency Contact Aadhaar Card {rentalModel === "LetzOwn" ? <span className="text-amber-700 font-bold">* (Mandatory for LetzOwn)</span> : <span className="text-slate-400 font-normal">(Optional)</span>}</span>
+                              {emergencyContactAadhaarDoc && <span className="text-[10px] text-emerald-600 font-semibold">✓ Document Uploaded</span>}
+                            </label>
+                            <div className="flex items-center gap-3">
+                              {emergencyContactAadhaarDoc ? (
+                                <div className="relative flex items-center gap-2 bg-slate-50 border border-border rounded-xl px-3 py-2">
+                                  {emergencyContactAadhaarDoc.startsWith("data:application/pdf") ? (
+                                    <div className="flex items-center gap-2">
+                                      <FileText className="w-5 h-5 text-emerald-600" />
+                                      <span className="text-xs font-medium text-slate-800">Aadhaar PDF attached</span>
+                                    </div>
+                                  ) : (
+                                    <img src={emergencyContactAadhaarDoc} alt="Emergency Contact Aadhaar" className="h-10 w-auto object-contain rounded" />
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={() => setEmergencyContactAadhaarDoc(null)}
+                                    className="ml-2 text-rose-500 hover:text-rose-700 p-1 rounded-full hover:bg-rose-50 cursor-pointer"
+                                  >
+                                    <X className="w-3.5 h-3.5" />
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2">
+                                  <label className="flex items-center gap-1.5 px-4 py-2 bg-white border border-border rounded-xl text-xs font-semibold text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors shadow-2xs">
+                                    <Upload className="w-3.5 h-3.5 text-primary" /> Upload Aadhaar
+                                    <input
+                                      type="file"
+                                      accept="image/*,.pdf,application/pdf"
+                                      className="hidden"
+                                      onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                          if (file.type === "application/pdf" || file.name.endsWith(".pdf")) {
+                                            const reader = new FileReader();
+                                            reader.onload = () => setEmergencyContactAadhaarDoc(reader.result as string);
+                                            reader.readAsDataURL(file);
+                                          } else {
+                                            compressImage(file).then(setEmergencyContactAadhaarDoc).catch((err) => alert('Upload failed: ' + err?.message));
+                                          }
+                                        }
+                                      }}
+                                    />
+                                  </label>
+                                  <button
+                                    type="button"
+                                    onClick={() => setCameraActiveField("emergency_contact_aadhaar")}
+                                    className="flex items-center gap-1.5 px-4 py-2 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl text-xs font-semibold text-slate-700 cursor-pointer transition-colors"
+                                  >
+                                    <Camera className="w-3.5 h-3.5 text-slate-600" /> Capture
+                                  </button>
+                                </div>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -2254,71 +2326,6 @@ export default function OnboardingForm({
                         </div>
                       </div>
 
-                      {/* Security Cheques (Up to 4 Cheques Multi-Upload) */}
-                      <div className="flex flex-col gap-3 rounded-xl border border-dashed border-border bg-white p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="font-sans text-xs font-bold text-slate-800">
-                              Security Cheques (Up to 4 Cheques) {rentalModel === "LetzOwn" ? <strong className="text-amber-700">(4 Cheques Required for LetzOwn *)</strong> : <span className="text-slate-400 font-normal">(Optional / Up to 4)</span>}
-                            </span>
-                            {rentalModel === "LetzOwn" && (
-                              <span className="block text-[10px] text-amber-700 font-semibold mt-0.5">All 4 Security Cheque documents are mandatory for the LetzOwn rental model.</span>
-                            )}
-                          </div>
-                          <span className="text-[11px] font-semibold text-slate-500">{securityChequeFiles.length} / 4 Cheques</span>
-                        </div>
-                        
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                          {securityChequeFiles.map((fileUrl, index) => (
-                            <div key={index} className="relative bg-slate-50 border border-slate-200 rounded-lg p-2 flex flex-col items-center">
-                              <img src={fileUrl} alt={`Security Cheque ${index + 1}`} className="max-h-24 object-contain rounded shadow-xs" />
-                              <span className="text-[10px] font-bold text-slate-600 mt-1">Cheque #{index + 1}</span>
-                              <button type="button" onClick={() => removeSecurityChequeFile(index)} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 transition-all cursor-pointer"><Trash2 className="h-3.5 w-3.5" /></button>
-                            </div>
-                          ))}
-
-                          {securityChequeFiles.length < 4 && (
-                            <div className="flex flex-col items-center justify-center p-3 border border-dashed border-primary/40 bg-emerald-50/40 rounded-lg gap-2 text-center min-h-[100px]">
-                              <span className="text-[11px] font-semibold text-slate-700">Add Cheque #{securityChequeFiles.length + 1}</span>
-                              <div className="flex gap-1.5 w-full">
-                                <button type="button" onClick={() => setCameraActiveField("security_cheque")} className="flex-1 flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-bold py-1.5 hover:bg-primary-dark transition-colors cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
-                                <label className="flex-1 flex items-center justify-center gap-1 rounded border border-border bg-white text-slate-700 text-[10px] font-bold py-1.5 hover:bg-slate-100 transition-colors cursor-pointer">
-                                  <Upload className="h-3 w-3 text-primary" /> Upload
-                                  <input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "security_cheque")} />
-                                </label>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Police Verification Document Upload */}
-                      <div className="flex flex-col gap-3 rounded-xl border border-dashed border-border bg-white p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="font-sans text-xs font-bold text-slate-800">
-                              Police Verification Document {rentalModel === "LetzOwn" ? <strong className="text-amber-700">(Mandatory for LetzOwn *)</strong> : <span className="text-slate-400 font-normal">(Optional)</span>}
-                            </span>
-                            <span className="block text-[10px] text-slate-500 mt-0.5">Upload official police verification report or certificate document</span>
-                          </div>
-                        </div>
-
-                        {policeVerificationDoc ? (
-                          <div className="relative bg-slate-50 border border-slate-200 rounded-xl p-3 flex items-center justify-center max-w-sm">
-                            <img src={policeVerificationDoc} alt="Police Verification Document" className="max-h-28 object-contain rounded-lg shadow-2xs" />
-                            <button type="button" onClick={() => setPoliceVerificationDoc(null)} className="absolute top-2 right-2 rounded-full bg-rose-50 text-rose-500 p-1.5 hover:bg-rose-100 transition-all cursor-pointer shadow-xs"><Trash2 className="h-3.5 w-3.5" /></button>
-                          </div>
-                        ) : (
-                          <div className="flex flex-col items-center justify-center p-4 border border-dashed border-border bg-slate-50 rounded-xl gap-2 text-center max-w-sm">
-                            <span className="text-xs font-medium text-slate-600">Attach Police Verification Proof</span>
-                            <div className="flex gap-2 w-full">
-                              <button type="button" onClick={() => setCameraActiveField("police_doc")} className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-primary text-white text-xs font-bold py-1.5 hover:bg-primary-dark transition-colors cursor-pointer shadow-xs"><Camera className="h-3.5 w-3.5" /> Capture</button>
-                              <label className="flex-1 flex items-center justify-center gap-1 rounded-lg border border-border bg-white text-slate-700 text-xs font-bold py-1.5 hover:bg-slate-50 transition-colors cursor-pointer shadow-xs"><Upload className="h-3.5 w-3.5 text-primary" /> Upload<input type="file" accept="image/*,application/pdf" className="hidden" onChange={(e) => handleFileUpload(e, "police_doc")} /></label>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
                     </div>
 
                     <hr className="border-border/60" />
@@ -2553,7 +2560,7 @@ export default function OnboardingForm({
                         </div>
                       </div>
                       
-                      {/* Right: Bank Proof (Cancelled Cheque) + Signature */}
+                      {/* Right: Bank Proof (Cancelled Cheque) */}
                       <div className="space-y-4">
                         {/* Cancelled Cheque / Bank Proof */}
                         <div className="flex flex-col gap-2 rounded-xl border border-dashed border-border bg-slate-50 p-3">
@@ -2568,22 +2575,6 @@ export default function OnboardingForm({
                               <div className="flex gap-1.5 w-full px-2">
                                 <button type="button" onClick={() => setCameraActiveField("cheque")} className="flex-1 flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-semibold py-1.5 hover:bg-primary-hover transition-colors cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
                                 <label className="flex-1 flex items-center justify-center gap-1 rounded border border-border bg-white text-text-muted text-[10px] font-semibold py-1.5 hover:bg-slate-100 transition-colors cursor-pointer"><Upload className="h-3 w-3" /> Upload<input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "cheque")} /></label>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        <div className="flex flex-col gap-2 rounded-xl border border-dashed border-border bg-slate-50 p-3">
-                          <span className="font-sans text-[11px] font-bold text-text-muted text-center">Candidate Signature</span>
-                          {signaturePhoto ? (
-                            <div className="relative h-20 flex items-center justify-center bg-white rounded-lg p-2">
-                              <img src={signaturePhoto} alt="Signature" className="max-h-16 object-contain rounded shadow-xs" />
-                              <button type="button" onClick={() => removePhoto("signature")} className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 transition-all cursor-pointer"><Trash2 className="h-3 w-3" /></button>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center justify-center h-16 border border-border/50 bg-white rounded-lg gap-1">
-                              <div className="flex gap-1.5 w-full px-2">
-                                <button type="button" onClick={() => setCameraActiveField("signature")} className="flex-1 flex items-center justify-center gap-1 rounded bg-primary text-white text-[10px] font-semibold py-1.5 hover:bg-primary-hover transition-colors cursor-pointer"><Camera className="h-3 w-3" /> Capture</button>
-                                <label className="flex-1 flex items-center justify-center gap-1 rounded border border-border bg-white text-text-muted text-[10px] font-semibold py-1.5 hover:bg-slate-100 transition-colors cursor-pointer"><Upload className="h-3 w-3" /> Upload<input type="file" accept="image/*" className="hidden" onChange={(e) => handleFileUpload(e, "signature")} /></label>
                               </div>
                             </div>
                           )}
@@ -3272,6 +3263,7 @@ export default function OnboardingForm({
             if (cameraActiveField === "aadhaar") setAadhaarPhoto(dataUrl);
             if (cameraActiveField === "aadhaar_front") setAadhaarCardFront(dataUrl);
             if (cameraActiveField === "aadhaar_back") setAadhaarCardBack(dataUrl);
+            if (cameraActiveField === "emergency_contact_aadhaar") setEmergencyContactAadhaarDoc(dataUrl);
             if (cameraActiveField === "local_address_proof") {
               if (localAddressProofFiles.length < 4) {
                 setLocalAddressProofFiles(prev => [...prev, dataUrl]);

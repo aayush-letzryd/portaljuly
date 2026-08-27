@@ -456,7 +456,8 @@ def startup_event():
             "police_verification_doc    TEXT",
             "reference_verified         BOOLEAN DEFAULT FALSE",
             "driver_manager_id          INTEGER",
-            "driver_manager_name        VARCHAR(255)"
+            "driver_manager_name        VARCHAR(255)",
+            "emergency_contact_aadhaar_doc TEXT"
         ]:
             cur.execute(f"ALTER TABLE july_form_onboarding ADD COLUMN IF NOT EXISTS {col};")
 
@@ -605,7 +606,21 @@ def startup_event():
             "engine_number VARCHAR(100)",
             "cng_tank_number VARCHAR(100)",
             "fast_tag_number VARCHAR(100)",
-            "fast_tag_vendor VARCHAR(100)"
+            "fast_tag_vendor VARCHAR(100)",
+            "mfg_date VARCHAR(30)",
+            "fitness_start_date DATE",
+            "fitness_end_date DATE",
+            "permit_start_date DATE",
+            "permit_end_date DATE",
+            "auth_start_date DATE",
+            "auth_end_date DATE",
+            "permit_type VARCHAR(50)",
+            "hp_details VARCHAR(255)",
+            "registered_owner_name VARCHAR(255)",
+            "color VARCHAR(100)",
+            "dealer_name VARCHAR(255)",
+            "invoice_date DATE",
+            "invoice_no VARCHAR(100)"
         ]:
             cur.execute(f"ALTER TABLE july_vehicle_onboarding ADD COLUMN IF NOT EXISTS {col};")
 
@@ -823,7 +838,15 @@ def startup_event():
                 "damage_penalty NUMERIC(12, 2) DEFAULT 0",
                 "deposit_refund_status VARCHAR(50) DEFAULT 'Pending Assessment'",
                 "pending_dues NUMERIC(12, 2) DEFAULT 0",
-                "fastag_balance_proof TEXT"
+                "fastag_balance_proof TEXT",
+                "driver_agreement_doc TEXT",
+                "security_cheque_1 TEXT",
+                "security_cheque_2 TEXT",
+                "security_cheque_3 TEXT",
+                "security_cheque_4 TEXT",
+                "security_cheques TEXT",
+                "police_verification_doc TEXT",
+                "vehicle_driver_photo TEXT"
             ]:
                 cur.execute(f"ALTER TABLE july_allocation_form ADD COLUMN IF NOT EXISTS {col};")
 
@@ -1618,6 +1641,7 @@ class OnboardingData(BaseModel):
     driver_manager_id: Optional[Union[int, str]] = None
     driver_manager_name: Optional[str] = None
     signature_photo: Optional[Any] = None
+    emergency_contact_aadhaar_doc: Optional[Any] = None
     candidate_role: Optional[str] = "Driver"
     rental_model: Optional[str] = None
     security_deposit: Optional[str] = None
@@ -1716,6 +1740,14 @@ class AllocationData(BaseModel):
     damage_penalty: Optional[Union[float, str]] = None
     deposit_refund_status: Optional[str] = None
     pending_dues: Optional[Union[float, str]] = None
+    driver_agreement_doc: Optional[Any] = None
+    security_cheque_1: Optional[Any] = None
+    security_cheque_2: Optional[Any] = None
+    security_cheque_3: Optional[Any] = None
+    security_cheque_4: Optional[Any] = None
+    security_cheques: Optional[Any] = None
+    police_verification_doc: Optional[Any] = None
+    vehicle_driver_photo: Optional[Any] = None
 
 class DropOffData(BaseModel):
     dropoff_date: Optional[str] = None
@@ -1774,10 +1806,16 @@ class VehicleOnboardingData(BaseModel):
     received_allocated: Optional[str] = "In Process"
     fuel_type: Optional[str] = None
     delivery_month: Optional[str] = None
+    mfg_date: Optional[str] = None
     registration_date: Optional[str] = None
     rto_tax_validity: Optional[str] = None
     permit_validity: Optional[str] = None
+    permit_start_date: Optional[str] = None
+    permit_end_date: Optional[str] = None
+    permit_type: Optional[str] = None
     fitness_validity: Optional[str] = None
+    fitness_start_date: Optional[str] = None
+    fitness_end_date: Optional[str] = None
     pollution_validity: Optional[str] = None
     insurance_validity: Optional[str] = None
     insurance_broker: Optional[str] = None
@@ -1792,6 +1830,14 @@ class VehicleOnboardingData(BaseModel):
     engine_number: Optional[str] = None
     cng_tank_number: Optional[str] = None
     authorization_certificate: Optional[str] = None
+    auth_start_date: Optional[str] = None
+    auth_end_date: Optional[str] = None
+    hp_details: Optional[str] = None
+    registered_owner_name: Optional[str] = None
+    color: Optional[str] = None
+    dealer_name: Optional[str] = None
+    invoice_date: Optional[str] = None
+    invoice_no: Optional[str] = None
     insurance_mapping: Optional[str] = None
     kms_reading: Optional[str] = None
     tracking_device_vendor: Optional[str] = None
@@ -2030,25 +2076,26 @@ def login(req: LoginRequest, request: Request):
     try:
         cur = conn.cursor()
         uname = req.username.strip().lower()
-        lookup_name = 'super_admin' if uname in ['admin', 'superadmin'] else uname
         client_ip = request.client.host if request.client else None
         user_agent = request.headers.get("user-agent", "")
         
-        # Check july_portal_users first (matches email ID or username)
+        # Check july_portal_users first (matches email ID, username, or alias)
         cur.execute("""
             SELECT pu.portal_user_id, pu.password_hash, pu.employee_id, 
-                   CONCAT(e.first_name, ' ', COALESCE(e.last_name, '')), 
-                   r.role_name, pu.username, pu.role_id,
-                   r.role_code, COALESCE(pu.city, e.city, 'Hyderabad')
+                   COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', COALESCE(e.last_name, ''))), ''), pu.username, 'User'), 
+                   COALESCE(r.role_name, pu.role, 'Executive'), pu.username, pu.role_id,
+                   COALESCE(r.role_code, 'SA'), COALESCE(pu.city, e.city, 'Hyderabad')
             FROM july_portal_users pu
-            JOIN july_employees e ON e.employee_id = pu.employee_id
-            JOIN july_roles r ON r.role_id = pu.role_id
+            LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
+            LEFT JOIN july_roles r ON r.role_id = pu.role_id
             WHERE (LOWER(pu.username) = %s 
+                   OR (LOWER(pu.username) = 'admin' AND %s IN ('admin', 'superadmin', 'super_admin'))
                    OR LOWER(e.company_email) = %s 
                    OR LOWER(pu.email) = %s 
+                   OR LOWER(pu.username) = %s
                    OR LOWER(pu.username) = %s)
-              AND pu.account_status = 'Active';
-        """, (lookup_name, lookup_name, lookup_name, f"{lookup_name}@letzryd.com"))
+              AND COALESCE(pu.account_status, 'Active') != 'Disabled';
+        """, (uname, uname, uname, uname, f"{uname}@letzryd.com", uname.replace("@letzryd.com", "")))
         row = cur.fetchone()
         
         def verify_password_flexible(plain_pwd, hashed_pwd, raw_pwd=None):
@@ -2060,6 +2107,12 @@ def login(req: LoginRequest, request: Request):
                 return True
             if plain_pwd == hashed_pwd:
                 return True
+            try:
+                import bcrypt
+                if hashed_pwd.startswith("$2b$") or hashed_pwd.startswith("$2a$"):
+                    return bcrypt.checkpw(plain_pwd.encode("utf-8"), hashed_pwd.encode("utf-8"))
+            except Exception:
+                pass
             try:
                 return pwd_context.verify(plain_pwd, hashed_pwd)
             except Exception:
@@ -3934,7 +3987,8 @@ def create_onboarding(data: OnboardingData, authorization: Optional[str] = Heade
                 ref2_name, ref2_phone, ref2_address,
                 ref3_name, ref3_phone, ref3_address,
                 created_by, updated_by, approval_status,
-                created_at, updated_at, gst_number, gst_certificate, incorporation_doc
+                created_at, updated_at, gst_number, gst_certificate, incorporation_doc,
+                emergency_contact_aadhaar_doc
             ) VALUES (
                 %s,%s,%s,%s,%s,%s,
                 %s,%s,%s,%s,
@@ -3955,7 +4009,8 @@ def create_onboarding(data: OnboardingData, authorization: Optional[str] = Heade
                 %s,%s,%s,
                 %s,%s,%s,
                 %s,%s,%s,
-                NOW(),NOW(),%s,%s,%s
+                NOW(),NOW(),%s,%s,%s,
+                %s
             )
             RETURNING id;
         """, (
@@ -3985,7 +4040,8 @@ def create_onboarding(data: OnboardingData, authorization: Optional[str] = Heade
             data.ref2_name, data.ref2_phone, data.ref2_address,
             data.ref3_name, data.ref3_phone, data.ref3_address,
             creator_id, creator_id, data.approval_status or 'Draft',
-            data.gst_number, extract_image(data.gst_certificate), extract_image(data.incorporation_doc)
+            data.gst_number, extract_image(data.gst_certificate), extract_image(data.incorporation_doc),
+            extract_image(data.emergency_contact_aadhaar_doc)
         ))
         new_id = cur.fetchone()[0]
         
@@ -4329,7 +4385,8 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
                     security_cheques, police_verification_doc,
                     signature_photo, gst_certificate, incorporation_doc,
                     created_by, updated_by, approval_status,
-                    created_at, updated_at
+                    created_at, updated_at,
+                    emergency_contact_aadhaar_doc
                 ) VALUES (
                     %s,%s,%s,%s,%s,%s,
                     %s,%s,%s,%s,
@@ -4355,7 +4412,8 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
                     %s,%s,
                     %s,%s,%s,
                     %s,%s,'Draft',
-                    NOW(),NOW()
+                    NOW(),NOW(),
+                    %s
                 )
                 RETURNING id;
             """, (
@@ -4385,7 +4443,8 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
                 json.dumps(data.security_cheque_files) if isinstance(data.security_cheque_files, list) else extract_image(data.security_cheque_files),
                 extract_image(data.police_verification_doc),
                 extract_image(data.signature_photo), extract_image(data.gst_certificate), extract_image(data.incorporation_doc),
-                user_p_id, user_p_id
+                user_p_id, user_p_id,
+                extract_image(data.emergency_contact_aadhaar_doc)
             ))
             new_id = cur.fetchone()[0]
             cur.execute("""
@@ -4435,6 +4494,7 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
                     security_cheques=%s, police_verification_doc=%s,
                     signature_photo=%s, gst_certificate=%s,
                     incorporation_doc=%s,
+                    emergency_contact_aadhaar_doc=%s,
                     updated_by=%s, updated_at=NOW()
                 WHERE id=%s;
             """, (
@@ -4476,6 +4536,7 @@ def save_onboarding_draft(id: int, data: OnboardingData, authorization: Optional
                 extract_image(data.signature_photo),
                 extract_image(data.gst_certificate),
                 extract_image(data.incorporation_doc),
+                extract_image(data.emergency_contact_aadhaar_doc),
                 user_p_id, id
             ))
             cur.execute("""
@@ -4529,7 +4590,8 @@ def get_onboarding(id: int):
                 COALESCE(approval_status, 'Draft') AS approval_status,
                 created_at, updated_at,
                 created_by, updated_by, current_approver_id, approved_by,
-                approval_note, gst_number, gst_certificate, incorporation_doc
+                approval_note, gst_number, gst_certificate, incorporation_doc,
+                emergency_contact_aadhaar_doc
             FROM july_form_onboarding
             WHERE id = %s;
         """, (id,))
@@ -4576,7 +4638,8 @@ def get_onboarding(id: int):
                 "approval_remarks": r[75],
                 "gst_number": r[76],
                 "gst_certificate": r[77],
-                "incorporation_doc": r[78]
+                "incorporation_doc": r[78],
+                "emergency_contact_aadhaar_doc": r[79]
             }
             if (r[29] == "Operator" or r[45] == "Operator") and (r[17] or r[16]):
                 cur.execute("""
@@ -4661,6 +4724,7 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
                 security_cheques=%s, police_verification_doc=%s,
                 signature_photo=%s, gst_certificate=%s,
                 incorporation_doc=%s,
+                emergency_contact_aadhaar_doc=%s,
                 updated_by=%s, updated_at=NOW()
             WHERE id=%s;
         """, (
@@ -4699,6 +4763,7 @@ def update_onboarding(id: int, data: OnboardingData, authorization: Optional[str
             extract_image(data.signature_photo),
             extract_image(data.gst_certificate),
             extract_image(data.incorporation_doc),
+            extract_image(data.emergency_contact_aadhaar_doc),
             user_p_id,
             id
         ))
@@ -5589,7 +5654,8 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
                 dropoff_location, manual_dropoff_location, duplicate_key_status,
                 fastag_balance_amount, fastag_balance_proof,
                 damage_penalty, deposit_refund_status, pending_dues,
-                status, approval_status, created_by, created_at
+                status, approval_status, created_by, created_at,
+                driver_agreement_doc, security_cheque_1, security_cheque_2, security_cheque_3, security_cheque_4, security_cheques, police_verification_doc, vehicle_driver_photo
             ) VALUES (
                 %s,%s,%s,%s,
                 %s,%s,%s,
@@ -5605,7 +5671,8 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
                 %s,%s,%s,
                 %s,%s,
                 %s,%s,%s,
-                %s,%s,%s, NOW()
+                %s,%s,%s, NOW(),
+                %s,%s,%s,%s,%s,%s,%s,%s
             ) RETURNING id;
         """, (
             data.allocation_date, data.allocation_type, data.sub_type, data.city_name,
@@ -5635,7 +5702,15 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
             float(data.pending_dues) if data.pending_dues is not None and str(data.pending_dues).strip() != "" else None,
             data.status or "Submitted",
             data.status or "Submitted",
-            data.created_by or uid
+            data.created_by or uid,
+            extract_image(data.driver_agreement_doc),
+            extract_image(data.security_cheque_1),
+            extract_image(data.security_cheque_2),
+            extract_image(data.security_cheque_3),
+            extract_image(data.security_cheque_4),
+            extract_image(data.security_cheques),
+            extract_image(data.police_verification_doc),
+            extract_image(data.vehicle_driver_photo)
         ))
         new_id = cur.fetchone()[0]
 
@@ -6038,6 +6113,7 @@ def update_allocation_record(id: int, data: AllocationData, authorization: Optio
                 dropoff_location=%s, manual_dropoff_location=%s, duplicate_key_status=%s,
                 fastag_balance_amount=%s, fastag_balance_proof=%s,
                 damage_penalty=%s, deposit_refund_status=%s, pending_dues=%s,
+                driver_agreement_doc=%s, security_cheque_1=%s, security_cheque_2=%s, security_cheque_3=%s, security_cheque_4=%s, security_cheques=%s, police_verification_doc=%s, vehicle_driver_photo=%s,
                 status=%s, approval_status=%s, updated_by=%s, updated_at=NOW()
             WHERE id=%s RETURNING id;
         """, (
@@ -6066,6 +6142,14 @@ def update_allocation_record(id: int, data: AllocationData, authorization: Optio
             float(data.damage_penalty) if data.damage_penalty is not None and str(data.damage_penalty).strip() != "" else None,
             data.deposit_refund_status or "Pending Assessment",
             float(data.pending_dues) if data.pending_dues is not None and str(data.pending_dues).strip() != "" else None,
+            extract_image(data.driver_agreement_doc),
+            extract_image(data.security_cheque_1),
+            extract_image(data.security_cheque_2),
+            extract_image(data.security_cheque_3),
+            extract_image(data.security_cheque_4),
+            extract_image(data.security_cheques),
+            extract_image(data.police_verification_doc),
+            extract_image(data.vehicle_driver_photo),
             data.status or "Submitted",
             data.status or "Submitted",
             uid, id
@@ -6397,6 +6481,8 @@ def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[s
                 fuel_type,
                 insurance_idv, cover_engine_protect, cover_consumables, cover_zero_dep, cover_rsa,
                 chassis_number, engine_number, cng_tank_number, fast_tag_number, fast_tag_vendor,
+                mfg_date, fitness_start_date, fitness_end_date, permit_start_date, permit_end_date, auth_start_date, auth_end_date,
+                permit_type, hp_details, registered_owner_name, color, dealer_name, invoice_date, invoice_no,
                 approval_status, current_approver_id, approval_remarks, created_by
             ) VALUES (
                 %s,%s,%s,%s,%s,%s,
@@ -6409,6 +6495,8 @@ def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[s
                 %s,
                 %s,%s,%s,%s,%s,
                 %s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,
                 %s,%s,%s,%s
             ) RETURNING id;
         """, (
@@ -6429,6 +6517,8 @@ def create_vehicle_record(data: VehicleOnboardingData, authorization: Optional[s
             bool(data.cover_zero_dep) if data.cover_zero_dep is not None else False,
             bool(data.cover_rsa) if data.cover_rsa is not None else False,
             data.chassis_number, data.engine_number, data.cng_tank_number, data.fast_tag_number, data.fast_tag_vendor,
+            data.mfg_date, data.fitness_start_date, data.fitness_end_date, data.permit_start_date, data.permit_end_date, data.auth_start_date, data.auth_end_date,
+            data.permit_type, data.hp_details, data.registered_owner_name, data.color, data.dealer_name, data.invoice_date, data.invoice_no,
             data.approval_status or "Draft", data.current_approver_id, data.approval_remarks, data.created_by or uid
         ))
         new_id = cur.fetchone()[0]
@@ -6491,6 +6581,8 @@ def update_vehicle_record(id: int, data: VehicleOnboardingData, authorization: O
                 fuel_type=%s,
                 insurance_idv=%s, cover_engine_protect=%s, cover_consumables=%s, cover_zero_dep=%s, cover_rsa=%s,
                 chassis_number=%s, engine_number=%s, cng_tank_number=%s, fast_tag_number=%s, fast_tag_vendor=%s,
+                mfg_date=%s, fitness_start_date=%s, fitness_end_date=%s, permit_start_date=%s, permit_end_date=%s, auth_start_date=%s, auth_end_date=%s,
+                permit_type=%s, hp_details=%s, registered_owner_name=%s, color=%s, dealer_name=%s, invoice_date=%s, invoice_no=%s,
                 approval_status=%s, current_approver_id=%s, approval_remarks=%s,
                 updated_by=%s, updated_at=NOW()
             WHERE id=%s RETURNING id;
@@ -6512,6 +6604,8 @@ def update_vehicle_record(id: int, data: VehicleOnboardingData, authorization: O
             bool(data.cover_zero_dep) if data.cover_zero_dep is not None else False,
             bool(data.cover_rsa) if data.cover_rsa is not None else False,
             data.chassis_number, data.engine_number, data.cng_tank_number, data.fast_tag_number, data.fast_tag_vendor,
+            data.mfg_date, data.fitness_start_date, data.fitness_end_date, data.permit_start_date, data.permit_end_date, data.auth_start_date, data.auth_end_date,
+            data.permit_type, data.hp_details, data.registered_owner_name, data.color, data.dealer_name, data.invoice_date, data.invoice_no,
             data.approval_status or old_veh_status or 'Draft', data.current_approver_id, data.approval_remarks if data.approval_remarks is not None else old_approval_remarks,
             uid,
             id

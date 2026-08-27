@@ -280,6 +280,22 @@ export default function VehicleOnboardingForm({
   const [fitnessValidity, setFitnessValidity] = useState("");
   const [pollutionValidity, setPollutionValidity] = useState("");
   const [authorizationCertificate, setAuthorizationCertificate] = useState("");
+
+  // Step 1: Extended Identity & RC Fields (S.No 26)
+  const [mfgDate, setMfgDate] = useState("");
+  const [fitnessStartDate, setFitnessStartDate] = useState("");
+  const [fitnessEndDate, setFitnessEndDate] = useState("");
+  const [permitStartDate, setPermitStartDate] = useState("");
+  const [permitEndDate, setPermitEndDate] = useState("");
+  const [authStartDate, setAuthStartDate] = useState("");
+  const [authEndDate, setAuthEndDate] = useState("");
+  const [permitType, setPermitType] = useState("State");
+  const [hpDetails, setHpDetails] = useState("");
+  const [registeredOwnerName, setRegisteredOwnerName] = useState("");
+  const [color, setColor] = useState("");
+  const [dealerName, setDealerName] = useState("");
+  const [invoiceDate, setInvoiceDate] = useState("");
+  const [invoiceNo, setInvoiceNo] = useState("");
   
   // New Insurance Fields & Covers
   const [insuranceBroker, setInsuranceBroker] = useState("");
@@ -575,6 +591,22 @@ export default function VehicleOnboardingForm({
       setFitnessValidity(data.fitness_validity && data.fitness_validity !== "1970-01-01" ? data.fitness_validity : "");
       setPollutionValidity(data.pollution_validity && data.pollution_validity !== "1970-01-01" ? data.pollution_validity : "");
       setAuthorizationCertificate(data.authorization_certificate || "");
+
+      // Extended Identity & RC Fields (S.No 26)
+      setMfgDate(data.mfg_date || "");
+      setFitnessStartDate(data.fitness_start_date && data.fitness_start_date !== "1970-01-01" ? data.fitness_start_date : "");
+      setFitnessEndDate(data.fitness_end_date && data.fitness_end_date !== "1970-01-01" ? data.fitness_end_date : (data.fitness_validity && data.fitness_validity !== "1970-01-01" ? data.fitness_validity : ""));
+      setPermitStartDate(data.permit_start_date && data.permit_start_date !== "1970-01-01" ? data.permit_start_date : "");
+      setPermitEndDate(data.permit_end_date && data.permit_end_date !== "1970-01-01" ? data.permit_end_date : (data.permit_validity && data.permit_validity !== "1970-01-01" ? data.permit_validity : ""));
+      setAuthStartDate(data.auth_start_date && data.auth_start_date !== "1970-01-01" ? data.auth_start_date : "");
+      setAuthEndDate(data.auth_end_date && data.auth_end_date !== "1970-01-01" ? data.auth_end_date : "");
+      setPermitType(data.permit_type || "State");
+      setHpDetails(data.hp_details || "");
+      setRegisteredOwnerName(data.registered_owner_name || "");
+      setColor(data.color || "");
+      setDealerName(data.dealer_name || "");
+      setInvoiceDate(data.invoice_date && data.invoice_date !== "1970-01-01" ? data.invoice_date : "");
+      setInvoiceNo(data.invoice_no || "");
       
       setInsuranceEndDate(data.insurance_validity && data.insurance_validity !== "1970-01-01" ? data.insurance_validity : "");
       setInsuranceBroker(data.insurance_broker || "");
@@ -667,6 +699,21 @@ export default function VehicleOnboardingForm({
     setFitnessValidity("");
     setPollutionValidity("");
     setAuthorizationCertificate("");
+
+    setMfgDate("");
+    setFitnessStartDate("");
+    setFitnessEndDate("");
+    setPermitStartDate("");
+    setPermitEndDate("");
+    setAuthStartDate("");
+    setAuthEndDate("");
+    setPermitType("State");
+    setHpDetails("");
+    setRegisteredOwnerName("");
+    setColor("");
+    setDealerName("");
+    setInvoiceDate("");
+    setInvoiceNo("");
     
     setInsuranceBroker("");
     setInsuranceUnderwriter("");
@@ -732,7 +779,7 @@ export default function VehicleOnboardingForm({
       if (!cityName.trim()) return alert("City is required");
       if (!modelName.trim()) return alert("Model Name is required");
       if (!registrationDate.trim()) return alert("Registration Date is required");
-      if (!fitnessValidity.trim()) return alert("Fitness Validity is required");
+      if (!fitnessEndDate.trim() && !fitnessValidity.trim()) return alert("Fitness Validity is required");
       if (!insuranceEndDate.trim()) return alert("Coverage End Date is required");
       if (!kmsReading.trim()) return alert("KMs Reading is required");
     } else {
@@ -751,9 +798,24 @@ export default function VehicleOnboardingForm({
       delivery_month: manufacturerMonth || undefined,
       registration_date: registrationDate.trim() || undefined,
       rto_tax_validity: rtoTaxValidity.trim() || undefined,
-      permit_validity: permitValidity.trim() || undefined,
-      fitness_validity: fitnessValidity.trim() || undefined,
+      permit_validity: permitEndDate.trim() || permitValidity.trim() || undefined,
+      fitness_validity: fitnessEndDate.trim() || fitnessValidity.trim() || undefined,
       pollution_validity: pollutionValidity.trim() || undefined,
+
+      mfg_date: mfgDate.trim() || undefined,
+      fitness_start_date: fitnessStartDate.trim() || undefined,
+      fitness_end_date: fitnessEndDate.trim() || fitnessValidity.trim() || undefined,
+      permit_start_date: permitStartDate.trim() || undefined,
+      permit_end_date: permitEndDate.trim() || permitValidity.trim() || undefined,
+      auth_start_date: authStartDate.trim() || undefined,
+      auth_end_date: authEndDate.trim() || undefined,
+      permit_type: permitType.trim() || undefined,
+      hp_details: hpDetails.trim() || undefined,
+      registered_owner_name: registeredOwnerName.trim() || undefined,
+      color: color.trim() || undefined,
+      dealer_name: dealerName.trim() || undefined,
+      invoice_date: invoiceDate.trim() || undefined,
+      invoice_no: invoiceNo.trim() || undefined,
       
       insurance_validity: insuranceEndDate.trim() || undefined, 
       insurance_broker: insuranceBroker.trim() || undefined,
@@ -1249,6 +1311,147 @@ export default function VehicleOnboardingForm({
                       type="date"
                       value={registrationDate}
                       onChange={(e) => setRegistrationDate(e.target.value)}
+                      className="w-full rounded-lg border border-border px-3 py-2 text-xs focus:border-primary focus:outline-hidden transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text mb-1">MFG Date (mm/yy)</label>
+                    <input
+                      type="text"
+                      value={mfgDate}
+                      onChange={(e) => setMfgDate(e.target.value)}
+                      placeholder="e.g. 05/24"
+                      maxLength={7}
+                      className="w-full rounded-lg border border-border px-3 py-2 text-xs focus:border-primary focus:outline-hidden transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text mb-1">Registered Owner Name</label>
+                    <input
+                      type="text"
+                      value={registeredOwnerName}
+                      onChange={(e) => setRegisteredOwnerName(e.target.value)}
+                      placeholder="Owner Name as per RC"
+                      className="w-full rounded-lg border border-border px-3 py-2 text-xs focus:border-primary focus:outline-hidden transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text mb-1">Colour</label>
+                    <input
+                      type="text"
+                      value={color}
+                      onChange={(e) => setColor(e.target.value)}
+                      placeholder="e.g. Pristine White"
+                      className="w-full rounded-lg border border-border px-3 py-2 text-xs focus:border-primary focus:outline-hidden transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text mb-1">HP Details (Hypothecation)</label>
+                    <input
+                      type="text"
+                      value={hpDetails}
+                      onChange={(e) => setHpDetails(e.target.value)}
+                      placeholder="e.g. HDFC Bank Ltd"
+                      className="w-full rounded-lg border border-border px-3 py-2 text-xs focus:border-primary focus:outline-hidden transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text mb-1">Dealer Name</label>
+                    <input
+                      type="text"
+                      value={dealerName}
+                      onChange={(e) => setDealerName(e.target.value)}
+                      placeholder="e.g. Metro Motors"
+                      className="w-full rounded-lg border border-border px-3 py-2 text-xs focus:border-primary focus:outline-hidden transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text mb-1">Invoice Date</label>
+                    <input
+                      type="date"
+                      value={invoiceDate}
+                      onChange={(e) => setInvoiceDate(e.target.value)}
+                      className="w-full rounded-lg border border-border px-3 py-2 text-xs focus:border-primary focus:outline-hidden transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text mb-1">Invoice No</label>
+                    <input
+                      type="text"
+                      value={invoiceNo}
+                      onChange={(e) => setInvoiceNo(e.target.value)}
+                      placeholder="e.g. INV-2024-8841"
+                      className="w-full rounded-lg border border-border px-3 py-2 text-xs focus:border-primary focus:outline-hidden transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text mb-1">Permit Type</label>
+                    <select
+                      value={permitType}
+                      onChange={(e) => setPermitType(e.target.value)}
+                      className="w-full rounded-lg border border-border px-3 py-2 text-xs focus:border-primary focus:outline-hidden bg-white transition-colors cursor-pointer"
+                    >
+                      <option value="State">State Permit</option>
+                      <option value="National">National Permit</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text mb-1">Permit Start Date</label>
+                    <input
+                      type="date"
+                      value={permitStartDate}
+                      onChange={(e) => setPermitStartDate(e.target.value)}
+                      className="w-full rounded-lg border border-border px-3 py-2 text-xs focus:border-primary focus:outline-hidden transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text mb-1">Permit End Date</label>
+                    <input
+                      type="date"
+                      value={permitEndDate}
+                      onChange={(e) => {
+                        setPermitEndDate(e.target.value);
+                        setPermitValidity(e.target.value);
+                      }}
+                      className="w-full rounded-lg border border-border px-3 py-2 text-xs focus:border-primary focus:outline-hidden transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text mb-1">Fitness Start Date</label>
+                    <input
+                      type="date"
+                      value={fitnessStartDate}
+                      onChange={(e) => setFitnessStartDate(e.target.value)}
+                      className="w-full rounded-lg border border-border px-3 py-2 text-xs focus:border-primary focus:outline-hidden transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text mb-1">Fitness End Date *</label>
+                    <input
+                      type="date"
+                      value={fitnessEndDate}
+                      onChange={(e) => {
+                        setFitnessEndDate(e.target.value);
+                        setFitnessValidity(e.target.value);
+                      }}
+                      className="w-full rounded-lg border border-border px-3 py-2 text-xs focus:border-primary focus:outline-hidden transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text mb-1">Auth Start Date</label>
+                    <input
+                      type="date"
+                      value={authStartDate}
+                      onChange={(e) => setAuthStartDate(e.target.value)}
+                      className="w-full rounded-lg border border-border px-3 py-2 text-xs focus:border-primary focus:outline-hidden transition-colors"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-text mb-1">Auth End Date</label>
+                    <input
+                      type="date"
+                      value={authEndDate}
+                      onChange={(e) => setAuthEndDate(e.target.value)}
                       className="w-full rounded-lg border border-border px-3 py-2 text-xs focus:border-primary focus:outline-hidden transition-colors"
                     />
                   </div>

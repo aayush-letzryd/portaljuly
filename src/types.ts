@@ -96,6 +96,7 @@ export interface OnboardingRecord {
   letzown_cheques?: string;
   is_spring_verified?: boolean;
   signature_photo?: string;
+  emergency_contact_aadhaar_doc?: string;
   platform_details?: string | Record<string, any>;
   approval_status?: string;
   approver_name?: string;
@@ -179,6 +180,14 @@ export interface AllocationRecord {
   pdi_completed?: boolean;
   insp_stepney?: string;
   insp_stepney_photo?: string;
+  driver_agreement_doc?: string;
+  security_cheque_1?: string;
+  security_cheque_2?: string;
+  security_cheque_3?: string;
+  security_cheque_4?: string;
+  security_cheques?: string[] | string;
+  police_verification_doc?: string;
+  vehicle_driver_photo?: string;
 }
 
 export interface ExpenseRecord {
@@ -259,13 +268,27 @@ export interface VehicleRecord {
   model: string;
   received_allocated: string;
   delivery_month?: string;
+  mfg_date?: string;
   registration_date: string;
   rto_tax_validity?: string;
   permit_validity?: string;
+  permit_start_date?: string;
+  permit_end_date?: string;
+  permit_type?: "State" | "National" | string;
   fitness_validity: string;
+  fitness_start_date?: string;
+  fitness_end_date?: string;
   pollution_validity?: string;
   insurance_validity: string;
   authorization_certificate?: string;
+  auth_start_date?: string;
+  auth_end_date?: string;
+  hp_details?: string;
+  registered_owner_name?: string;
+  color?: string;
+  dealer_name?: string;
+  invoice_date?: string;
+  invoice_no?: string;
   insurance_mapping?: string;
   insurance_broker?: string;
   insurance_underwriter?: string;

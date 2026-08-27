@@ -23,6 +23,42 @@ const PLAN_MAPPING: Record<string, { typeOfPlan: string; carModel: string }> = {
   "Salary Model": { typeOfPlan: "Employment Contract", carModel: "Hyundai Kona EV" }
 };
 
+const CITY_HUBS: Record<string, string[]> = {
+  "Hyderabad": [
+    "Miyapur Hub",
+    "Kukatpally Hub",
+    "Secunderabad Hub",
+    "LB Nagar Hub",
+    "Gachibowli Hub",
+    "Shamshabad Hub",
+    "Uppal Hub",
+    "Kondapur Hub",
+    "Other Hub"
+  ],
+  "Bangalore": [
+    "Koramangala Hub",
+    "Indiranagar Hub",
+    "Whitefield Hub",
+    "HSR Layout Hub",
+    "Electronic City Hub",
+    "Yelahanka Hub",
+    "Hebbal Hub",
+    "Marathahalli Hub",
+    "Other Hub"
+  ],
+  "Mumbai": [
+    "Andheri Hub",
+    "Bandra Hub",
+    "Thane Hub",
+    "Navi Mumbai Hub",
+    "Borivali Hub",
+    "Kurla Hub",
+    "Dadar Hub",
+    "Goregaon Hub",
+    "Other Hub"
+  ]
+};
+
 export default function AllocationForm({ 
   user, 
   onBackToSelector, 
@@ -65,6 +101,15 @@ export default function AllocationForm({
   const [photoRhSide, setPhotoRhSide] = useState<string | null>(null);
   const [photoFrontSide, setPhotoFrontSide] = useState<string | null>(null);
   const [photoBackSide, setPhotoBackSide] = useState<string | null>(null);
+  const [vehicleDriverPhoto, setVehicleDriverPhoto] = useState<string | null>(null);
+
+  // Documents & Cheques states
+  const [driverAgreementDoc, setDriverAgreementDoc] = useState<string | null>(null);
+  const [securityCheque1, setSecurityCheque1] = useState<string | null>(null);
+  const [securityCheque2, setSecurityCheque2] = useState<string | null>(null);
+  const [securityCheque3, setSecurityCheque3] = useState<string | null>(null);
+  const [securityCheque4, setSecurityCheque4] = useState<string | null>(null);
+  const [policeVerificationDoc, setPoliceVerificationDoc] = useState<string | null>(null);
 
   // Driver Fetch / Lookup state
   const [driverLookupStatus, setDriverLookupStatus] = useState<string>("");
@@ -180,7 +225,7 @@ export default function AllocationForm({
 
   const [cameraActive, setCameraActive] = useState(false);
   const [activeCameraTarget, setActiveCameraTarget] = useState<
-    "lhSide" | "rhSide" | "frontSide" | "backSide" | "olaProof" | "odometer" | "battery" | "stepney" | "dropoffPhoto" | "fastagProof" | null
+    "lhSide" | "rhSide" | "frontSide" | "backSide" | "olaProof" | "odometer" | "battery" | "stepney" | "dropoffPhoto" | "fastagProof" | "vehicleDriverPhoto" | "securityCheque1" | "securityCheque2" | "securityCheque3" | "securityCheque4" | "policeVerificationDoc" | null
   >(null);
 
   // Registry Search & Filter State
@@ -269,6 +314,16 @@ export default function AllocationForm({
     }
   };
 
+  const handlePdfUpload = (e: React.ChangeEvent<HTMLInputElement>, setter: (val: string | null) => void) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      setter(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const loadRecordForEdit = async (id: number) => {
     try {
       const token = localStorage.getItem("lr_token");
@@ -301,6 +356,15 @@ export default function AllocationForm({
       setPhotoRhSide(data.photo_rh_side || null);
       setPhotoFrontSide(data.photo_front_side || null);
       setPhotoBackSide(data.photo_back_side || null);
+      setVehicleDriverPhoto(data.vehicle_driver_photo || null);
+
+      // Documents & Cheques
+      setDriverAgreementDoc(data.driver_agreement_doc || null);
+      setSecurityCheque1(data.security_cheque_1 || null);
+      setSecurityCheque2(data.security_cheque_2 || null);
+      setSecurityCheque3(data.security_cheque_3 || null);
+      setSecurityCheque4(data.security_cheque_4 || null);
+      setPoliceVerificationDoc(data.police_verification_doc || null);
 
       // Swap / Returned vehicle fields
       setOldVehicleNumber(data.old_vehicle_number || "");
@@ -364,6 +428,15 @@ export default function AllocationForm({
     setPhotoRhSide(null);
     setPhotoFrontSide(null);
     setPhotoBackSide(null);
+    setVehicleDriverPhoto(null);
+
+    // Reset Documents & Cheques
+    setDriverAgreementDoc(null);
+    setSecurityCheque1(null);
+    setSecurityCheque2(null);
+    setSecurityCheque3(null);
+    setSecurityCheque4(null);
+    setPoliceVerificationDoc(null);
 
     // Swap / Returned fields reset
     setOldVehicleNumber("");
@@ -407,8 +480,8 @@ export default function AllocationForm({
         return alert("Allocation cannot happen until the Jama Form is filled.");
       }
 
-      if (!customerAddress || !customerAddress.trim()) {
-        return alert("Customer address is mandatory for recovery and allocation.");
+      if (!driverAgreementDoc) {
+        return alert("Driver Agreement copy (PDF) is mandatory for vehicle allocation.");
       }
 
       if (!pdiCompleted && stepney === "Available" && !stepneyPhoto) {
@@ -474,6 +547,13 @@ export default function AllocationForm({
         photo_rh_side: photoRhSide,
         photo_front_side: photoFrontSide,
         photo_back_side: photoBackSide,
+        vehicle_driver_photo: vehicleDriverPhoto,
+        driver_agreement_doc: driverAgreementDoc,
+        security_cheque_1: securityCheque1,
+        security_cheque_2: securityCheque2,
+        security_cheque_3: securityCheque3,
+        security_cheque_4: securityCheque4,
+        police_verification_doc: policeVerificationDoc,
         insp_jack: jack,
         insp_jack_rod: jackRod,
         insp_spanner: spanner,
@@ -486,7 +566,7 @@ export default function AllocationForm({
         insp_stepney_photo: stepneyPhoto,
         insp_remarks: inspectionRemarks,
         hub_name: hubName,
-        customer_address: customerAddress,
+        customer_address: customerAddress || null,
         jama_form_filled: jamaFormFilled,
         pdi_completed: pdiCompleted,
         status: targetStatus
@@ -823,12 +903,9 @@ export default function AllocationForm({
                           required
                           className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs cursor-pointer"
                         >
-                          <option value="Miyapur Hub">Miyapur Hub</option>
-                          <option value="Kukatpally Hub">Kukatpally Hub</option>
-                          <option value="Secunderabad Hub">Secunderabad Hub</option>
-                          <option value="LB Nagar Hub">LB Nagar Hub</option>
-                          <option value="Gachibowli Hub">Gachibowli Hub</option>
-                          <option value="Other Hub">Other Hub</option>
+                          {(CITY_HUBS[cityName] || CITY_HUBS["Hyderabad"]).map((hub) => (
+                            <option key={hub} value={hub}>{hub}</option>
+                          ))}
                         </select>
                       </div>
                     </div>
@@ -865,18 +942,6 @@ export default function AllocationForm({
                           />
                           <div className="w-9 h-5 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-emerald-600"></div>
                         </label>
-                      </div>
-
-                      <div>
-                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Customer Address (Mandatory for Recovery) <span className="text-red-500">*</span></label>
-                        <input 
-                          type="text" 
-                          placeholder="Complete address for recovery..."
-                          value={customerAddress}
-                          onChange={(e) => setCustomerAddress(e.target.value)}
-                          required
-                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 font-sans text-xs font-medium text-slate-900 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs"
-                        />
                       </div>
 
                       <div>
@@ -1147,26 +1212,213 @@ export default function AllocationForm({
                   </div>
                 </div>
 
-                {/* 4. CAR CONDITION PHOTOS */}
+                {/* 4. AGREEMENTS & SECURITY DOCUMENTS (MANDATORY PDF AGREEMENT, 4 CHEQUES & PVC) */}
                 <div className="border-t border-slate-200 pt-8 space-y-5">
                   <div className="border-b border-slate-200 pb-2.5">
                     <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
                       <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">4</span>
-                      Car Condition Photos <span className="text-red-500">*</span>
+                      Driver Agreement &amp; Security Documents
                     </h3>
-                    <p className="font-sans text-xs text-slate-500 mt-1">Upload mandatory photos recording the vehicle's condition prior to handover.</p>
+                    <p className="font-sans text-xs text-slate-500 mt-1">Upload the mandatory Driver Agreement copy (PDF) and collect 4 Security Cheques and Police Verification Certificate.</p>
                   </div>
 
-                  <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    {/* Driver Agreement Copy (Mandatory PDF) */}
+                    <div className="p-4 rounded-xl border-2 border-dashed border-emerald-300 bg-emerald-50/40 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="font-sans text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                          <FileText className="h-4 w-4 text-emerald-600" />
+                          Driver Agreement Copy (PDF) <span className="text-red-500">*</span>
+                        </span>
+                        <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-800 uppercase">Mandatory</span>
+                      </div>
+                      
+                      {driverAgreementDoc ? (
+                        <div className="flex items-center justify-between bg-white rounded-lg p-3 border border-emerald-200 shadow-2xs">
+                          <div className="flex items-center gap-2 overflow-hidden">
+                            <FileText className="h-5 w-5 text-emerald-600 shrink-0" />
+                            <div className="truncate">
+                              <span className="block text-xs font-semibold text-slate-800 truncate">Driver Agreement Uploaded</span>
+                              <span className="block text-[10px] text-slate-500">PDF / Document attached</span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <a
+                              href={driverAgreementDoc}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-2 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 text-[11px] font-medium transition-colors"
+                            >
+                              View
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => setDriverAgreementDoc(null)}
+                              className="p-1 rounded-full bg-rose-50 text-rose-600 hover:bg-rose-100 transition-colors"
+                            >
+                              <X className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center gap-2 p-4 rounded-xl bg-white border border-slate-300 hover:bg-slate-50 cursor-pointer transition-colors shadow-2xs">
+                          <Upload className="h-6 w-6 text-emerald-600" />
+                          <div className="text-center">
+                            <span className="block text-xs font-bold text-slate-800">Upload Agreement PDF</span>
+                            <span className="block text-[10px] text-slate-500">Click to browse (.pdf)</span>
+                          </div>
+                          <input
+                            type="file"
+                            accept=".pdf,application/pdf"
+                            className="hidden"
+                            onChange={(e) => handlePdfUpload(e, setDriverAgreementDoc)}
+                          />
+                        </label>
+                      )}
+                    </div>
+
+                    {/* Police Verification Certificate (PVC) */}
+                    <div className="p-4 rounded-xl border border-dashed border-slate-300 bg-slate-50/60 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <span className="font-sans text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                          <CheckCircle className="h-4 w-4 text-emerald-600" />
+                          Police Verification Certificate (PVC)
+                        </span>
+                      </div>
+
+                      {policeVerificationDoc ? (
+                        <div className="relative flex items-center justify-center bg-white rounded-lg p-2 border border-slate-200 shadow-2xs">
+                          {policeVerificationDoc.startsWith("data:application/pdf") ? (
+                            <div className="flex items-center gap-2 py-2">
+                              <FileText className="h-6 w-6 text-emerald-600" />
+                              <span className="text-xs font-medium text-slate-800">PVC Document attached</span>
+                            </div>
+                          ) : (
+                            <img src={policeVerificationDoc} alt="PVC Doc" className="max-h-24 object-contain rounded" />
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => setPoliceVerificationDoc(null)}
+                            className="absolute top-1 right-1 rounded-full bg-rose-50 text-rose-500 p-1 hover:bg-rose-100 cursor-pointer shadow-xs"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => { setActiveCameraTarget("policeVerificationDoc"); setCameraActive(true); }}
+                            className="flex-1 flex items-center justify-center gap-1 rounded-lg bg-emerald-600 text-white text-[11px] font-medium py-2 hover:bg-emerald-700 cursor-pointer transition-colors shadow-2xs"
+                          >
+                            <Camera className="h-3.5 w-3.5" /> Capture
+                          </button>
+                          <label className="flex-1 flex items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white text-slate-700 text-[11px] font-medium py-2 hover:bg-slate-50 cursor-pointer transition-colors shadow-2xs">
+                            <Upload className="h-3.5 w-3.5 text-emerald-600" /> Upload
+                            <input
+                              type="file"
+                              accept="image/*,.pdf,application/pdf"
+                              className="hidden"
+                              onChange={(e) => {
+                                const f = e.target.files?.[0];
+                                if (f) {
+                                  if (f.type === "application/pdf" || f.name.endsWith(".pdf")) {
+                                    handlePdfUpload(e, setPoliceVerificationDoc);
+                                  } else {
+                                    compressImage(f).then(setPoliceVerificationDoc).catch((err) => alert('Upload failed: ' + err?.message));
+                                  }
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* 4 Security Cheques */}
+                  <div className="space-y-2 pt-2">
+                    <span className="block font-sans text-xs font-bold text-slate-800">4 Security Cheques Uploads</span>
+                    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                      {[
+                        { label: "Security Cheque 1", state: securityCheque1, setState: setSecurityCheque1, target: "securityCheque1" },
+                        { label: "Security Cheque 2", state: securityCheque2, setState: setSecurityCheque2, target: "securityCheque2" },
+                        { label: "Security Cheque 3", state: securityCheque3, setState: setSecurityCheque3, target: "securityCheque3" },
+                        { label: "Security Cheque 4", state: securityCheque4, setState: setSecurityCheque4, target: "securityCheque4" },
+                      ].map((chk) => (
+                        <div key={chk.label} className="space-y-1.5">
+                          <span className="block font-sans text-[11px] font-medium text-slate-700">{chk.label}</span>
+                          <div className="w-full rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-2.5 text-center hover:bg-slate-100/50 transition-all shadow-2xs">
+                            {chk.state ? (
+                              <div className="relative inline-block">
+                                <img
+                                  src={chk.state}
+                                  alt={chk.label}
+                                  className="h-20 w-auto object-cover rounded-lg border border-slate-200 shadow-xs"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => chk.setState(null)}
+                                  className="absolute -top-1.5 -right-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-600 text-white hover:bg-rose-700 shadow-xs cursor-pointer"
+                                >
+                                  <X className="h-2.5 w-2.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex flex-col gap-1.5 py-1">
+                                <button
+                                  type="button"
+                                  onClick={() => { setActiveCameraTarget(chk.target as any); setCameraActive(true); }}
+                                  className="w-full flex items-center justify-center gap-1 rounded-lg bg-emerald-600 px-2 py-1 font-sans text-[10px] font-medium text-white hover:bg-emerald-700 shadow-2xs cursor-pointer"
+                                >
+                                  <Camera className="h-3 w-3" /> Capture
+                                </button>
+                                <label className="w-full flex items-center justify-center gap-1 rounded-lg border border-slate-300 bg-white px-2 py-1 font-sans text-[10px] font-medium text-slate-700 hover:bg-slate-50 cursor-pointer transition-colors shadow-2xs">
+                                  <Upload className="h-3 w-3 text-emerald-600" /> Upload
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                      const file = e.target.files?.[0];
+                                      if (file) {
+                                        compressImage(file).then(chk.setState).catch((err) => alert('Upload failed: ' + err?.message));
+                                      }
+                                    }}
+                                    className="hidden"
+                                  />
+                                </label>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* 5. CAR CONDITION PHOTOS & VEHICLE WITH DRIVER PHOTO */}
+                <div className="border-t border-slate-200 pt-8 space-y-5">
+                  <div className="border-b border-slate-200 pb-2.5">
+                    <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
+                      <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">5</span>
+                      Car Condition &amp; Handover Photos <span className="text-red-500">*</span>
+                    </h3>
+                    <p className="font-sans text-xs text-slate-500 mt-1">Upload mandatory photos recording the vehicle's condition and driver photo prior to handover.</p>
+                  </div>
+
+                  <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
                     {[
-                      { label: "Left-Hand (LH) Side", state: photoLhSide, setState: setPhotoLhSide, target: "lhSide" },
-                      { label: "Right-Hand (RH) Side", state: photoRhSide, setState: setPhotoRhSide, target: "rhSide" },
-                      { label: "Front Side", state: photoFrontSide, setState: setPhotoFrontSide, target: "frontSide" },
-                      { label: "Back Side", state: photoBackSide, setState: setPhotoBackSide, target: "backSide" },
-                      { label: "Battery Photo Upload", state: batteryPhoto, setState: setBatteryPhoto, target: "battery" }
+                      { label: "Left-Hand (LH) Side", state: photoLhSide, setState: setPhotoLhSide, target: "lhSide", req: true },
+                      { label: "Right-Hand (RH) Side", state: photoRhSide, setState: setPhotoRhSide, target: "rhSide", req: true },
+                      { label: "Front Side", state: photoFrontSide, setState: setPhotoFrontSide, target: "frontSide", req: true },
+                      { label: "Back Side", state: photoBackSide, setState: setPhotoBackSide, target: "backSide", req: true },
+                      { label: "Battery Photo", state: batteryPhoto, setState: setBatteryPhoto, target: "battery", req: true },
+                      { label: "Vehicle along with Driver Photo", state: vehicleDriverPhoto, setState: setVehicleDriverPhoto, target: "vehicleDriverPhoto", req: false }
                     ].map((ph) => (
                       <div key={ph.label} className="space-y-1.5">
-                        <span className="block font-sans text-xs font-medium text-slate-700">{ph.label} <span className="text-red-500">*</span></span>
+                        <span className="block font-sans text-xs font-medium text-slate-700 truncate" title={ph.label}>
+                          {ph.label} {ph.req && <span className="text-red-500">*</span>}
+                        </span>
                         <div className="w-full rounded-xl border border-dashed border-slate-300 bg-slate-50/60 p-3 text-center hover:bg-slate-100/50 transition-all shadow-2xs">
                           {ph.state ? (
                             <div className="relative inline-block">
@@ -1176,7 +1428,7 @@ export default function AllocationForm({
                                 className="h-28 w-auto object-cover rounded-xl border border-slate-200 shadow-xs"
                               />
                               <button 
-                                type="button"
+                                type="button" 
                                 onClick={() => ph.setState(null)}
                                 className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-rose-600 text-white border border-white hover:bg-rose-700 shadow-xs cursor-pointer"
                               >
@@ -1221,12 +1473,12 @@ export default function AllocationForm({
                   </div>
                 </div>
 
-                {/* 5. GIVEN VEHICLE INSPECTION CHECKLIST */}
+                {/* 6. GIVEN VEHICLE INSPECTION CHECKLIST */}
                 <div className="border-t border-slate-200 pt-8 space-y-5">
                   <div className="border-b border-slate-200 pb-2.5 flex items-center justify-between">
                     <div>
                       <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">5</span>
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">6</span>
                         Inspection Checklist: Allocated Car ({vehicleNumber || "No vehicle entered"})
                       </h3>
                     </div>
@@ -1854,6 +2106,12 @@ export default function AllocationForm({
             else if (activeCameraTarget === "stepney") setStepneyPhoto(base64);
             else if (activeCameraTarget === "dropoffPhoto") setDropoffPhoto(base64);
             else if (activeCameraTarget === "fastagProof") setFastagBalanceProof(base64);
+            else if (activeCameraTarget === "vehicleDriverPhoto") setVehicleDriverPhoto(base64);
+            else if (activeCameraTarget === "securityCheque1") setSecurityCheque1(base64);
+            else if (activeCameraTarget === "securityCheque2") setSecurityCheque2(base64);
+            else if (activeCameraTarget === "securityCheque3") setSecurityCheque3(base64);
+            else if (activeCameraTarget === "securityCheque4") setSecurityCheque4(base64);
+            else if (activeCameraTarget === "policeVerificationDoc") setPoliceVerificationDoc(base64);
             
             setCameraActive(false);
             setActiveCameraTarget(null);
