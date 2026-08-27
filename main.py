@@ -2756,7 +2756,7 @@ def get_driver_managers(city: Optional[str] = None, authorization: Optional[str]
             FROM july_employees e
             LEFT JOIN july_portal_users pu ON pu.employee_id = e.employee_id
             LEFT JOIN july_roles r ON r.role_id = COALESCE(pu.role_id, e.role_id)
-            WHERE (r.role_code = 'DM' OR LOWER(r.role_name) = 'driver manager' OR LOWER(r.role_name) LIKE '%driver manager%' OR LOWER(pu.role) LIKE '%driver manager%')
+            WHERE (r.role_code = 'DM' OR LOWER(r.role_name) = 'driver manager' OR LOWER(r.role_name) LIKE '%%driver manager%%' OR LOWER(pu.role) LIKE '%%driver manager%%')
               AND e.is_active != FALSE
         """
         params = []
