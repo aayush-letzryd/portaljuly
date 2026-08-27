@@ -88,13 +88,45 @@ export default function OperatorOnboardingForm({
   const [phoneNumber, setPhoneNumber] = useState("");
   const [isWhatsappSame, setIsWhatsappSame] = useState(true);
   const [whatsappNumber, setWhatsappNumber] = useState("");
-  const [city, setCity] = useState("Hyderabad");
+  
+  const getUserNormalizedCity = (uCity?: string) => {
+    if (!uCity) return "Bengaluru";
+    const s = uCity.trim().toLowerCase();
+    if (["bangalore", "bengaluru", "blr"].includes(s)) return "Bengaluru";
+    if (["hyderabad", "hyd"].includes(s)) return "Hyderabad";
+    if (["mumbai", "bom"].includes(s)) return "Mumbai";
+    if (["delhi", "del"].includes(s)) return "Delhi";
+    if (["chennai", "maa"].includes(s)) return "Chennai";
+    return uCity;
+  };
+
+  const [city, setCity] = useState(getUserNormalizedCity(user?.city));
   const [operatingPlace, setOperatingPlace] = useState("");
   
   // Driver Manager Assignment (City-filtered)
   const [driverManagerId, setDriverManagerId] = useState<number | null>(null);
   const [driverManagerName, setDriverManagerName] = useState("");
   const [driverManagersList, setDriverManagersList] = useState<any[]>([]);
+
+  const isSameCity = (c1?: string, c2?: string) => {
+    if (!c1 || !c2) return true;
+    const norm = (s: string) => {
+      const v = s.trim().toLowerCase();
+      if (["bangalore", "bengaluru", "blr"].includes(v)) return "bangalore";
+      if (["hyderabad", "hyd"].includes(v)) return "hyderabad";
+      if (["mumbai", "bom"].includes(v)) return "mumbai";
+      if (["delhi", "del"].includes(v)) return "delhi";
+      if (["chennai", "maa"].includes(v)) return "chennai";
+      return v;
+    };
+    return norm(c1) === norm(c2);
+  };
+
+  const filteredDriverManagers = useMemo(() => {
+    const activeCity = city || user?.city || "";
+    if (!activeCity) return driverManagersList;
+    return driverManagersList.filter((dm: any) => isSameCity(dm.city, activeCity));
+  }, [driverManagersList, city, user?.city]);
 
   const fetchDriverManagersForCity = async (selectedCity: string) => {
     try {
@@ -121,10 +153,9 @@ export default function OperatorOnboardingForm({
   };
 
   useEffect(() => {
-    if (city) {
-      fetchDriverManagersForCity(city);
-    }
-  }, [city]);
+    const activeCity = city || user?.city || "Hyderabad";
+    fetchDriverManagersForCity(activeCity);
+  }, [city, user?.city]);
   
   // Business Address State
   const [businessLine1, setBusinessLine1] = useState("");
@@ -280,6 +311,7 @@ export default function OperatorOnboardingForm({
     setAccountNumber("");
     setIfscCode("");
     setUpiId("");
+    setCity(getUserNormalizedCity(user?.city));
     setDriverManagerId(null);
     setDriverManagerName("");
     setDrivers([]);
@@ -830,7 +862,7 @@ export default function OperatorOnboardingForm({
                           className="w-full h-11 px-4 bg-slate-50 border border-border rounded-xl text-sm focus:bg-white focus:border-primary focus:ring-2 focus:ring-primary/20 outline-none transition-all cursor-pointer"
                         >
                           <option value="">Select Driver Manager for {city}...</option>
-                          {driverManagersList.map((dm: any) => (
+                          {filteredDriverManagers.map((dm: any) => (
                             <option key={dm.id} value={dm.id}>
                               {dm.name} ({dm.city} - {dm.role})
                             </option>

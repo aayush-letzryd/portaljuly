@@ -2745,7 +2745,8 @@ def delete_vehicle_model(id: int, authorization: Optional[str] = Header(None)):
 # ─────────────────────────────────────────────────────────
 @app.get("/api/driver-managers")
 def get_driver_managers(city: Optional[str] = None, authorization: Optional[str] = Header(None)):
-    get_current_user(authorization)
+    current_user = get_current_user(authorization)
+    target_city = city or (current_user.get("city") if current_user else None)
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
@@ -2760,9 +2761,21 @@ def get_driver_managers(city: Optional[str] = None, authorization: Optional[str]
               AND e.is_active != FALSE
         """
         params = []
-        if city and city.strip() and city.lower() != "all":
-            query += " AND LOWER(TRIM(e.city)) = LOWER(TRIM(%s))"
-            params.append(city.strip())
+        if target_city and target_city.strip() and target_city.lower() != "all":
+            clean_c = target_city.strip().lower()
+            if clean_c in ("bangalore", "bengaluru", "blr"):
+                query += " AND LOWER(TRIM(e.city)) IN ('bangalore', 'bengaluru', 'blr')"
+            elif clean_c in ("hyderabad", "hyd"):
+                query += " AND LOWER(TRIM(e.city)) IN ('hyderabad', 'hyd')"
+            elif clean_c in ("mumbai", "bom"):
+                query += " AND LOWER(TRIM(e.city)) IN ('mumbai', 'bom')"
+            elif clean_c in ("delhi", "del"):
+                query += " AND LOWER(TRIM(e.city)) IN ('delhi', 'del')"
+            elif clean_c in ("chennai", "maa"):
+                query += " AND LOWER(TRIM(e.city)) IN ('chennai', 'maa')"
+            else:
+                query += " AND LOWER(TRIM(e.city)) = LOWER(TRIM(%s))"
+                params.append(target_city.strip())
             
         query += " ORDER BY e.first_name;"
         cur.execute(query, tuple(params))

@@ -250,7 +250,19 @@ export default function OnboardingForm({
   const [differentWhatsapp, setDifferentWhatsapp] = useState(false);
   const [whatsappNumber, setWhatsappNumber] = useState("");
   const [dob, setDob] = useState("");
-  const [city, setCity] = useState("Hyderabad");
+  
+  const getUserNormalizedCity = (uCity?: string) => {
+    if (!uCity) return "Bengaluru";
+    const s = uCity.trim().toLowerCase();
+    if (["bangalore", "bengaluru", "blr"].includes(s)) return "Bengaluru";
+    if (["hyderabad", "hyd"].includes(s)) return "Hyderabad";
+    if (["mumbai", "bom"].includes(s)) return "Mumbai";
+    if (["delhi", "del"].includes(s)) return "Delhi";
+    if (["chennai", "maa"].includes(s)) return "Chennai";
+    return uCity;
+  };
+
+  const [city, setCity] = useState(getUserNormalizedCity(user?.city));
   const [presentAddress, setPresentAddress] = useState("");
   const [presentCity, setPresentCity] = useState("");
   const [presentState, setPresentState] = useState("");
@@ -352,15 +364,26 @@ export default function OnboardingForm({
   const [emergencyContactAadhaarNumber, setEmergencyContactAadhaarNumber] = useState<string>("");
   const [showEmergencyAadhaar, setShowEmergencyAadhaar] = useState<boolean>(false);
 
-  // Dynamic City-filtered Driver Managers (strictly matching selected city)
+  const isSameCity = (c1?: string, c2?: string) => {
+    if (!c1 || !c2) return true;
+    const norm = (s: string) => {
+      const v = s.trim().toLowerCase();
+      if (["bangalore", "bengaluru", "blr"].includes(v)) return "bangalore";
+      if (["hyderabad", "hyd"].includes(v)) return "hyderabad";
+      if (["mumbai", "bom"].includes(v)) return "mumbai";
+      if (["delhi", "del"].includes(v)) return "delhi";
+      if (["chennai", "maa"].includes(v)) return "chennai";
+      return v;
+    };
+    return norm(c1) === norm(c2);
+  };
+
+  // Dynamic City-filtered Driver Managers (strictly matching selected city / user's city)
   const filteredDriverManagers = useMemo(() => {
-    if (!city) return driverManagersList;
-    const cleanCity = city.trim().toLowerCase();
-    return driverManagersList.filter((dm: any) => {
-      const dmCity = (dm.city || "").trim().toLowerCase();
-      return !dmCity || dmCity === cleanCity;
-    });
-  }, [driverManagersList, city]);
+    const activeCity = city || user?.city || "";
+    if (!activeCity) return driverManagersList;
+    return driverManagersList.filter((dm: any) => isSameCity(dm.city, activeCity));
+  }, [driverManagersList, city, user?.city]);
 
   const fetchDriverManagersForCity = async (selectedCity: string) => {
     try {
@@ -387,10 +410,9 @@ export default function OnboardingForm({
   };
 
   useEffect(() => {
-    if (city) {
-      fetchDriverManagersForCity(city);
-    }
-  }, [city]);
+    const activeCity = city || user?.city || "Hyderabad";
+    fetchDriverManagersForCity(activeCity);
+  }, [city, user?.city]);
 
   // Police Verification
   const [policeVerificationStatus, setPoliceVerificationStatus] = useState<string>("Not Required");
@@ -1016,7 +1038,7 @@ export default function OnboardingForm({
     setDifferentWhatsapp(false);
     setWhatsappNumber("");
     setDob("");
-    setCity("Hyderabad");
+    setCity(getUserNormalizedCity(user?.city));
     setPresentAddress("");
     setPresentCity("");
     setPresentState("");
