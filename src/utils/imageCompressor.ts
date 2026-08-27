@@ -52,6 +52,7 @@ export async function uploadDirectToGCS(
   }
 
   const filename = existingName || `document_${Date.now()}.${defaultExt}`;
+  const formData = new FormData();
   formData.append("file", fileToSend, filename);
 
   const token = localStorage.getItem("lr_token");
