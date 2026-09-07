@@ -109,7 +109,7 @@ export default function AllocationForm({
 
   const fetchPortalUsers = async () => {
     try {
-      const token = localStorage.getItem("token") || localStorage.getItem("lr_token") || localStorage.getItem("auth_token") || sessionStorage.getItem("token");
+      const token = localStorage.getItem("lr_token") || localStorage.getItem("token") || localStorage.getItem("auth_token") || sessionStorage.getItem("token");
       const res = await fetch("/api/portal-users", {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
@@ -1880,7 +1880,6 @@ export default function AllocationForm({
                     </button>
                     <button 
                       type="submit" 
-                      onClick={(e) => handleSubmit(e, "Submitted")}
                       className={`h-11 rounded-lg px-6 font-sans text-sm font-semibold shadow-md cursor-pointer transition-all flex items-center justify-center gap-2 ${
                         deltaInfo.isOver48
                           ? "bg-amber-600 hover:bg-amber-700 text-white"

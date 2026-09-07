@@ -195,7 +195,7 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
     try {
       let token: string | null = null;
       try {
-        token = localStorage.getItem("token") || localStorage.getItem("lr_token") || localStorage.getItem("auth_token") || sessionStorage.getItem("token");
+        token = localStorage.getItem("lr_token") || localStorage.getItem("token") || localStorage.getItem("auth_token") || sessionStorage.getItem("token");
       } catch (e) {
         console.error("Failed to read token from storage:", e);
       }

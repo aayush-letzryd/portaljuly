@@ -59,7 +59,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
 
   const fetchPortalUsers = async () => {
     try {
-      const token = localStorage.getItem("token") || localStorage.getItem("lr_token") || localStorage.getItem("auth_token") || sessionStorage.getItem("token");
+      const token = localStorage.getItem("lr_token") || localStorage.getItem("token") || localStorage.getItem("auth_token") || sessionStorage.getItem("token");
       const res = await fetch("/api/portal-users", {
         headers: token ? { Authorization: `Bearer ${token}` } : {}
       });
@@ -345,7 +345,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
       setPhotoBackSide(r.photo_back_side || null);
       setOlaNegativeBalance(r.ola_negative_balance ? String(r.ola_negative_balance) : "");
       setOlaNegativeBalanceProof(r.ola_negative_balance_proof || null);
-      setPendingDues(r.pending_dues ? String(r.pending_dues) : (r.fastag_balance_amount ? String(r.fastag_balance_amount) : ""));
+      setPendingDues(r.pending_dues ? String(r.pending_dues) : "");
       setFastagBalanceAmount(r.fastag_balance_amount ? String(r.fastag_balance_amount) : "");
       setFastagBalanceProof(r.fastag_balance_proof || null);
       setDamagePenalty(r.damage_penalty ? String(r.damage_penalty) : "");
@@ -413,7 +413,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
         pending_dues: pendingDues ? parseFloat(pendingDues) : null,
         damage_penalty: damagePenalty ? parseFloat(damagePenalty) : null,
         deposit_refund_status: depositRefundStatus,
-        fastag_balance_amount: fastagBalanceAmount ? parseFloat(fastagBalanceAmount) : (pendingDues ? parseFloat(pendingDues) : null),
+        fastag_balance_amount: fastagBalanceAmount ? parseFloat(fastagBalanceAmount) : null,
         fastag_balance_proof: fastagBalanceProof,
         insp_jack: jack,
         insp_jack_rod: jackRod,
