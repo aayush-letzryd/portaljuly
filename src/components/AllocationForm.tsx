@@ -605,7 +605,6 @@ export default function AllocationForm({
   const handleSubmit = async (e: React.FormEvent, targetStatus: "Draft" | "Submitted" = "Submitted") => {
     e.preventDefault();
     if (isSubmitting) return;
-    setIsSubmitting(true);
     const isDraft = targetStatus === "Draft";
 
     if (!isDraft) {
@@ -633,6 +632,7 @@ export default function AllocationForm({
       }
     }
 
+    setIsSubmitting(true);
     try {
       const token = localStorage.getItem("lr_token");
 

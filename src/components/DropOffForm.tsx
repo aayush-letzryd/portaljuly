@@ -378,7 +378,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout, initialE
   const handleSubmit = async (e: React.FormEvent, isDraft = false) => {
     e.preventDefault();
     if (isSubmitting) return;
-    setIsSubmitting(true);
+
     if (!isDraft) {
       if (!vehicleNumber.trim()) return alert("Please specify the vehicle number.");
       if (!driverPhone.trim() && !driverId.trim()) return alert("Please enter Driver ID or Phone Number.");
@@ -392,6 +392,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout, initialE
       }
     }
 
+    setIsSubmitting(true);
     const targetStatus = isDraft ? "Draft" : "Submitted";
     try {
       const token = localStorage.getItem("lr_token");
