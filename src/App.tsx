@@ -183,15 +183,21 @@ export default function App() {
             setScreen(dest);
           }} 
           onLogout={handleLogout} 
-          initialEditId={editTarget?.formType === "vehicle_allocation" ? editTarget.id : undefined}
+          initialEditId={(editTarget?.formType === "allocation" || editTarget?.formType === "vehicle_allocation") ? editTarget.id : undefined}
           isReviewMode={editTarget?.isReview}
         />
       )}
       {screen === "dropoff" && user && (
         <DropOffForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={() => {
+            const dest = editTarget ? "approvals" : "selector";
+            setEditTarget(null);
+            setScreen(dest);
+          }} 
           onLogout={handleLogout} 
+          initialEditId={(editTarget?.formType === "dropoff" || editTarget?.formType === "vehicle_dropoff") ? editTarget.id : undefined}
+          isReviewMode={editTarget?.isReview}
         />
       )}
       {screen === "expenses" && user && (
@@ -332,7 +338,8 @@ export default function App() {
             setEditTarget({ formType: module, id, isReview });
             let targetScreen = module;
             if (module === "individual_onboarding" || module === "operator_onboarding") targetScreen = "onboarding";
-            else if (module === "vehicle_allocation") targetScreen = "allocation";
+            else if (module === "allocation" || module === "vehicle_allocation") targetScreen = "allocation";
+            else if (module === "dropoff" || module === "vehicle_dropoff") targetScreen = "dropoff";
             else if (module === "adjustment_form") targetScreen = "adjustment";
             else if (module === "accidents_form") targetScreen = "accident";
             else if (module === "expenses_form") targetScreen = "expenses";

@@ -13,6 +13,8 @@ interface DropOffFormProps {
   user: UserSession;
   onBackToSelector: () => void;
   onLogout: () => void;
+  initialEditId?: number;
+  isReviewMode?: boolean;
 }
 
 const REASON_COLORS: Record<string, string> = {
@@ -23,7 +25,7 @@ const REASON_COLORS: Record<string, string> = {
   "Other": "bg-slate-100 text-slate-700 border-slate-200/60",
 };
 
-export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOffFormProps) {
+export default function DropOffForm({ user, onBackToSelector, onLogout, initialEditId, isReviewMode }: DropOffFormProps) {
   const [activeTab, setActiveTab] = useState<"form" | "drafts" | "registry">("form");
 
   // Clock
@@ -368,6 +370,12 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
     }
   };
 
+  useEffect(() => {
+    if (initialEditId) {
+      loadForEdit(initialEditId);
+    }
+  }, [initialEditId]);
+
   const handleSubmit = async (e: React.FormEvent, isDraft = false) => {
     e.preventDefault();
     if (!isDraft) {
@@ -559,7 +567,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
             <th className="px-3.5 py-3">Reason</th>
             <th className="px-3.5 py-3">Status</th>
             <th className="px-3.5 py-3">Recorded By</th>
-            <th className="px-3.5 py-3">Date & Time</th>
+            <th className="px-3.5 py-3">Drop-Off Date</th>
             <th className="px-3.5 py-3 text-center w-20">Action</th>
           </tr>
         </thead>
@@ -568,7 +576,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
             <tr><td colSpan={11} className="px-6 py-12 text-center text-slate-500 font-sans bg-slate-50/50 text-xs">No records found.</td></tr>
           ) : (
             rows.map((r: any) => {
-              const rawDate = r.updated_at || r.created_at;
+              const rawDate = r.event_date_time || r.dropoff_date_time || r.dropoff_date || r.allocation_date || r.created_at || r.updated_at;
               const datePart = rawDate ? new Date(rawDate).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }) : "—";
               const timePart = rawDate ? new Date(rawDate).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true }).toLowerCase() : "—";
               const recBy = r.created_by_name || user.name || "Executive";

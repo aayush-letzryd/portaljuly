@@ -5820,9 +5820,12 @@ def get_allocation_record(id: int, authorization: Optional[str] = Header(None)):
             raise HTTPException(status_code=404, detail="Allocation record not found")
         cols = [d[0] for d in cur.description]
         rec = dict(zip(cols, r))
-        for dt_field in ["allocation_date", "created_at", "updated_at"]:
+        for dt_field in ["allocation_date", "event_date_time", "created_at", "updated_at"]:
             if rec.get(dt_field) and hasattr(rec[dt_field], "isoformat"):
-                rec[dt_field] = rec[dt_field].isoformat()
+                if dt_field in ("event_date_time", "created_at", "updated_at") and hasattr(rec[dt_field], "astimezone"):
+                    rec[dt_field] = rec[dt_field].astimezone(ist_tz).isoformat()
+                else:
+                    rec[dt_field] = rec[dt_field].isoformat()
         return _clean_dict_decimals(rec)
     finally:
         postgreSQL_pool.putconn(conn)
@@ -5841,6 +5844,9 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
 
     # 48-Hour Delta Approval Check
     alloc_dt_str = data.allocation_date_time or data.allocation_date
+    db_event_dt = alloc_dt_str
+    if db_event_dt and "T" in db_event_dt and not ("+" in db_event_dt or "Z" in db_event_dt):
+        db_event_dt = f"{db_event_dt}:00+05:30" if len(db_event_dt) == 16 else f"{db_event_dt}+05:30"
     is_pending_approval = False
     diff_hours = 0.0
     dt_val = None
@@ -5942,7 +5948,7 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
             target_approval_status,
             target_approver,
             data.approval_remarks,
-            alloc_dt_str,
+            db_event_dt,
             data.created_by or uid,
             extract_image(data.driver_agreement_doc),
             extract_image(data.security_cheque_1),
@@ -6051,6 +6057,10 @@ def get_dropoffs(status: Optional[str] = None, authorization: Optional[str] = He
                 a.insp_stepney,
                 a.insp_stepney_photo,
                 a.status,
+                a.approval_status,
+                a.current_approver_id,
+                a.approval_remarks,
+                a.event_date_time,
                 a.created_by,
                 COALESCE(u.username, 'Executive') AS created_by_name,
                 a.created_at,
@@ -6065,9 +6075,12 @@ def get_dropoffs(status: Optional[str] = None, authorization: Optional[str] = He
         res = []
         for r in rows:
             rec = dict(zip(cols, r))
-            for dt_field in ["created_at", "updated_at", "dropoff_date"]:
+            for dt_field in ["created_at", "updated_at", "dropoff_date", "event_date_time"]:
                 if rec.get(dt_field) and hasattr(rec[dt_field], "isoformat"):
-                    rec[dt_field] = rec[dt_field].isoformat()
+                    if dt_field in ("created_at", "updated_at", "event_date_time") and hasattr(rec[dt_field], "astimezone"):
+                        rec[dt_field] = rec[dt_field].astimezone(ist_tz).isoformat()
+                    else:
+                        rec[dt_field] = rec[dt_field].isoformat()
             res.append(_clean_dict_decimals(rec))
         return res
     except Exception as e:
@@ -6118,6 +6131,10 @@ def get_single_dropoff(id: int, authorization: Optional[str] = Header(None)):
                 a.insp_stepney,
                 a.insp_stepney_photo,
                 a.status,
+                a.approval_status,
+                a.current_approver_id,
+                a.approval_remarks,
+                a.event_date_time,
                 a.created_by,
                 COALESCE(u.username, 'Executive') AS created_by_name,
                 a.created_at,
@@ -6131,9 +6148,12 @@ def get_single_dropoff(id: int, authorization: Optional[str] = Header(None)):
             raise HTTPException(status_code=404, detail="Drop-off record not found")
         cols = [d[0] for d in cur.description]
         rec = dict(zip(cols, row))
-        for dt_field in ["created_at", "updated_at", "dropoff_date"]:
+        for dt_field in ["created_at", "updated_at", "dropoff_date", "event_date_time"]:
             if rec.get(dt_field) and hasattr(rec[dt_field], "isoformat"):
-                rec[dt_field] = rec[dt_field].isoformat()
+                if dt_field in ("created_at", "updated_at", "event_date_time") and hasattr(rec[dt_field], "astimezone"):
+                    rec[dt_field] = rec[dt_field].astimezone(ist_tz).isoformat()
+                else:
+                    rec[dt_field] = rec[dt_field].isoformat()
         return _clean_dict_decimals(rec)
     finally:
         postgreSQL_pool.putconn(conn)
@@ -6151,6 +6171,9 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
 
     # 48-Hour Delta Approval Check
     drop_dt_str = data.dropoff_date_time or data.dropoff_date
+    db_event_dt = drop_dt_str
+    if db_event_dt and "T" in db_event_dt and not ("+" in db_event_dt or "Z" in db_event_dt):
+        db_event_dt = f"{db_event_dt}:00+05:30" if len(db_event_dt) == 16 else f"{db_event_dt}+05:30"
     is_pending_approval = False
     diff_hours = 0.0
     dt_val = None
@@ -6239,7 +6262,7 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
             data.insp_fire_extinguishers or "Available", data.insp_seat_cover or "Available", data.insp_floor_carpet or "Available", data.insp_music_system or "Available",
             data.insp_stepney or "Available", extract_image(data.insp_stepney_photo),
             target_status, target_approval_status, target_approver,
-            data.approval_remarks, drop_dt_str, uid
+            data.approval_remarks, db_event_dt, uid
         ))
         new_id = cur.fetchone()[0]
 
@@ -6290,6 +6313,9 @@ def update_dropoff(id: int, data: DropOffData, authorization: Optional[str] = He
 
     # 48-Hour Delta Approval Check
     drop_dt_str = data.dropoff_date_time or data.dropoff_date
+    db_event_dt = drop_dt_str
+    if db_event_dt and "T" in db_event_dt and not ("+" in db_event_dt or "Z" in db_event_dt):
+        db_event_dt = f"{db_event_dt}:00+05:30" if len(db_event_dt) == 16 else f"{db_event_dt}+05:30"
     is_pending_approval = False
     diff_hours = 0.0
     dt_val = None
@@ -6365,7 +6391,7 @@ def update_dropoff(id: int, data: DropOffData, authorization: Optional[str] = He
             data.insp_fire_extinguishers or "Available", data.insp_seat_cover or "Available", data.insp_floor_carpet or "Available", data.insp_music_system or "Available",
             data.insp_stepney or "Available", extract_image(data.insp_stepney_photo),
             target_status, target_approval_status, target_approver,
-            data.approval_remarks, drop_dt_str,
+            data.approval_remarks, db_event_dt,
             uid, id
         ))
         if not cur.fetchone():
@@ -6456,6 +6482,9 @@ def update_allocation_record(id: int, data: AllocationData, authorization: Optio
 
         # 48-Hour Delta Approval Check
         alloc_dt_str = data.allocation_date_time or data.allocation_date
+        db_event_dt = alloc_dt_str
+        if db_event_dt and "T" in db_event_dt and not ("+" in db_event_dt or "Z" in db_event_dt):
+            db_event_dt = f"{db_event_dt}:00+05:30" if len(db_event_dt) == 16 else f"{db_event_dt}+05:30"
         is_pending_approval = False
         diff_hours = 0.0
         dt_val = None
@@ -6545,7 +6574,7 @@ def update_allocation_record(id: int, data: AllocationData, authorization: Optio
             target_approval_status,
             target_approver,
             data.approval_remarks,
-            alloc_dt_str,
+            db_event_dt,
             uid, id
         ))
         row = cur.fetchone()

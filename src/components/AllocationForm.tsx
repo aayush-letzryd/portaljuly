@@ -1936,7 +1936,7 @@ export default function AllocationForm({
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">VEHICLE NO</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">TRANSACTION TYPE</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">RECORDED BY</th>
-                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">DATE &amp; TIME SAVED</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">DATE OF ALLOCATION</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-center">ACTION</th>
                     </tr>
                   </thead>
@@ -1953,7 +1953,7 @@ export default function AllocationForm({
                       </tr>
                     ) : (
                       paginatedDrafts.map((r: any) => {
-                        const rawDate = r.updated_at || r.created_at || r.allocation_date;
+                        const rawDate = r.event_date_time || r.allocation_date_time || r.allocation_date || r.created_at || r.updated_at;
                         const datePart = rawDate ? new Date(rawDate).toLocaleDateString("en-IN", {
                           day: "2-digit",
                           month: "short",
@@ -2173,7 +2173,7 @@ export default function AllocationForm({
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">TRANSACTION TYPE</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">STATUS</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">RECORDED BY</th>
-                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">DATE &amp; TIME CREATED</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">DATE OF ALLOCATION</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-center">ACTION</th>
                     </tr>
                   </thead>
@@ -2186,7 +2186,7 @@ export default function AllocationForm({
                       </tr>
                     ) : (
                       paginatedRecords.map((r: any) => {
-                        const rawDate = r.updated_at || r.created_at || r.allocation_date;
+                        const rawDate = r.event_date_time || r.allocation_date_time || r.allocation_date || r.created_at || r.updated_at;
                         const datePart = rawDate ? new Date(rawDate).toLocaleDateString("en-IN", {
                           day: "2-digit",
                           month: "short",

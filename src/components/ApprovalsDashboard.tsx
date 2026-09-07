@@ -825,7 +825,9 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
                     )}
 
                     <th className="py-3.5 px-4 w-[12%]">Submitted By</th>
-                    <th className="py-3.5 px-4 w-[11%]">Submitted At</th>
+                    <th className="py-3.5 px-4 w-[11%]">
+                      {selectedCategory === "allocation" ? "Allocation Date" : selectedCategory === "dropoff" ? "Drop-Off Date" : "Date / Time"}
+                    </th>
                     <th className="py-3.5 px-4 w-[14%]">Pending With</th>
                     <th className="py-3.5 px-4 w-[9%] text-center">Status</th>
                     <th className="py-3.5 px-4 w-[12%] text-right">Actions</th>
@@ -1677,7 +1679,10 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
                     <p className="text-xs text-slate-500 flex justify-between"><span>City:</span> <strong className="text-slate-800">{selectedRecord.city}</strong></p>
                     <p className="text-xs text-slate-500 flex justify-between"><span>Status:</span> <strong className="text-slate-800">{selectedRecord.approval_status}</strong></p>
                     <p className="text-xs text-slate-500 flex justify-between"><span>Submitted By:</span> <strong className="text-slate-800">{selectedRecord.submitted_by_name}</strong></p>
-                    <p className="text-xs text-slate-500 flex justify-between"><span>Created At:</span> <strong className="text-slate-800">{formatDateTimeComponents(selectedRecord.created_at).date} {formatDateTimeComponents(selectedRecord.created_at).time}</strong></p>
+                    <p className="text-xs text-slate-500 flex justify-between">
+                      <span>{selectedRecord.module === "dropoff" ? "Drop-Off Date:" : selectedRecord.module === "allocation" ? "Allocation Date:" : "Submitted At:"}</span> 
+                      <strong className="text-slate-800">{formatDateTimeComponents(selectedRecord.created_at).date} {formatDateTimeComponents(selectedRecord.created_at).time}</strong>
+                    </p>
                   </div>
 
                   {/* History timeline */}
