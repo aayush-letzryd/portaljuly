@@ -56,6 +56,38 @@ const safeParsePhotos = (photosData: unknown): string[] => {
 };
 
 /**
+ * Safely parse document URLs from array, JSON string, or single string (up to 2 items)
+ */
+const safeParseDocuments = (docData: unknown): string[] => {
+  try {
+    if (!docData) return [];
+    if (Array.isArray(docData)) {
+      return docData
+        .filter((d): d is string => typeof d === "string" && d.trim() !== "")
+        .map(d => d.trim())
+        .slice(0, 2);
+    }
+    if (typeof docData === "string") {
+      const trimmed = docData.trim();
+      if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed
+            .filter((d): d is string => typeof d === "string" && d.trim() !== "")
+            .map(d => d.trim())
+            .slice(0, 2);
+        }
+      }
+      return trimmed ? [trimmed] : [];
+    }
+    return [];
+  } catch (err) {
+    console.error("Failed to parse documents safely:", err, docData);
+    return [];
+  }
+};
+
+/**
  * Helper to safely format current date-time for datetime-local inputs
  */
 const getNowDateTimeString = (): string => {
@@ -165,9 +197,7 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
   const [insuranceClaimed, setInsuranceClaimed] = useState("No");
   const [insuranceBrokerage, setInsuranceBrokerage] = useState("");
   const [claimNumber, setClaimNumber] = useState("");
-  const [approvedBy, setApprovedBy] = useState("");
-  const [approvalDate, setApprovalDate] = useState("");
-  const [approvalFile, setApprovalFile] = useState<string | null>(null);
+  const [documents, setDocuments] = useState<string[]>([]);
   const [damagePhotos, setDamagePhotos] = useState<string[]>([]);
   const [remarks, setRemarks] = useState("");
 
@@ -176,8 +206,8 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [uploadingApproval, setUploadingApproval] = useState(false);
-  const [activeCameraTarget, setActiveCameraTarget] = useState<"damage" | "approval" | null>(null);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [activeCameraTarget, setActiveCameraTarget] = useState<"damage" | "document" | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // Active Inward Ticket Check (Vehicle already in workshop)
@@ -187,62 +217,6 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
   // Edit and View state
   const [editingId, setEditingId] = useState<number | null>(null);
   const [viewingRecord, setViewingRecord] = useState<MaintenanceInRecord | null>(null);
-
-  // Portal Users for Approver Dropdown
-  const [portalUsers, setPortalUsers] = useState<Array<{ id: number; username: string; name: string; role: string; city?: string }>>([]);
-
-  const fetchPortalUsers = async () => {
-    try {
-      let token: string | null = null;
-      try {
-        token = localStorage.getItem("lr_token") || localStorage.getItem("token") || localStorage.getItem("auth_token") || sessionStorage.getItem("token");
-      } catch (e) {
-        console.error("Failed to read token from storage:", e);
-      }
-      const res = await fetch("/api/portal-users", {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setPortalUsers(data);
-        }
-      } else {
-        console.warn("Failed to fetch portal users:", res.status);
-      }
-    } catch (err) {
-      console.error("Error fetching portal users:", err);
-    }
-  };
-
-  useEffect(() => {
-    fetchPortalUsers();
-  }, []);
-
-  // City normalization helper for reliable city matching
-  const normalizeCity = (c?: string): string => {
-    if (!c) return "";
-    const s = c.trim().toLowerCase();
-    if (s === "bengaluru" || s === "bangalore" || s === "blr") return "bangalore";
-    if (s === "mumbai" || s === "bom") return "mumbai";
-    if (s === "hyderabad" || s === "hyd") return "hyderabad";
-    if (s === "chennai" || s === "maa") return "chennai";
-    if (s === "delhi" || s === "new delhi" || s === "del") return "delhi";
-    return s;
-  };
-
-  // Filter approvers strictly by the currently filled city
-  const filteredApprovers = useMemo(() => {
-    try {
-      if (!cityName || !cityName.trim()) return portalUsers;
-      const targetNorm = normalizeCity(cityName);
-      const matched = portalUsers.filter(u => normalizeCity(u.city) === targetNorm);
-      return matched.length > 0 ? matched : portalUsers;
-    } catch (err) {
-      console.error("Error filtering approvers by city in MaintenanceInForm:", err);
-      return portalUsers;
-    }
-  }, [portalUsers, cityName]);
 
   // Registry states
   const [registryRecords, setRegistryRecords] = useState<MaintenanceInRecord[]>([]);
@@ -328,9 +302,7 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
       setInsuranceClaimed(r.insurance_claimed || "No");
       setInsuranceBrokerage(r.insurance_brokerage || "");
       setClaimNumber(r.claim_number || "");
-      setApprovedBy(r.approved_by || "");
-      setApprovalDate(r.approval_date || "");
-      setApprovalFile(r.approval_file || null);
+      setDocuments(safeParseDocuments(r.approval_file));
 
       const parsedPhotos = safeParsePhotos(r.vehicle_damage_photos);
       setDamagePhotos(parsedPhotos);
@@ -365,9 +337,7 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
       setInsuranceClaimed("No");
       setInsuranceBrokerage("");
       setClaimNumber("");
-      setApprovedBy("");
-      setApprovalDate("");
-      setApprovalFile(null);
+      setDocuments([]);
       setDamagePhotos([]);
       setRemarks("");
       setVehicleInDateTime(getNowDateTimeString());
@@ -553,8 +523,16 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
         } else {
           setDamagePhotos(prev => [...prev, url].slice(0, 5));
         }
-      } else if (activeCameraTarget === "approval") {
-        setApprovalFile(url);
+      } else if (activeCameraTarget === "document") {
+        if (documents.length >= 2) {
+          try {
+            alert("Maximum 2 documents can be attached.");
+          } catch (aErr) {
+            console.error("Alert error in handleCameraCapture document", aErr);
+          }
+        } else {
+          setDocuments(prev => [...prev, url].slice(0, 2));
+        }
       }
     } catch (err: any) {
       console.error("Failed to handle camera capture:", err);
@@ -568,38 +546,74 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
     }
   };
 
-  const handleApprovalFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      setUploadingApproval(true);
-      try {
-        const url = await compressImage(file, undefined, undefined, undefined, "maintenance_approval");
-        if (url) {
-          setApprovalFile(url);
-        }
-      } catch (err: any) {
-        console.error("Approval upload failed:", err);
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+
+      if (documents.length + files.length > 2) {
+        alert("You can upload a maximum of 2 documents.");
+        return;
+      }
+
+      setUploadingDocument(true);
+      const uploadedUrls: string[] = [];
+      for (let i = 0; i < files.length; i++) {
         try {
-          alert("Approval upload failed: " + (err?.message || "Unknown error"));
-        } catch (aErr) {
-          console.error("Alert error in handleApprovalFileUpload", aErr);
+          const file = files[i];
+          const url = await compressImage(file, undefined, undefined, undefined, "maintenance_doc");
+          if (url) uploadedUrls.push(url);
+        } catch (fileErr: any) {
+          console.error(`Failed to compress/upload document ${files[i]?.name || i}:`, fileErr);
+          alert(`Failed to upload document ${files[i]?.name || i + 1}: ${fileErr?.message || "Unknown error"}`);
         }
+      }
+
+      if (uploadedUrls.length > 0) {
+        setDocuments(prev => [...prev, ...uploadedUrls].slice(0, 2));
       }
     } catch (outerErr: any) {
-      console.error("Unexpected error in handleApprovalFileUpload:", outerErr);
-      try {
-        alert("Approval upload error: " + (outerErr?.message || "Unknown error"));
-      } catch (aErr) {
-        console.error("Alert error in handleApprovalFileUpload outer catch", aErr);
-      }
+      console.error("Unexpected error in handleDocumentUpload:", outerErr);
+      alert("Document upload error: " + (outerErr?.message || "Unknown error"));
     } finally {
-      setUploadingApproval(false);
+      setUploadingDocument(false);
       try {
         e.target.value = "";
       } catch (targetErr) {
-        console.error("Failed to reset approval input target value", targetErr);
+        console.error("Failed to reset document input target value", targetErr);
       }
+    }
+  };
+
+  const handleReplaceDocument = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      const file = e.target.files?.[0];
+      if (!file) return;
+      setUploadingDocument(true);
+      const url = await compressImage(file, undefined, undefined, undefined, "maintenance_doc");
+      if (url) {
+        setDocuments(prev => {
+          const updated = [...prev];
+          updated[index] = url;
+          return updated;
+        });
+      }
+    } catch (err: any) {
+      console.error("Document replace failed:", err);
+      alert("Document replace failed: " + (err?.message || "Unknown error"));
+    } finally {
+      setUploadingDocument(false);
+      try {
+        e.target.value = "";
+      } catch (tErr) {}
+    }
+  };
+
+  const removeDocument = (index: number) => {
+    try {
+      setDocuments(prev => prev.filter((_, i) => i !== index));
+    } catch (err) {
+      console.error("Failed to remove document at index", index, err);
     }
   };
 
@@ -668,9 +682,9 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
         insurance_claimed: insuranceClaimed.trim() || "No",
         insurance_brokerage: insuranceBrokerage.trim() || null,
         claim_number: claimNumber.trim() || null,
-        approved_by: approvedBy.trim() || null,
-        approval_date: approvalDate.trim() || null,
-        approval_file: approvalFile || null,
+        approved_by: null,
+        approval_date: null,
+        approval_file: documents.length === 0 ? null : (documents.length === 1 ? documents[0] : JSON.stringify(documents)),
         vehicle_damage_photos: damagePhotos,
         remarks: remarks.trim() || null,
       };
@@ -732,7 +746,7 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
         "Inward ID", "Status", "Vehicle Number", "City", "Location",
         "In Date/Time", "In KMs", "Repair Type", "Workshop Name",
         "Est. Delivery Date", "Est. Amount (₹)", "Insurance Claimed",
-        "Brokerage", "Claim No", "Approved By", "Approval Date", "Remarks"
+        "Brokerage", "Claim No", "Remarks"
       ];
       const rows = registryRecords.map(r => {
         try {
@@ -751,13 +765,11 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
             r.insurance_claimed || "No",
             r.insurance_brokerage || "",
             r.claim_number || "",
-            r.approved_by || "",
-            r.approval_date || "",
             (r.remarks || "").replace(/[\r\n]+/g, " ")
           ];
         } catch (rowErr) {
           console.error("Error creating CSV row for record:", rowErr, r);
-          return [r.id || "", "", r.vehicle_number || "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""];
+          return [r.id || "", "", r.vehicle_number || "", "", "", "", "", "", "", "", "", "", "", "", ""];
         }
       });
 
@@ -942,7 +954,7 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
               console.error("Error closing CameraCapture modal", err);
             }
           }}
-          title={activeCameraTarget === "damage" ? "Capture Vehicle Damage Photo" : "Capture Approval Document Photo"}
+          title={activeCameraTarget === "damage" ? "Capture Vehicle Damage Photo" : "Capture Document Photo"}
         />
       )}
 
@@ -1115,10 +1127,10 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
                 </div>
               </div>
 
-              {/* Insurance & Approval Info */}
+              {/* Insurance & Documents Info */}
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
                 <h4 className="text-xs font-bold text-slate-800 flex items-center gap-2">
-                  <ShieldCheck className="w-4 h-4 text-primary" /> Insurance &amp; Intake Approvals
+                  <ShieldCheck className="w-4 h-4 text-primary" /> Insurance &amp; Documents
                 </h4>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
                   <div>
@@ -1137,48 +1149,49 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
                       <span className="font-mono font-bold text-slate-800">{viewingRecord.claim_number}</span>
                     </div>
                   )}
-                  <div>
-                    <span className="text-[11px] text-slate-400 block">Approved By</span>
-                    <span className="font-semibold text-slate-800">{viewingRecord.approved_by || "—"}</span>
-                  </div>
-                  <div>
-                    <span className="text-[11px] text-slate-400 block">Approval Date</span>
-                    <span className="font-mono text-slate-800">{safeFormatIndianDate(viewingRecord.approval_date)}</span>
-                  </div>
                 </div>
 
-                {/* Document Thumbnail */}
-                {viewingRecord.approval_file && (
-                  <div className="pt-2 border-t border-slate-200 flex items-center gap-3">
-                    <span className="text-[11px] text-slate-500 font-medium">Document:</span>
-                    <div
-                      onClick={() => {
-                        try {
-                          if (viewingRecord.approval_file?.toLowerCase().endsWith(".pdf")) {
-                            window.open(viewingRecord.approval_file, "_blank");
-                          } else if (viewingRecord.approval_file) {
-                            setPreviewImage(viewingRecord.approval_file);
-                          }
-                        } catch (err) {
-                          console.error("Error opening approval proof file", err);
-                        }
-                      }}
-                      className="flex items-center gap-2 px-2.5 py-1 bg-white border border-slate-300 rounded-lg hover:border-primary cursor-pointer shadow-2xs transition-colors"
-                    >
-                      {viewingRecord.approval_file.toLowerCase().endsWith(".pdf") ? (
-                        <span className="text-[10px] font-bold text-rose-600">PDF</span>
-                      ) : (
-                        <img
-                          src={viewingRecord.approval_file}
-                          alt="Approval thumbnail"
-                          className="w-6 h-6 object-cover rounded"
-                        />
-                      )}
-                      <Eye className="w-3.5 h-3.5 text-primary" />
-                      <span className="text-[11px] font-bold text-primary">View Document</span>
+                {/* Documents Thumbnails */}
+                {(() => {
+                  const docs = safeParseDocuments(viewingRecord.approval_file);
+                  if (docs.length === 0) return null;
+                  return (
+                    <div className="pt-2 border-t border-slate-200">
+                      <span className="text-[11px] text-slate-500 font-medium block mb-2">Attached Documents ({docs.length}):</span>
+                      <div className="flex flex-wrap items-center gap-3">
+                        {docs.map((docUrl, dIdx) => (
+                          <div
+                            key={dIdx}
+                            onClick={() => {
+                              try {
+                                if (docUrl.toLowerCase().endsWith(".pdf") || docUrl.toLowerCase().includes(".pdf")) {
+                                  window.open(docUrl, "_blank");
+                                } else {
+                                  setPreviewImage(docUrl);
+                                }
+                              } catch (err) {
+                                console.error("Error opening document file", err);
+                              }
+                            }}
+                            className="flex items-center gap-2 px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg hover:border-primary cursor-pointer shadow-2xs transition-colors"
+                          >
+                            {docUrl.toLowerCase().endsWith(".pdf") || docUrl.toLowerCase().includes(".pdf") ? (
+                              <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">PDF</span>
+                            ) : (
+                              <img
+                                src={docUrl}
+                                alt={`Document ${dIdx + 1}`}
+                                className="w-6 h-6 object-cover rounded"
+                              />
+                            )}
+                            <Eye className="w-3.5 h-3.5 text-primary" />
+                            <span className="text-[11px] font-bold text-primary">View Document {dIdx + 1}</span>
+                          </div>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
               </div>
 
               {/* Photos Gallery */}
@@ -1591,14 +1604,14 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
                 </div>
               </div>
 
-              {/* Section 3: Insurance & Approval */}
+              {/* Section 3: Insurance & Documents */}
               <div className="rounded-2xl border border-border bg-white p-6 shadow-2xs">
                 <div className="border-b border-border/80 pb-3 mb-6 flex items-center justify-between">
                   <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
                     <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">3</span>
-                    Insurance Claim &amp; Estimate Approval
+                    Insurance &amp; Documents
                   </h3>
-                  <span className="text-[11px] font-semibold text-text-muted">Financial authorization</span>
+                  <span className="text-[11px] font-semibold text-text-muted">Insurance details &amp; document attachments</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -1659,91 +1672,44 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
                       className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs"
                     />
                   </div>
-
-                  <div>
-                    <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
-                      Approved by (Estimate)
-                    </label>
-                    <select
-                      value={approvedBy}
-                      onChange={e => {
-                        try {
-                          setApprovedBy(e.target.value);
-                        } catch (err) {
-                          console.error("Error setting approved by", err);
-                        }
-                      }}
-                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs cursor-pointer"
-                    >
-                      <option value="">{cityName ? `Select Approver (${cityName})` : "Select Approver"}</option>
-                      {filteredApprovers.map(u => (
-                        <option key={u.id} value={u.name}>
-                          {u.name} ({u.role}{u.city ? ` - ${u.city}` : ""})
-                        </option>
-                      ))}
-                      {approvedBy && !filteredApprovers.some(u => u.name === approvedBy) && (
-                        <option value={approvedBy}>{approvedBy}</option>
-                      )}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
-                      Approval Date
-                    </label>
-                    <input
-                      type="date"
-                      value={approvalDate}
-                      onChange={e => {
-                        try {
-                          setApprovalDate(e.target.value);
-                        } catch (err) {
-                          console.error("Error setting approval date", err);
-                        }
-                      }}
-                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs cursor-pointer"
-                    />
-                  </div>
                 </div>
 
-                {/* Dedicated Document Section */}
+                {/* Dedicated Document Section (Up to 2 documents) */}
                 <div className="pt-6 mt-6 border-t border-slate-100">
                   <div className="mb-4">
                     <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                       <FileText className="w-4 h-4 text-primary" />
-                      Document
+                      Documents ({documents.length}/2)
                     </h4>
-                    <span className="text-[11px] text-text-muted">Attach approval screenshot, estimate quotation, or related document</span>
+                    <span className="text-[11px] text-text-muted">Attach up to 2 documents (images or PDF up to 10MB each)</span>
                   </div>
 
-                  <div className="max-w-xl">
-                    <label className="block font-sans text-xs font-bold text-slate-700 mb-2">
-                      Document
-                    </label>
-                    {approvalFile ? (
-                      <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3.5 flex items-center justify-between gap-3 shadow-2xs min-h-[96px]">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Render uploaded documents */}
+                    {documents.map((docUrl, idx) => (
+                      <div key={idx} className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3.5 flex items-center justify-between gap-3 shadow-2xs min-h-[96px]">
                         <div className="flex items-center gap-3 min-w-0">
                           <div
                             onClick={() => {
                               try {
-                                if (approvalFile.toLowerCase().endsWith(".pdf")) {
-                                  window.open(approvalFile, "_blank");
+                                if (docUrl.toLowerCase().endsWith(".pdf") || docUrl.toLowerCase().includes(".pdf")) {
+                                  window.open(docUrl, "_blank");
                                 } else {
-                                  setPreviewImage(approvalFile);
+                                  setPreviewImage(docUrl);
                                 }
                               } catch (err) {
-                                console.error("Error previewing approvalFile:", err);
+                                console.error("Error previewing document:", err);
                               }
                             }}
                             className="relative w-14 h-14 rounded-lg border border-emerald-300 overflow-hidden bg-white cursor-pointer group shrink-0 flex items-center justify-center shadow-xs"
                             title="Click to view full preview"
                           >
-                            {approvalFile.toLowerCase().endsWith(".pdf") ? (
+                            {docUrl.toLowerCase().endsWith(".pdf") || docUrl.toLowerCase().includes(".pdf") ? (
                               <div className="text-[11px] font-black text-rose-600 uppercase tracking-wider">PDF</div>
                             ) : (
                               <img
-                                src={approvalFile}
-                                alt="Approval thumbnail"
+                                src={docUrl}
+                                alt={`Document ${idx + 1}`}
                                 className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                               />
                             )}
@@ -1754,21 +1720,21 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
                           <div className="min-w-0">
                             <div className="flex items-center gap-1.5">
                               <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                              <span className="text-xs font-bold text-emerald-950 truncate">Document Attached</span>
+                              <span className="text-xs font-bold text-emerald-950 truncate">Document {idx + 1} Attached</span>
                             </div>
-                            <p className="text-[10px] text-slate-500 mt-0.5">Click thumbnail to expand preview</p>
+                            <p className="text-[10px] text-slate-500 mt-0.5">Click thumbnail to view</p>
                             <div className="flex items-center gap-2.5 mt-1.5">
                               <button
                                 type="button"
                                 onClick={() => {
                                   try {
-                                    if (approvalFile.toLowerCase().endsWith(".pdf")) {
-                                      window.open(approvalFile, "_blank");
+                                    if (docUrl.toLowerCase().endsWith(".pdf") || docUrl.toLowerCase().includes(".pdf")) {
+                                      window.open(docUrl, "_blank");
                                     } else {
-                                      setPreviewImage(approvalFile);
+                                      setPreviewImage(docUrl);
                                     }
                                   } catch (err) {
-                                    console.error("Error opening approval file viewer link", err);
+                                    console.error("Error viewing document:", err);
                                   }
                                 }}
                                 className="text-[11px] font-bold text-primary hover:underline cursor-pointer flex items-center gap-1"
@@ -1778,18 +1744,12 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
                               <span className="text-slate-300">·</span>
                               <label className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 cursor-pointer flex items-center gap-1">
                                 <Upload className="w-3 h-3" /> Replace
-                                <input type="file" onChange={handleApprovalFileUpload} className="hidden" accept="image/*,.pdf" />
+                                <input type="file" onChange={(e) => handleReplaceDocument(idx, e)} className="hidden" accept="image/*,.pdf" />
                               </label>
                               <span className="text-slate-300">·</span>
                               <button
                                 type="button"
-                                onClick={() => {
-                                  try {
-                                    setApprovalFile(null);
-                                  } catch (err) {
-                                    console.error("Error removing approval file", err);
-                                  }
-                                }}
+                                onClick={() => removeDocument(idx)}
                                 className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 cursor-pointer flex items-center gap-1"
                               >
                                 <Trash2 className="w-3 h-3" /> Remove
@@ -1798,23 +1758,34 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
                           </div>
                         </div>
                       </div>
-                    ) : (
+                    ))}
+
+                    {/* Show Add Document box if fewer than 2 documents */}
+                    {documents.length < 2 && (
                       <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-4 hover:border-primary/40 hover:bg-slate-50 transition-all flex flex-col items-center justify-center text-center min-h-[96px]">
-                        <span className="text-xs font-semibold text-slate-700 mb-0.5">Attach Document</span>
-                        <span className="text-[10px] text-slate-400 mb-2.5">Upload document, image, or PDF</span>
+                        <span className="text-xs font-semibold text-slate-700 mb-0.5">
+                          {documents.length === 0 ? "Attach Document" : "Attach Second Document"}
+                        </span>
+                        <span className="text-[10px] text-slate-400 mb-2.5">Upload image or PDF up to 10MB</span>
                         <div className="flex items-center gap-2">
                           <label className="flex items-center gap-1.5 h-8 px-3.5 text-xs font-semibold text-white bg-primary hover:bg-primary-hover rounded-lg cursor-pointer transition-colors shadow-xs">
                             <Upload className="w-3 h-3" />
-                            <span>{uploadingApproval ? "Uploading..." : "Upload Document"}</span>
-                            <input type="file" onChange={handleApprovalFileUpload} className="hidden" accept="image/*,.pdf" />
+                            <span>{uploadingDocument ? "Uploading..." : "Upload Document"}</span>
+                            <input
+                              type="file"
+                              multiple={documents.length === 0}
+                              onChange={handleDocumentUpload}
+                              className="hidden"
+                              accept="image/*,.pdf"
+                            />
                           </label>
                           <button
                             type="button"
                             onClick={() => {
                               try {
-                                setActiveCameraTarget("approval");
+                                setActiveCameraTarget("document");
                               } catch (err) {
-                                console.error("Error opening camera for approval", err);
+                                console.error("Error setting camera target to document:", err);
                               }
                             }}
                             className="flex items-center gap-1.5 h-8 px-3 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 cursor-pointer transition-colors shadow-xs"

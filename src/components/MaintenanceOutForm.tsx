@@ -144,6 +144,53 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
     return [];
   };
 
+  /**
+   * Safely parse document URLs from array, JSON string, or single string (up to 2 items)
+   */
+  const safeParseDocuments = (docData: unknown): string[] => {
+    try {
+      if (!docData) return [];
+      if (Array.isArray(docData)) {
+        return docData
+          .filter((d): d is string => typeof d === "string" && d.trim() !== "")
+          .map(d => d.trim())
+          .slice(0, 2);
+      }
+      if (typeof docData === "string") {
+        const trimmed = docData.trim();
+        if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+          const parsed = JSON.parse(trimmed);
+          if (Array.isArray(parsed)) {
+            return parsed
+              .filter((d): d is string => typeof d === "string" && d.trim() !== "")
+              .map(d => d.trim())
+              .slice(0, 2);
+          }
+        }
+        return trimmed ? [trimmed] : [];
+      }
+      return [];
+    } catch (err) {
+      console.error("Failed to parse documents safely:", err, docData);
+      return [];
+    }
+  };
+
+  /**
+   * Parse outward documents from invoice_file and approval_file columns
+   */
+  const safeParseOutwardDocuments = (invoiceFile: unknown, approvalFile: unknown): string[] => {
+    try {
+      const fromInv = safeParseDocuments(invoiceFile);
+      const fromApp = safeParseDocuments(approvalFile);
+      const combined = Array.from(new Set([...fromInv, ...fromApp])).filter(Boolean);
+      return combined.slice(0, 2);
+    } catch (err) {
+      console.error("Error parsing outward documents:", err);
+      return [];
+    }
+  };
+
   // Safe file open / preview helper
   const handleOpenFileOrPreview = (fileUrl: string | null | undefined) => {
     try {
@@ -184,11 +231,8 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
   const [invoiceNo, setInvoiceNo] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(getTodayDateString());
   const [invoiceAmount, setInvoiceAmount] = useState("");
-  const [invoiceFile, setInvoiceFile] = useState<string | null>(null);
+  const [documents, setDocuments] = useState<string[]>([]);
   const [paymentStatus, setPaymentStatus] = useState("Pending");
-  const [approvedBy, setApprovedBy] = useState("");
-  const [approvalDate, setApprovalDate] = useState("");
-  const [approvalFile, setApprovalFile] = useState<string | null>(null);
   const [outwardPhotos, setOutwardPhotos] = useState<string[]>([]);
   const [finalStatus, setFinalStatus] = useState("Completed & RFD");
   const [remarks, setRemarks] = useState("");
@@ -198,70 +242,13 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
   const [submitSuccess, setSubmitSuccess] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
-  const [uploadingInvoice, setUploadingInvoice] = useState(false);
-  const [uploadingApproval, setUploadingApproval] = useState(false);
-  const [activeCameraTarget, setActiveCameraTarget] = useState<"photos" | "invoice" | "approval" | null>(null);
+  const [uploadingDocument, setUploadingDocument] = useState(false);
+  const [activeCameraTarget, setActiveCameraTarget] = useState<"photos" | "document" | null>(null);
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // Edit and View States
   const [editingId, setEditingId] = useState<number | null>(null);
   const [viewingRecord, setViewingRecord] = useState<MaintenanceOutRecord | null>(null);
-
-  // Portal Users for Approver Dropdown
-  const [portalUsers, setPortalUsers] = useState<Array<{ id: number; username: string; name: string; role: string; city?: string }>>([]);
-
-  const fetchPortalUsers = async () => {
-    try {
-      let token: string | null = null;
-      try {
-        token = localStorage.getItem("lr_token") || localStorage.getItem("token") || localStorage.getItem("auth_token") || sessionStorage.getItem("token");
-      } catch (e) {
-        console.error("Failed to read token from storage:", e);
-      }
-      const res = await fetch("/api/portal-users", {
-        headers: token ? { Authorization: `Bearer ${token}` } : {}
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data)) {
-          setPortalUsers(data);
-        }
-      } else {
-        console.warn("Failed to fetch portal users:", res.status);
-      }
-    } catch (err) {
-      console.error("Error fetching portal users:", err);
-    }
-  };
-
-  useEffect(() => {
-    fetchPortalUsers();
-  }, []);
-
-  // City normalization helper for reliable city matching
-  const normalizeCity = (c?: string): string => {
-    if (!c) return "";
-    const s = c.trim().toLowerCase();
-    if (s === "bengaluru" || s === "bangalore" || s === "blr") return "bangalore";
-    if (s === "mumbai" || s === "bom") return "mumbai";
-    if (s === "hyderabad" || s === "hyd") return "hyderabad";
-    if (s === "chennai" || s === "maa") return "chennai";
-    if (s === "delhi" || s === "new delhi" || s === "del") return "delhi";
-    return s;
-  };
-
-  // Filter approvers strictly by the currently filled city
-  const filteredApprovers = useMemo(() => {
-    try {
-      if (!cityName || !cityName.trim()) return portalUsers;
-      const targetNorm = normalizeCity(cityName);
-      const matched = portalUsers.filter(u => normalizeCity(u.city) === targetNorm);
-      return matched.length > 0 ? matched : portalUsers;
-    } catch (err) {
-      console.error("Error filtering approvers by city in MaintenanceOutForm:", err);
-      return portalUsers;
-    }
-  }, [portalUsers, cityName]);
 
   // Registry States
   const [registryRecords, setRegistryRecords] = useState<MaintenanceOutRecord[]>([]);
@@ -424,10 +411,12 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
         } else {
           setOutwardPhotos(prev => [...prev, url].slice(0, 5));
         }
-      } else if (activeCameraTarget === "invoice") {
-        setInvoiceFile(url);
-      } else if (activeCameraTarget === "approval") {
-        setApprovalFile(url);
+      } else if (activeCameraTarget === "document") {
+        if (documents.length >= 2) {
+          alert("Maximum 2 documents can be attached.");
+        } else {
+          setDocuments(prev => [...prev, url].slice(0, 2));
+        }
       }
     } catch (err: any) {
       console.error("Error handling camera capture:", err);
@@ -441,69 +430,75 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
     }
   };
 
-  const handleInvoiceFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleDocumentUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
-      const file = e.target.files?.[0];
-      if (!file) return;
-      setUploadingInvoice(true);
-      try {
-        const url = await compressImage(file, undefined, undefined, undefined, "maintenance_invoice");
-        if (url) {
-          setInvoiceFile(url);
-        } else {
-          throw new Error("No URL returned from server.");
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+
+      if (documents.length + files.length > 2) {
+        alert("You can upload a maximum of 2 documents.");
+        return;
+      }
+
+      setUploadingDocument(true);
+      const uploadedUrls: string[] = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        try {
+          const url = await compressImage(file, undefined, undefined, undefined, "maintenance_out_doc");
+          if (url) uploadedUrls.push(url);
+        } catch (itemErr: any) {
+          console.error(`Failed to upload document #${i + 1}:`, itemErr);
+          alert(`Failed to upload document #${i + 1}: ` + (itemErr?.message || "Upload error"));
         }
-      } catch (err: any) {
-        console.error("Invoice upload failed:", err);
-        alert("Invoice upload failed: " + (err?.message || "Unknown error"));
-      } finally {
-        setUploadingInvoice(false);
+      }
+      if (uploadedUrls.length > 0) {
+        setDocuments(prev => [...prev, ...uploadedUrls].slice(0, 2));
       }
     } catch (err: any) {
-      console.error("Unexpected error in handleInvoiceFileUpload:", err);
-      alert("Invoice upload error: " + (err?.message || "Unknown error"));
-      setUploadingInvoice(false);
+      console.error("Unexpected error in handleDocumentUpload:", err);
+      alert("Document upload error: " + (err?.message || "Unknown error"));
     } finally {
+      setUploadingDocument(false);
       try {
         if (e?.target) {
           e.target.value = "";
         }
       } catch (resetErr) {
-        console.error("Error resetting invoice file input:", resetErr);
+        console.error("Error resetting document file input:", resetErr);
       }
     }
   };
 
-  const handleApprovalFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleReplaceDocument = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       const file = e.target.files?.[0];
       if (!file) return;
-      setUploadingApproval(true);
-      try {
-        const url = await compressImage(file, undefined, undefined, undefined, "maintenance_approval");
-        if (url) {
-          setApprovalFile(url);
-        } else {
-          throw new Error("No URL returned from server.");
-        }
-      } catch (err: any) {
-        console.error("Approval upload failed:", err);
-        alert("Approval upload failed: " + (err?.message || "Unknown error"));
-      } finally {
-        setUploadingApproval(false);
+      setUploadingDocument(true);
+      const url = await compressImage(file, undefined, undefined, undefined, "maintenance_out_doc");
+      if (url) {
+        setDocuments(prev => {
+          const updated = [...prev];
+          updated[index] = url;
+          return updated;
+        });
       }
     } catch (err: any) {
-      console.error("Unexpected error in handleApprovalFileUpload:", err);
-      alert("Approval upload error: " + (err?.message || "Unknown error"));
-      setUploadingApproval(false);
+      console.error("Document replace failed:", err);
+      alert("Document replace failed: " + (err?.message || "Unknown error"));
     } finally {
+      setUploadingDocument(false);
       try {
-        if (e?.target) {
-          e.target.value = "";
-        }
-      } catch (resetErr) {
-        console.error("Error resetting approval file input:", resetErr);
-      }
+        if (e?.target) e.target.value = "";
+      } catch (tErr) {}
+    }
+  };
+
+  const removeDocument = (index: number) => {
+    try {
+      setDocuments(prev => prev.filter((_, i) => i !== index));
+    } catch (err) {
+      console.error("Error removing document at index " + index, err);
     }
   };
 
@@ -526,11 +521,8 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
       setInvoiceNo(r.invoice_no || "");
       setInvoiceDate(r.invoice_date || getTodayDateString());
       setInvoiceAmount(r.invoice_amount || "");
-      setInvoiceFile(r.invoice_file || null);
+      setDocuments(safeParseOutwardDocuments(r.invoice_file, r.approval_file));
       setPaymentStatus(r.payment_status || "Pending");
-      setApprovedBy(r.approved_by || "");
-      setApprovalDate(r.approval_date || "");
-      setApprovalFile(r.approval_file || null);
       setFinalStatus(r.final_status || "Completed & RFD");
       setRemarks(r.remarks || "");
 
@@ -566,11 +558,8 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
       setInvoiceNo("");
       setInvoiceDate(getTodayDateString());
       setInvoiceAmount("");
-      setInvoiceFile(null);
+      setDocuments([]);
       setPaymentStatus("Pending");
-      setApprovedBy("");
-      setApprovalDate("");
-      setApprovalFile(null);
       setOutwardPhotos([]);
       setFinalStatus("Completed & RFD");
       setRemarks("");
@@ -653,13 +642,13 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
         invoice_amount: invoiceAmount.trim() || null,
         insurance_liability_discounts: "0",
         letzryd_payable: null,
-        invoice_file: invoiceFile || null,
+        invoice_file: documents[0] || null,
         type_of_payment: null,
         payment_status: paymentStatus.trim() || "Pending",
         utr_no: null,
-        approved_by: approvedBy.trim() || null,
-        approval_date: approvalDate.trim() || null,
-        approval_file: approvalFile || null,
+        approved_by: null,
+        approval_date: null,
+        approval_file: documents[1] || null,
         vehicle_out_photos: outwardPhotos,
         final_status: finalStatus.trim() || "Completed & RFD",
         remarks: remarks.trim() || null,
@@ -719,7 +708,7 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
       const headers = [
         "Outward ID", "Inward ID", "Vehicle Number", "Workshop", "In Date/Time",
         "Out Date/Time", "Out KMs", "RFD Date", "Invoice No", "Invoice Date",
-        "Invoice Amount (₹)", "Payment Status", "Approved By", "Approval Date", "Final Status", "Remarks"
+        "Invoice Amount (₹)", "Payment Status", "Final Status", "Remarks"
       ];
       const rows = registryRecords.map(r => {
         try {
@@ -736,8 +725,6 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
             r?.invoice_date || "",
             r?.invoice_amount || "",
             r?.payment_status || "Pending",
-            r?.approved_by || "",
-            r?.approval_date || "",
             r?.final_status || "",
             (r?.remarks || "").replace(/[\r\n]+/g, " ")
           ];
@@ -902,9 +889,7 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
           title={
             activeCameraTarget === "photos"
               ? "Capture Outward Vehicle / Repair Photo"
-              : activeCameraTarget === "invoice"
-              ? "Capture Workshop Invoice Bill"
-              : "Capture Approval Document"
+              : "Capture Document Photo"
           }
         />
       )}
@@ -1098,58 +1083,42 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
                       {viewingRecord.payment_status || "Pending"}
                     </span>
                   </div>
-                  <div>
-                    <span className="text-[11px] text-slate-400 block">Approved By</span>
-                    <span className="font-semibold text-slate-800">{viewingRecord.approved_by || "—"}</span>
-                  </div>
                 </div>
 
-                {/* Proof Thumbnails */}
-                <div className="pt-3 border-t border-slate-200 flex flex-wrap items-center gap-4">
-                  {viewingRecord.invoice_file && (
-                    <div
-                      onClick={() => handleOpenFileOrPreview(viewingRecord.invoice_file)}
-                      className="flex items-center gap-2.5 px-3 py-1.5 bg-white border border-slate-300 rounded-lg hover:border-primary cursor-pointer shadow-2xs transition-colors"
-                    >
-                      {viewingRecord.invoice_file.toLowerCase().endsWith(".pdf") ? (
-                        <span className="text-[10px] font-bold text-rose-600">PDF</span>
-                      ) : (
-                        <img
-                          src={viewingRecord.invoice_file}
-                          alt="Invoice thumbnail"
-                          className="w-7 h-7 object-cover rounded"
-                        />
-                      )}
-                      <div>
-                        <span className="text-[11px] font-bold text-primary flex items-center gap-1">
-                          <Eye className="w-3.5 h-3.5" /> View Invoice Bill
-                        </span>
+                {/* Attached Documents */}
+                {(() => {
+                  const docs = safeParseOutwardDocuments(viewingRecord.invoice_file, viewingRecord.approval_file);
+                  if (docs.length === 0) return null;
+                  return (
+                    <div className="pt-3 border-t border-slate-200">
+                      <span className="text-[11px] text-slate-500 font-medium block mb-2">Attached Documents ({docs.length}):</span>
+                      <div className="flex flex-wrap items-center gap-3">
+                        {docs.map((docUrl, dIdx) => (
+                          <div
+                            key={dIdx}
+                            onClick={() => handleOpenFileOrPreview(docUrl)}
+                            className="flex items-center gap-2.5 px-3 py-1.5 bg-white border border-slate-300 rounded-lg hover:border-primary cursor-pointer shadow-2xs transition-colors"
+                          >
+                            {docUrl.toLowerCase().endsWith(".pdf") || docUrl.toLowerCase().includes(".pdf") ? (
+                              <span className="text-[10px] font-bold text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded">PDF</span>
+                            ) : (
+                              <img
+                                src={docUrl}
+                                alt={`Document ${dIdx + 1}`}
+                                className="w-7 h-7 object-cover rounded"
+                              />
+                            )}
+                            <div>
+                              <span className="text-[11px] font-bold text-primary flex items-center gap-1">
+                                <Eye className="w-3.5 h-3.5" /> View Document {dIdx + 1}
+                              </span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  )}
-
-                  {viewingRecord.approval_file && (
-                    <div
-                      onClick={() => handleOpenFileOrPreview(viewingRecord.approval_file)}
-                      className="flex items-center gap-2.5 px-3 py-1.5 bg-white border border-slate-300 rounded-lg hover:border-primary cursor-pointer shadow-2xs transition-colors"
-                    >
-                      {viewingRecord.approval_file.toLowerCase().endsWith(".pdf") ? (
-                        <span className="text-[10px] font-bold text-rose-600">PDF</span>
-                      ) : (
-                        <img
-                          src={viewingRecord.approval_file}
-                          alt="Approval thumbnail"
-                          className="w-7 h-7 object-cover rounded"
-                        />
-                      )}
-                      <div>
-                        <span className="text-[11px] font-bold text-primary flex items-center gap-1">
-                          <Eye className="w-3.5 h-3.5" /> View Document
-                        </span>
-                      </div>
-                    </div>
-                  )}
-                </div>
+                  );
+                })()}
               </div>
 
               {/* Completed Repair Photos Gallery */}
@@ -1612,270 +1581,122 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
-                      Approved by (Final Bill)
-                    </label>
-                    <select
-                      value={approvedBy}
-                      onChange={e => {
-                        try {
-                          setApprovedBy(e.target.value);
-                        } catch (err) {
-                          console.error("Error setting approvedBy:", err);
-                        }
-                      }}
-                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs cursor-pointer"
-                    >
-                      <option value="">{cityName ? `Select Approver (${cityName})` : "Select Approver"}</option>
-                      {filteredApprovers.map(u => (
-                        <option key={u.id} value={u.name}>
-                          {u.name} ({u.role}{u.city ? ` - ${u.city}` : ""})
-                        </option>
-                      ))}
-                      {approvedBy && !filteredApprovers.some(u => u.name === approvedBy) && (
-                        <option value={approvedBy}>{approvedBy}</option>
-                      )}
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
-                      Approval Date
-                    </label>
-                    <input
-                      type="date"
-                      value={approvalDate}
-                      onChange={e => {
-                        try {
-                          setApprovalDate(e.target.value);
-                        } catch (err) {
-                          console.error("Error setting approvalDate:", err);
-                        }
-                      }}
-                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs cursor-pointer"
-                    />
-                  </div>
                 </div>
 
-                {/* Dedicated Document & Proof Attachments Section */}
+                {/* Dedicated Document Section (Up to 2 documents) */}
                 <div className="pt-6 mt-6 border-t border-slate-100">
                   <div className="mb-4">
                     <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
                       <FileText className="w-4 h-4 text-primary" />
-                      Workshop Billing &amp; Documents
+                      Documents ({documents.length}/2)
                     </h4>
-                    <span className="text-[11px] text-text-muted">Attach invoice bills and related documents</span>
+                    <span className="text-[11px] text-text-muted">Attach up to 2 documents (images or PDF up to 10MB each)</span>
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                    {/* Column 1: Workshop Invoice Copy / Bill */}
-                    <div className="flex flex-col">
-                      <label className="block font-sans text-xs font-bold text-slate-700 mb-2">
-                        Workshop Invoice Copy / Bill
-                      </label>
-                      {invoiceFile ? (
-                        <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3.5 flex items-center justify-between gap-3 shadow-2xs min-h-[96px]">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div
-                              onClick={() => {
-                                try {
-                                  handleOpenFileOrPreview(invoiceFile);
-                                } catch (err) {
-                                  console.error("Error previewing invoiceFile:", err);
-                                }
-                              }}
-                              className="relative w-14 h-14 rounded-lg border border-emerald-300 overflow-hidden bg-white cursor-pointer group shrink-0 flex items-center justify-center shadow-xs"
-                              title="Click to view full preview"
-                            >
-                              {invoiceFile.toLowerCase().endsWith(".pdf") ? (
-                                <div className="text-[11px] font-black text-rose-600 uppercase tracking-wider">PDF</div>
-                              ) : (
-                                <img
-                                  src={invoiceFile}
-                                  alt="Invoice preview"
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                />
-                              )}
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <Eye className="w-4 h-4 text-white" />
-                              </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Render uploaded documents */}
+                    {documents.map((docUrl, idx) => (
+                      <div key={idx} className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3.5 flex items-center justify-between gap-3 shadow-2xs min-h-[96px]">
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div
+                            onClick={() => {
+                              try {
+                                handleOpenFileOrPreview(docUrl);
+                              } catch (err) {
+                                console.error("Error previewing document:", err);
+                              }
+                            }}
+                            className="relative w-14 h-14 rounded-lg border border-emerald-300 overflow-hidden bg-white cursor-pointer group shrink-0 flex items-center justify-center shadow-xs"
+                            title="Click to view full preview"
+                          >
+                            {docUrl.toLowerCase().endsWith(".pdf") || docUrl.toLowerCase().includes(".pdf") ? (
+                              <div className="text-[11px] font-black text-rose-600 uppercase tracking-wider">PDF</div>
+                            ) : (
+                              <img
+                                src={docUrl}
+                                alt={`Document ${idx + 1}`}
+                                className="w-full h-full object-cover group-hover:scale-105 transition-transform"
+                              />
+                            )}
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <Eye className="w-4 h-4 text-white" />
                             </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                <span className="text-xs font-bold text-emerald-950 truncate">Invoice Attached</span>
-                              </div>
-                              <p className="text-[10px] text-slate-500 mt-0.5">Click thumbnail to expand preview</p>
-                              <div className="flex items-center gap-2.5 mt-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    try {
-                                      handleOpenFileOrPreview(invoiceFile);
-                                    } catch (err) {
-                                      console.error("Error viewing invoiceFile:", err);
-                                    }
-                                  }}
-                                  className="text-[11px] font-bold text-primary hover:underline cursor-pointer flex items-center gap-1"
-                                >
-                                  <Eye className="w-3 h-3" /> View
-                                </button>
-                                <span className="text-slate-300">·</span>
-                                <label className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 cursor-pointer flex items-center gap-1">
-                                  <Upload className="w-3 h-3" /> Replace
-                                  <input type="file" onChange={handleInvoiceFileUpload} className="hidden" accept="image/*,.pdf" />
-                                </label>
-                                <span className="text-slate-300">·</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    try {
-                                      setInvoiceFile(null);
-                                    } catch (err) {
-                                      console.error("Error removing invoiceFile:", err);
-                                    }
-                                  }}
-                                  className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 cursor-pointer flex items-center gap-1"
-                                >
-                                  <Trash2 className="w-3 h-3" /> Remove
-                                </button>
-                              </div>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                              <span className="text-xs font-bold text-emerald-950 truncate">Document {idx + 1} Attached</span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 mt-0.5">Click thumbnail to view</p>
+                            <div className="flex items-center gap-2.5 mt-1.5">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  try {
+                                    handleOpenFileOrPreview(docUrl);
+                                  } catch (err) {
+                                    console.error("Error viewing document:", err);
+                                  }
+                                }}
+                                className="text-[11px] font-bold text-primary hover:underline cursor-pointer flex items-center gap-1"
+                              >
+                                <Eye className="w-3 h-3" /> View
+                              </button>
+                              <span className="text-slate-300">·</span>
+                              <label className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 cursor-pointer flex items-center gap-1">
+                                <Upload className="w-3 h-3" /> Replace
+                                <input type="file" onChange={(e) => handleReplaceDocument(idx, e)} className="hidden" accept="image/*,.pdf" />
+                              </label>
+                              <span className="text-slate-300">·</span>
+                              <button
+                                type="button"
+                                onClick={() => removeDocument(idx)}
+                                className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 cursor-pointer flex items-center gap-1"
+                              >
+                                <Trash2 className="w-3 h-3" /> Remove
+                              </button>
                             </div>
                           </div>
                         </div>
-                      ) : (
-                        <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-4 hover:border-primary/40 hover:bg-slate-50 transition-all flex flex-col items-center justify-center text-center min-h-[96px]">
-                          <span className="text-xs font-semibold text-slate-700 mb-0.5">Attach Workshop Bill</span>
-                          <span className="text-[10px] text-slate-400 mb-2.5">Upload image or PDF up to 10MB</span>
-                          <div className="flex items-center gap-2">
-                            <label className="flex items-center gap-1.5 h-8 px-3.5 text-xs font-semibold text-white bg-primary hover:bg-primary-hover rounded-lg cursor-pointer transition-colors shadow-xs">
-                              <Upload className="w-3 h-3" />
-                              <span>{uploadingInvoice ? "Uploading..." : "Upload Bill"}</span>
-                              <input type="file" onChange={handleInvoiceFileUpload} className="hidden" accept="image/*,.pdf" />
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                try {
-                                  setActiveCameraTarget("invoice");
-                                } catch (err) {
-                                  console.error("Error setting camera target to invoice:", err);
-                                }
-                              }}
-                              className="flex items-center gap-1.5 h-8 px-3 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 cursor-pointer transition-colors shadow-xs"
-                            >
-                              <Camera className="w-3 h-3 text-slate-600" />
-                              <span>Camera</span>
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                      </div>
+                    ))}
 
-                    {/* Column 2: Document */}
-                    <div className="flex flex-col">
-                      <label className="block font-sans text-xs font-bold text-slate-700 mb-2">
-                        Document
-                      </label>
-                      {approvalFile ? (
-                        <div className="rounded-xl border border-emerald-200 bg-emerald-50/50 p-3.5 flex items-center justify-between gap-3 shadow-2xs min-h-[96px]">
-                          <div className="flex items-center gap-3 min-w-0">
-                            <div
-                              onClick={() => {
-                                try {
-                                  handleOpenFileOrPreview(approvalFile);
-                                } catch (err) {
-                                  console.error("Error previewing approvalFile:", err);
-                                }
-                              }}
-                              className="relative w-14 h-14 rounded-lg border border-emerald-300 overflow-hidden bg-white cursor-pointer group shrink-0 flex items-center justify-center shadow-xs"
-                              title="Click to view full preview"
-                            >
-                              {approvalFile.toLowerCase().endsWith(".pdf") ? (
-                                <div className="text-[11px] font-black text-rose-600 uppercase tracking-wider">PDF</div>
-                              ) : (
-                                <img
-                                  src={approvalFile}
-                                  alt="Approval preview"
-                                  className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                                />
-                              )}
-                              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                <Eye className="w-4 h-4 text-white" />
-                              </div>
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                                <span className="text-xs font-bold text-emerald-950 truncate">Document Attached</span>
-                              </div>
-                              <p className="text-[10px] text-slate-500 mt-0.5">Click thumbnail to expand preview</p>
-                              <div className="flex items-center gap-2.5 mt-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    try {
-                                      handleOpenFileOrPreview(approvalFile);
-                                    } catch (err) {
-                                      console.error("Error viewing approvalFile:", err);
-                                    }
-                                  }}
-                                  className="text-[11px] font-bold text-primary hover:underline cursor-pointer flex items-center gap-1"
-                                >
-                                  <Eye className="w-3 h-3" /> View
-                                </button>
-                                <span className="text-slate-300">·</span>
-                                <label className="text-[11px] font-semibold text-slate-600 hover:text-slate-900 cursor-pointer flex items-center gap-1">
-                                  <Upload className="w-3 h-3" /> Replace
-                                  <input type="file" onChange={handleApprovalFileUpload} className="hidden" accept="image/*,.pdf" />
-                                </label>
-                                <span className="text-slate-300">·</span>
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    try {
-                                      setApprovalFile(null);
-                                    } catch (err) {
-                                      console.error("Error removing approvalFile:", err);
-                                    }
-                                  }}
-                                  className="text-[11px] font-semibold text-rose-600 hover:text-rose-800 cursor-pointer flex items-center gap-1"
-                                >
-                                  <Trash2 className="w-3 h-3" /> Remove
-                                </button>
-                              </div>
-                            </div>
-                          </div>
+                    {/* Show Add Document box if fewer than 2 documents */}
+                    {documents.length < 2 && (
+                      <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-4 hover:border-primary/40 hover:bg-slate-50 transition-all flex flex-col items-center justify-center text-center min-h-[96px]">
+                        <span className="text-xs font-semibold text-slate-700 mb-0.5">
+                          {documents.length === 0 ? "Attach Document" : "Attach Second Document"}
+                        </span>
+                        <span className="text-[10px] text-slate-400 mb-2.5">Upload image or PDF up to 10MB</span>
+                        <div className="flex items-center gap-2">
+                          <label className="flex items-center gap-1.5 h-8 px-3.5 text-xs font-semibold text-white bg-primary hover:bg-primary-hover rounded-lg cursor-pointer transition-colors shadow-xs">
+                            <Upload className="w-3 h-3" />
+                            <span>{uploadingDocument ? "Uploading..." : "Upload Document"}</span>
+                            <input
+                              type="file"
+                              multiple={documents.length === 0}
+                              onChange={handleDocumentUpload}
+                              className="hidden"
+                              accept="image/*,.pdf"
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              try {
+                                setActiveCameraTarget("document");
+                              } catch (err) {
+                                console.error("Error setting camera target to document:", err);
+                              }
+                            }}
+                            className="flex items-center gap-1.5 h-8 px-3 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 cursor-pointer transition-colors shadow-xs"
+                          >
+                            <Camera className="w-3 h-3 text-slate-600" />
+                            <span>Camera</span>
+                          </button>
                         </div>
-                      ) : (
-                        <div className="rounded-xl border-2 border-dashed border-slate-200 bg-slate-50/50 p-4 hover:border-primary/40 hover:bg-slate-50 transition-all flex flex-col items-center justify-center text-center min-h-[96px]">
-                          <span className="text-xs font-semibold text-slate-700 mb-0.5">Attach Document</span>
-                          <span className="text-[10px] text-slate-400 mb-2.5">Upload document or screenshot</span>
-                          <div className="flex items-center gap-2">
-                            <label className="flex items-center gap-1.5 h-8 px-3.5 text-xs font-semibold text-white bg-primary hover:bg-primary-hover rounded-lg cursor-pointer transition-colors shadow-xs">
-                              <Upload className="w-3 h-3" />
-                              <span>{uploadingApproval ? "Uploading..." : "Upload Document"}</span>
-                              <input type="file" onChange={handleApprovalFileUpload} className="hidden" accept="image/*,.pdf" />
-                            </label>
-                            <button
-                              type="button"
-                              onClick={() => {
-                                try {
-                                  setActiveCameraTarget("approval");
-                                } catch (err) {
-                                  console.error("Error setting camera target to approval:", err);
-                                }
-                              }}
-                              className="flex items-center gap-1.5 h-8 px-3 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-100 rounded-lg border border-slate-200 cursor-pointer transition-colors shadow-xs"
-                            >
-                              <Camera className="w-3 h-3 text-slate-600" />
-                              <span>Camera</span>
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -2041,11 +1862,8 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
                       setInvoiceNo("");
                       setInvoiceDate(getTodayDateString());
                       setInvoiceAmount("");
-                      setInvoiceFile(null);
+                      setDocuments([]);
                       setPaymentStatus("Pending");
-                      setApprovedBy("");
-                      setApprovalDate("");
-                      setApprovalFile(null);
                       setOutwardPhotos([]);
                       setRemarks("");
                       setVehicleOutDateTime(getNowDateTimeString());
