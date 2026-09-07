@@ -321,27 +321,28 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
     }
   };
 
-  const handleAction = async () => {
-    if (!selectedRecord || !actionModal.type) return;
-    if (actionModal.type === "FORWARD" && !forwardToId) {
+  const handleAction = async (overrideType?: string) => {
+    const actType = overrideType || actionModal.type;
+    if (!selectedRecord || !actType) return;
+    if (actType === "FORWARD" && !forwardToId) {
       showToast("Please select who to forward to", "error"); return;
     }
-    if ((actionModal.type === "REJECT" || actionModal.type === "SEND_BACK") && !remarks.trim()) {
+    if ((actType === "REJECT" || actType === "SEND_BACK") && !remarks.trim()) {
       showToast("Please enter a reason", "error"); return;
     }
     setActionLoading(true);
     try {
       let finalRemarks = remarks;
-      let actionName = actionModal.type;
+      let actionName = actType;
 
-      if (actionModal.type === "SUGGEST") {
+      if (actType === "SUGGEST") {
         actionName = "FORWARD";
         const parts = [];
         if (suggestedRent) parts.push(`Suggested Rent: ₹${suggestedRent}/day`);
         if (suggestedDeposit) parts.push(`Suggested Deposit: ₹${suggestedDeposit}`);
         if (remarks) parts.push(`Remarks: ${remarks}`);
         finalRemarks = parts.join(" | ");
-      } else if (actionModal.type === "HOLD") {
+      } else if (actType === "HOLD") {
         actionName = "FORWARD";
         finalRemarks = `[ON HOLD] ${remarks || "Application placed on hold"}`;
       }
@@ -357,12 +358,13 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.detail || "Action failed");
-      showToast(`${actionModal.type === "APPROVE" ? "Approved" : actionModal.type === "REJECT" ? "Rejected" : actionModal.type === "HOLD" ? "Placed on hold" : actionModal.type === "SUGGEST" ? "Rent/Deposit suggestion submitted" : "Updated"} successfully!`);
-      setSelectedRecord(null);
+      showToast(`${actType === "APPROVE" ? "Approved" : actType === "REJECT" ? "Rejected" : actType === "HOLD" ? "Placed on hold" : actType === "SUGGEST" ? "Rent/Deposit suggestion submitted" : "Updated"} successfully!`);
       setActionModal({ type: null });
+      setRemarks("");
+      setSelectedRecord(null);
       loadAll();
-    } catch (e: any) {
-      showToast(e.message || "Action failed", "error");
+    } catch (err: any) {
+      showToast(err.message || "Action failed", "error");
     } finally {
       setActionLoading(false);
     }
@@ -916,10 +918,11 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
                           })()}
                         </td>
 
-                        {/* Submitted At */}
+                        {/* Submitted At / Event Date */}
                         <td className="py-3 px-4 whitespace-nowrap font-sans">
                           {(() => {
-                            const { date, time } = formatDateTimeComponents(item.created_at);
+                            const rawDate = item.event_date_time || item.allocation_date || item.dropoff_date || item.created_at;
+                            const { date, time } = formatDateTimeComponents(rawDate);
                             return (
                               <div>
                                 <div className="font-bold text-slate-800 text-xs">{date}</div>
@@ -955,7 +958,8 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
                                 <button
                                   type="button"
                                   onClick={() => handleDirectApprove(item.module, item.id)}
-                                  className="h-8 w-8 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200/80 flex items-center justify-center transition-all shadow-2xs cursor-pointer"
+                                  disabled={actionLoading}
+                                  className="h-8 w-8 rounded-lg bg-emerald-50 hover:bg-emerald-600 text-emerald-700 hover:text-white border border-emerald-200/80 flex items-center justify-center transition-all shadow-2xs cursor-pointer disabled:opacity-50"
                                   title="Quick Approve Application"
                                 >
                                   <CheckCircle className="w-4 h-4" />
@@ -1681,7 +1685,10 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
                     <p className="text-xs text-slate-500 flex justify-between"><span>Submitted By:</span> <strong className="text-slate-800">{selectedRecord.submitted_by_name}</strong></p>
                     <p className="text-xs text-slate-500 flex justify-between">
                       <span>{selectedRecord.module === "dropoff" ? "Drop-Off Date:" : selectedRecord.module === "allocation" ? "Allocation Date:" : "Submitted At:"}</span> 
-                      <strong className="text-slate-800">{formatDateTimeComponents(selectedRecord.created_at).date} {formatDateTimeComponents(selectedRecord.created_at).time}</strong>
+                      <strong className="text-slate-800">
+                        {formatDateTimeComponents(selectedRecord.event_date_time || selectedRecord.allocation_date || selectedRecord.dropoff_date || selectedRecord.created_at).date}{" "}
+                        {formatDateTimeComponents(selectedRecord.event_date_time || selectedRecord.allocation_date || selectedRecord.dropoff_date || selectedRecord.created_at).time}
+                      </strong>
                     </p>
                   </div>
 
@@ -1816,7 +1823,7 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
                           </div>
                           <div className="flex justify-end gap-1.5 pt-1">
                             <button
-                              onClick={handleAction}
+                              onClick={() => handleAction("FORWARD")}
                               disabled={actionLoading}
                               className="px-4 py-1.5 bg-blue-600 text-white font-bold text-[11px] rounded-lg hover:bg-blue-700 transition-colors"
                             >
@@ -1834,23 +1841,23 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
 
                       <div className="grid grid-cols-3 gap-2">
                         <button
-                          onClick={() => { setActionModal({ type: "APPROVE" }); handleAction(); }}
+                          onClick={() => handleAction("APPROVE")}
                           disabled={actionLoading}
-                          className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 transition-all shadow-xs"
+                          className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-600 text-white font-bold text-xs hover:bg-emerald-700 transition-all shadow-xs disabled:opacity-50"
                         >
                           <CheckCircle className="w-4 h-4" /> Approve
                         </button>
                         <button
-                          onClick={() => { setActionModal({ type: "HOLD" }); handleAction(); }}
+                          onClick={() => handleAction("HOLD")}
                           disabled={actionLoading}
-                          className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-amber-500 text-white font-bold text-xs hover:bg-amber-600 transition-all shadow-xs"
+                          className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-amber-500 text-white font-bold text-xs hover:bg-amber-600 transition-all shadow-xs disabled:opacity-50"
                         >
                           <PauseCircle className="w-4 h-4" /> Hold
                         </button>
                         <button
-                          onClick={() => { setActionModal({ type: "REJECT" }); handleAction(); }}
+                          onClick={() => setActionModal({ type: "REJECT" })}
                           disabled={actionLoading}
-                          className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border-2 border-rose-200 text-rose-600 font-bold text-xs hover:bg-rose-50 transition-all"
+                          className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl border-2 border-rose-200 text-rose-600 font-bold text-xs hover:bg-rose-50 transition-all disabled:opacity-50"
                         >
                           <XCircle className="w-4 h-4" /> Reject
                         </button>
@@ -1872,9 +1879,13 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
                       </div>
 
                       <button
-                        onClick={() => {
+                        onClick={async () => {
                           setForwardModalItem(selectedRecord);
-                          setApprovalLogs(selectedRecord.approval_logs || []);
+                          if (selectedRecord.approval_logs && selectedRecord.approval_logs.length > 0) {
+                            setApprovalLogs(selectedRecord.approval_logs);
+                          } else {
+                            loadLogs(selectedRecord.module, selectedRecord.id);
+                          }
                           setSelectedRecord(null);
                         }}
                         className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl bg-blue-600 text-white font-semibold text-xs hover:bg-blue-700 transition-all shadow-xs"

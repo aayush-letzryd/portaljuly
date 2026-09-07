@@ -47,6 +47,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout, initialE
   };
 
   // Edit mode
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
 
   // Form state
@@ -318,12 +319,10 @@ export default function DropOffForm({ user, onBackToSelector, onLogout, initialE
       setEditingId(id);
       const rawDt = r.event_date_time || r.dropoff_date_time || r.dropoff_date;
       if (rawDt) {
-        const s = String(rawDt);
-        if (s.includes("T")) {
-          setDropoffDate(s.substring(0, 16));
-        } else {
-          setDropoffDate(`${s}T12:00`);
-        }
+        const s = String(rawDt).trim().replace(" ", "T");
+        const [dPart, tPart] = s.split("T");
+        const tClean = tPart ? tPart.split(".")[0].split("+")[0].split("Z")[0].slice(0, 5) : "12:00";
+        setDropoffDate(`${dPart}T${tClean}`);
       } else {
         setDropoffDate(getInitialLocalDateTime());
       }
@@ -378,6 +377,8 @@ export default function DropOffForm({ user, onBackToSelector, onLogout, initialE
 
   const handleSubmit = async (e: React.FormEvent, isDraft = false) => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     if (!isDraft) {
       if (!vehicleNumber.trim()) return alert("Please specify the vehicle number.");
       if (!driverPhone.trim() && !driverId.trim()) return alert("Please enter Driver ID or Phone Number.");
@@ -456,9 +457,15 @@ export default function DropOffForm({ user, onBackToSelector, onLogout, initialE
       }
       resetForm();
       fetchRecords();
-      setActiveTab(isDraft ? "drafts" : "registry");
+      if (onBackToSelector && !isDraft) {
+        onBackToSelector();
+      } else {
+        setActiveTab(isDraft ? "drafts" : "registry");
+      }
     } catch (err: any) {
       alert(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -1087,7 +1094,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout, initialE
               <div className="border-t border-slate-200 pt-8 space-y-5">
                 <div className="border-b border-slate-200 pb-2.5">
                   <h3 className="font-sans text-xs font-bold uppercase tracking-wider text-slate-800 flex items-center gap-2">
-                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">5</span>
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-100 text-emerald-800 text-[11px] font-bold">6</span>
                     Dues, Penalties &amp; Refund Settlement
                   </h3>
                 </div>
@@ -1155,7 +1162,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout, initialE
                 <p className="text-[10px] font-bold text-red-500">* Mandatory Fields</p>
                 <div className="flex gap-3">
                   {editingId ? (
-                    <button type="button" onClick={() => { resetForm(); setActiveTab("registry"); }}
+                    <button type="button" onClick={() => { resetForm(); if (onBackToSelector) onBackToSelector(); else setActiveTab("registry"); }}
                       className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer transition-colors">
                       Cancel Edit
                     </button>
@@ -1166,16 +1173,20 @@ export default function DropOffForm({ user, onBackToSelector, onLogout, initialE
                     </button>
                   )}
                   <button type="button" onClick={(e) => handleSubmit(e, true)}
-                    className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer transition-colors">
-                    Save as Draft
+                    disabled={isSubmitting}
+                    className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer transition-colors disabled:opacity-50">
+                    {isSubmitting ? "Saving..." : "Save as Draft"}
                   </button>
                   <button type="submit"
-                    className={`h-11 rounded-lg px-6 font-sans text-sm font-bold shadow-md cursor-pointer transition-all flex items-center justify-center gap-2 ${
+                    disabled={isSubmitting}
+                    className={`h-11 rounded-lg px-6 font-sans text-sm font-bold shadow-md cursor-pointer transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${
                       deltaInfo.isOver48
                         ? "bg-amber-600 hover:bg-amber-700 text-white"
                         : "bg-primary hover:bg-primary-hover text-white"
                     }`}>
-                    {deltaInfo.isOver48 ? (
+                    {isSubmitting ? (
+                      <span>Processing...</span>
+                    ) : deltaInfo.isOver48 ? (
                       <>
                         <Send className="h-4 w-4" />
                         <span>Send for Approval</span>

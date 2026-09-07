@@ -31,6 +31,19 @@ app.add_middleware(
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+import datetime as dt_module
+ist_tz = dt_module.timezone(dt_module.timedelta(hours=5, minutes=30))
+
+def to_ist_iso(dt):
+    if not dt: return None
+    if isinstance(dt, (dt_module.datetime, dt_module.date)):
+        if isinstance(dt, dt_module.datetime):
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=dt_module.timezone.utc)
+            return dt.astimezone(ist_tz).isoformat()
+        return dt.isoformat()
+    return str(dt)
+
 def get_user_for_log(request: Request) -> str:
     auth = request.headers.get("authorization")
     if not auth or not auth.startswith("Bearer "):
@@ -857,7 +870,10 @@ def startup_event():
                 "vehicle_driver_photo TEXT",
                 "event_date_time TIMESTAMP WITH TIME ZONE",
                 "approved_by INTEGER",
-                "approval_remarks TEXT"
+                "approval_remarks TEXT",
+                "approval_status VARCHAR(50) DEFAULT 'Draft'",
+                "current_approver_id INTEGER",
+                "updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP"
             ]:
                 cur.execute(f"ALTER TABLE july_allocation_form ADD COLUMN IF NOT EXISTS {col};")
 
@@ -1824,6 +1840,7 @@ class AllocationData(BaseModel):
     police_verification_doc: Optional[Any] = None
     vehicle_driver_photo: Optional[Any] = None
     allocation_date_time: Optional[str] = None
+    event_date_time: Optional[str] = None
     approval_status: Optional[str] = None
     current_approver_id: Optional[int] = None
     approval_remarks: Optional[str] = None
@@ -1831,6 +1848,7 @@ class AllocationData(BaseModel):
 class DropOffData(BaseModel):
     dropoff_date: Optional[str] = None
     dropoff_date_time: Optional[str] = None
+    event_date_time: Optional[str] = None
     dropoff_reason: Optional[str] = None
     city_name: Optional[str] = "Hyderabad"
     dropoff_location: Optional[str] = "Hub"
@@ -5546,6 +5564,13 @@ def get_allocations(
             rec = dict(zip(cols, row))
             rec = _clean_dict_decimals(rec)
             
+            for dt_field in ["allocation_date", "event_date_time", "created_at", "updated_at"]:
+                if rec.get(dt_field) and hasattr(rec[dt_field], "isoformat"):
+                    if dt_field in ("event_date_time", "created_at", "updated_at") and hasattr(rec[dt_field], "astimezone"):
+                        rec[dt_field] = rec[dt_field].astimezone(ist_tz).isoformat()
+                    else:
+                        rec[dt_field] = rec[dt_field].isoformat()
+
             # Format clean user-friendly allocated_by
             raw_exec = rec.get("executive_name") or "Onboarding Executive 1"
             if raw_exec == "onboarding_executive" or raw_exec == "26":
@@ -5723,7 +5748,8 @@ def get_active_allocation(query: str, authorization: Optional[str] = Header(None
             WHERE (LOWER(driver_id) = LOWER(%s)
                OR driver_phone = %s
                OR UPPER(vehicle_number) = UPPER(%s))
-              AND allocation_type = 'Allocation'
+              AND allocation_type != 'Drop-Off'
+              AND (status IS NULL OR status NOT IN ('Returned', 'Completed'))
             ORDER BY id DESC LIMIT 1;
         """, (clean_q, clean_q, clean_q))
         row = cur.fetchone()
@@ -8313,6 +8339,11 @@ def create_maintenance_in(data: MaintenanceInCreate, authorization: Optional[str
             data.approval_file, photos_val, data.remarks
         ))
         row = cur.fetchone()
+        cur.execute("""
+            UPDATE july_vehicle_onboarding 
+            SET received_allocated = 'In Maintenance' 
+            WHERE UPPER(vehicle_number) = UPPER(%s);
+        """, (vnum,))
         conn.commit()
         return {"success": True, "id": row[0], "created_at": row[1].isoformat(), "message": "Vehicle inward entry created successfully"}
     except HTTPException:
@@ -8615,6 +8646,13 @@ def create_maintenance_out(data: MaintenanceOutCreate, authorization: Optional[s
                 WHERE id = %s;
             """, (uid, data.inward_id))
 
+        if data.final_status == "Completed & RFD":
+            cur.execute("""
+                UPDATE july_vehicle_onboarding 
+                SET received_allocated = 'Ready for Deployment' 
+                WHERE UPPER(vehicle_number) = UPPER(%s);
+            """, (vnum,))
+
         conn.commit()
         return {
             "success": True,
@@ -8768,7 +8806,10 @@ def delete_maintenance_out(id: int, authorization: Optional[str] = Header(None))
         inw_id = row[0]
 
         cur.execute("DELETE FROM july_maintenance_out WHERE id = %s;", (id,))
-        cur.execute("UPDATE july_maintenance_in SET is_closed = FALSE, closed_at = NULL, closed_by = NULL WHERE id = %s;", (inw_id,))
+        cur.execute("UPDATE july_maintenance_in SET is_closed = FALSE, closed_at = NULL, closed_by = NULL WHERE id = %s RETURNING vehicle_number;", (inw_id,))
+        inw_row = cur.fetchone()
+        if inw_row and inw_row[0]:
+            cur.execute("UPDATE july_vehicle_onboarding SET received_allocated = 'In Maintenance' WHERE UPPER(vehicle_number) = UPPER(%s);", (inw_row[0],))
         conn.commit()
         return {"success": True, "message": "Outward record deleted and inward ticket re-opened"}
     except Exception as e:

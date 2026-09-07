@@ -97,6 +97,7 @@ export default function AllocationForm({
   };
 
   // Vehicle Allocation Form Fields State
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [allocationDate, setAllocationDate] = useState<string>(getInitialLocalDateTime());
   const [transactionType, setTransactionType] = useState<"New Allocation" | "Reallocation" | "Rejoining" | "Swap">("New Allocation");
@@ -461,12 +462,10 @@ export default function AllocationForm({
       setEditingId(data.id);
       const rawDt = data.event_date_time || data.allocation_date_time || data.allocation_date;
       if (rawDt) {
-        const s = String(rawDt);
-        if (s.includes("T")) {
-          setAllocationDate(s.substring(0, 16));
-        } else {
-          setAllocationDate(`${s}T12:00`);
-        }
+        const s = String(rawDt).trim().replace(" ", "T");
+        const [dPart, tPart] = s.split("T");
+        const tClean = tPart ? tPart.split(".")[0].split("+")[0].split("Z")[0].slice(0, 5) : "12:00";
+        setAllocationDate(`${dPart}T${tClean}`);
       } else {
         setAllocationDate(getInitialLocalDateTime());
       }
@@ -605,6 +604,8 @@ export default function AllocationForm({
 
   const handleSubmit = async (e: React.FormEvent, targetStatus: "Draft" | "Submitted" = "Submitted") => {
     e.preventDefault();
+    if (isSubmitting) return;
+    setIsSubmitting(true);
     const isDraft = targetStatus === "Draft";
 
     if (!isDraft) {
@@ -744,9 +745,15 @@ export default function AllocationForm({
       resetForm();
       fetchStats();
       fetchRecords();
-      setActiveTab(isDraft ? "drafts" : "registry");
+      if (onBackToSelector && !isDraft) {
+        onBackToSelector();
+      } else {
+        setActiveTab(isDraft ? "drafts" : "registry");
+      }
     } catch (err: any) {
       alert(err.message);
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -829,8 +836,8 @@ export default function AllocationForm({
       r.allocation_date,
       r.allocation_type,
       r.city_name,
-      `"${r.driver_id.replace(/"/g, '""')}"`,
-      `"${r.driver_name.replace(/"/g, '""')}"`,
+      `"${(r.driver_id || "").replace(/"/g, '""')}"`,
+      `"${(r.driver_name || "").replace(/"/g, '""')}"`,
       r.driver_phone,
       `"${(r.driver_plan || "").replace(/"/g, '""')}"`,
       `"${(r.type_of_plan || "").replace(/"/g, '""')}"`,
@@ -1857,7 +1864,7 @@ export default function AllocationForm({
                     {editingId ? (
                       <button 
                         type="button" 
-                        onClick={() => { resetForm(); setActiveTab("registry"); }} 
+                        onClick={() => { resetForm(); if (onBackToSelector) onBackToSelector(); else setActiveTab("registry"); }} 
                         className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer transition-colors"
                       >
                         Cancel Edit
@@ -1874,19 +1881,23 @@ export default function AllocationForm({
                     <button
                       type="button"
                       onClick={(e) => handleSubmit(e, "Draft")}
-                      className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer transition-colors"
+                      disabled={isSubmitting}
+                      className="h-11 rounded-lg border border-border bg-white px-5 font-sans text-sm font-semibold text-text-muted hover:bg-slate-100 cursor-pointer transition-colors disabled:opacity-50"
                     >
-                      Save as Draft
+                      {isSubmitting ? "Saving..." : "Save as Draft"}
                     </button>
                     <button 
                       type="submit" 
-                      className={`h-11 rounded-lg px-6 font-sans text-sm font-semibold shadow-md cursor-pointer transition-all flex items-center justify-center gap-2 ${
+                      disabled={isSubmitting}
+                      className={`h-11 rounded-lg px-6 font-sans text-sm font-semibold shadow-md cursor-pointer transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${
                         deltaInfo.isOver48
                           ? "bg-amber-600 hover:bg-amber-700 text-white"
                           : "bg-primary hover:bg-primary-hover text-white"
                       }`}
                     >
-                      {deltaInfo.isOver48 ? (
+                      {isSubmitting ? (
+                        <span>Processing...</span>
+                      ) : deltaInfo.isOver48 ? (
                         <>
                           <Send className="h-4 w-4" />
                           <span>Send for Approval</span>
