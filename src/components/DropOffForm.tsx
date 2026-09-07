@@ -4,7 +4,7 @@ import {
   Calendar, MapPin, User, Phone, FileText, CheckCircle,
   Clock, ArrowLeft, Download, Search, Trash2, Camera, Edit,
   Upload, X, RefreshCw, ChevronLeft, ChevronRight, Database,
-  Plus, AlertTriangle
+  Plus, AlertTriangle, Send, ShieldAlert
 } from "lucide-react";
 import { User as UserSession, CITIES } from "../types";
 import CameraCapture from "./CameraCapture";
@@ -33,13 +33,98 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
     return () => clearInterval(timer);
   }, []);
 
+  const getInitialLocalDateTime = () => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const year = d.getFullYear();
+    const month = pad(d.getMonth() + 1);
+    const day = pad(d.getDate());
+    const hours = pad(d.getHours());
+    const minutes = pad(d.getMinutes());
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
   // Edit mode
   const [editingId, setEditingId] = useState<number | null>(null);
 
   // Form state
-  const [dropoffDate, setDropoffDate] = useState(new Date().toISOString().split("T")[0]);
+  const [dropoffDate, setDropoffDate] = useState<string>(getInitialLocalDateTime());
   const [dropoffReason, setDropoffReason] = useState("Voluntary Return");
   const [cityName, setCityName] = useState(user.city || "Hyderabad");
+
+  // Managerial Approval & 48-Hour Deviation States
+  const [approverId, setApproverId] = useState<number | null>(null);
+  const [approvalRemarks, setApprovalRemarks] = useState<string>("");
+  const [portalUsers, setPortalUsers] = useState<Array<{ id: number; username: string; name: string; role: string; city?: string }>>([]);
+
+  const fetchPortalUsers = async () => {
+    try {
+      const token = localStorage.getItem("token") || localStorage.getItem("lr_token") || localStorage.getItem("auth_token") || sessionStorage.getItem("token");
+      const res = await fetch("/api/portal-users", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setPortalUsers(data);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching portal users:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchPortalUsers();
+  }, []);
+
+  const normalizeCity = (c?: string): string => {
+    if (!c) return "";
+    const s = c.trim().toLowerCase();
+    if (s === "bengaluru" || s === "bangalore" || s === "blr") return "bangalore";
+    if (s === "mumbai" || s === "bom") return "mumbai";
+    if (s === "hyderabad" || s === "hyd") return "hyderabad";
+    if (s === "chennai" || s === "maa") return "chennai";
+    if (s === "delhi" || s === "new delhi" || s === "del") return "delhi";
+    return s;
+  };
+
+  // Filter approvers strictly by the currently filled city
+  const filteredApprovers = useMemo(() => {
+    try {
+      if (!cityName || !cityName.trim()) return portalUsers;
+      const targetNorm = normalizeCity(cityName);
+      const matched = portalUsers.filter(u => normalizeCity(u.city) === targetNorm);
+      return matched.length > 0 ? matched : portalUsers;
+    } catch (err) {
+      console.error("Error filtering approvers by city in DropOffForm:", err);
+      return portalUsers;
+    }
+  }, [portalUsers, cityName]);
+
+  // 48-Hour Deviation Calculation
+  const deltaInfo = useMemo(() => {
+    if (!dropoffDate) return { isOver48: false, diffHours: 0, days: 0, remainingHours: 0, direction: "earlier" };
+    const selectedTime = new Date(dropoffDate).getTime();
+    const now = Date.now();
+    if (isNaN(selectedTime)) return { isOver48: false, diffHours: 0, days: 0, remainingHours: 0, direction: "earlier" };
+
+    const diffMs = selectedTime - now;
+    const absDiffHours = Math.abs(diffMs) / (1000 * 60 * 60);
+    const isOver48 = absDiffHours > 48;
+    const roundedHours = Math.round(absDiffHours);
+    const days = Math.floor(roundedHours / 24);
+    const remainingHours = roundedHours % 24;
+    const direction = diffMs < 0 ? "earlier" : "later";
+
+    return {
+      isOver48,
+      diffHours: roundedHours,
+      days,
+      remainingHours,
+      direction
+    };
+  }, [dropoffDate]);
   const [dropoffLocation, setDropoffLocation] = useState("Hub");
   const [manualDropoffLocation, setManualDropoffLocation] = useState("");
   const [customerAddress, setCustomerAddress] = useState("");
@@ -186,7 +271,9 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
 
   const resetForm = () => {
     setEditingId(null);
-    setDropoffDate(new Date().toISOString().split("T")[0]);
+    setDropoffDate(getInitialLocalDateTime());
+    setApproverId(null);
+    setApprovalRemarks("");
     setDropoffReason("Voluntary Return");
     setCityName(user.city || "Hyderabad");
     setDropoffLocation("Hub");
@@ -227,7 +314,19 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
       if (!r) { alert("Could not load record."); return; }
 
       setEditingId(id);
-      setDropoffDate(r.dropoff_date?.split("T")[0] || new Date().toISOString().split("T")[0]);
+      const rawDt = r.event_date_time || r.dropoff_date_time || r.dropoff_date;
+      if (rawDt) {
+        const s = String(rawDt);
+        if (s.includes("T")) {
+          setDropoffDate(s.substring(0, 16));
+        } else {
+          setDropoffDate(`${s}T12:00`);
+        }
+      } else {
+        setDropoffDate(getInitialLocalDateTime());
+      }
+      setApproverId(r.current_approver_id || r.approved_by || null);
+      setApprovalRemarks(r.approval_remarks || "");
       setDropoffReason(r.dropoff_reason || "Voluntary Return");
       setCityName(r.city_name || "Hyderabad");
       setDropoffLocation(r.dropoff_location || "Hub");
@@ -278,14 +377,20 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
         return alert("Customer Address is mandatory for Forced Recovery.");
       }
       if (!odometerReading.trim()) return alert("Please enter Odometer Reading.");
-      if (!odometerPhoto) return alert("Please upload or capture Odometer Photo.");
+      if (deltaInfo.isOver48 && !approverId) {
+        return alert(`Please select a designated approver for ${cityName} since the drop-off date deviates by more than 48 hours.`);
+      }
     }
 
     const targetStatus = isDraft ? "Draft" : "Submitted";
     try {
       const token = localStorage.getItem("lr_token");
       const payload = {
-        dropoff_date: dropoffDate,
+        dropoff_date: dropoffDate ? dropoffDate.split("T")[0] : new Date().toISOString().split("T")[0],
+        dropoff_date_time: dropoffDate,
+        approval_status: isDraft ? "Draft" : (deltaInfo.isOver48 ? "Pending Approval" : "Approved"),
+        current_approver_id: approverId,
+        approval_remarks: approvalRemarks || null,
         dropoff_reason: dropoffReason,
         city_name: cityName,
         dropoff_location: dropoffLocation,
@@ -333,9 +438,13 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
       });
       if (!res.ok) { const t = await res.text(); throw new Error(t || "Failed to submit"); }
 
-      alert(isDraft
-        ? (editingId ? "Draft Updated Successfully!" : "Draft Saved Successfully!")
-        : (editingId ? "Drop-Off Record Updated!" : "Vehicle Drop-Off Submitted Successfully!"));
+      if (deltaInfo.isOver48 && !isDraft) {
+        alert("Vehicle Drop-Off Record Submitted and Sent for Managerial Approval!");
+      } else {
+        alert(isDraft
+          ? (editingId ? "Draft Updated Successfully!" : "Draft Saved Successfully!")
+          : (editingId ? "Drop-Off Record Updated!" : "Vehicle Drop-Off Submitted Successfully!"));
+      }
       resetForm();
       fetchRecords();
       setActiveTab(isDraft ? "drafts" : "registry");
@@ -447,6 +556,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
             <th className="px-3.5 py-3">City</th>
             <th className="px-3.5 py-3">Vehicle No</th>
             <th className="px-3.5 py-3">Reason</th>
+            <th className="px-3.5 py-3">Status</th>
             <th className="px-3.5 py-3">Recorded By</th>
             <th className="px-3.5 py-3">Date & Time</th>
             <th className="px-3.5 py-3 text-center w-20">Action</th>
@@ -454,7 +564,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
         </thead>
         <tbody className="divide-y divide-slate-100">
           {rows.length === 0 ? (
-            <tr><td colSpan={10} className="px-6 py-12 text-center text-slate-500 font-sans bg-slate-50/50 text-xs">No records found.</td></tr>
+            <tr><td colSpan={11} className="px-6 py-12 text-center text-slate-500 font-sans bg-slate-50/50 text-xs">No records found.</td></tr>
           ) : (
             rows.map((r: any) => {
               const rawDate = r.updated_at || r.created_at;
@@ -473,6 +583,17 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                   <td className="px-3.5 py-3">
                     <span className={`inline-block px-2.5 py-0.5 rounded-md border font-semibold text-[10px] whitespace-nowrap ${reasonColor}`}>
                       {r.dropoff_reason || "Voluntary Return"}
+                    </span>
+                  </td>
+                  <td className="px-3.5 py-3">
+                    <span className={`inline-block px-2.5 py-0.5 rounded-md border font-semibold text-[10px] whitespace-nowrap ${
+                      r.approval_status === "Pending Approval"
+                        ? "bg-amber-50 text-amber-800 border-amber-300"
+                        : r.approval_status === "Rejected"
+                        ? "bg-rose-50 text-rose-800 border-rose-300"
+                        : "bg-emerald-50 text-emerald-800 border-emerald-300"
+                    }`}>
+                      {r.approval_status || "Approved"}
                     </span>
                   </td>
                   <td className="px-3.5 py-3 text-slate-800">
@@ -615,10 +736,67 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                   </div>
                   <div className="space-y-3.5">
                     <div>
-                      <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Date of Drop-Off <span className="text-red-500">*</span></label>
-                      <input type="date" value={dropoffDate} onChange={(e) => setDropoffDate(e.target.value)} required
-                        className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs cursor-pointer" />
+                      <label className="block font-sans text-xs font-medium text-slate-700 mb-1">
+                        Date & Time of Drop-Off <span className="text-red-500">*</span>
+                      </label>
+                      <input 
+                        type="datetime-local" 
+                        value={dropoffDate} 
+                        onChange={(e) => setDropoffDate(e.target.value)} 
+                        required
+                        className={`w-full h-10 rounded-xl border bg-white px-3 text-xs font-medium text-slate-800 outline-none transition-all shadow-2xs cursor-pointer ${
+                          deltaInfo.isOver48 
+                            ? "border-amber-400 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20" 
+                            : "border-slate-200 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20"
+                        }`}
+                      />
                     </div>
+
+                    {deltaInfo.isOver48 && (
+                      <div className="rounded-xl border border-amber-300 bg-amber-50/90 p-3 text-amber-900 shadow-2xs space-y-2.5">
+                        <div className="flex items-start gap-2">
+                          <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                          <div className="text-[11px] leading-snug">
+                            <span className="font-bold text-amber-950 block">Approval Required (&gt; 48h Delta)</span>
+                            <span>
+                              Date is <strong>{deltaInfo.diffHours} hours ({deltaInfo.days} days{deltaInfo.remainingHours > 0 ? ` ${deltaInfo.remainingHours}h` : ''}) {deltaInfo.direction}</strong> than current time. This drop-off requires manager approval.
+                            </span>
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block font-sans text-[11px] font-semibold text-amber-950 mb-1">
+                            Designated Approver ({cityName}) <span className="text-red-500">*</span>
+                          </label>
+                          <select
+                            value={approverId || ""}
+                            onChange={(e) => setApproverId(e.target.value ? parseInt(e.target.value) : null)}
+                            required={deltaInfo.isOver48}
+                            className="w-full h-9 rounded-lg border border-amber-300 bg-white px-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 outline-none cursor-pointer"
+                          >
+                            <option value="">{cityName ? `Select Approver for ${cityName}` : "Select Approver"}</option>
+                            {filteredApprovers.map((u) => (
+                              <option key={u.id} value={u.id}>
+                                {u.name || u.username} ({u.role || "Manager"}) {u.city ? `• ${u.city}` : ""}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block font-sans text-[11px] font-semibold text-amber-950 mb-1">
+                            Reason for Deviation / Note
+                          </label>
+                          <input
+                            type="text"
+                            placeholder="Reason for backdated / future drop-off..."
+                            value={approvalRemarks}
+                            onChange={(e) => setApprovalRemarks(e.target.value)}
+                            className="w-full h-8 rounded-lg border border-amber-300 bg-white px-2.5 text-xs text-slate-800 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 outline-none"
+                          />
+                        </div>
+                      </div>
+                    )}
                     <div>
                       <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Drop-Off Reason <span className="text-red-500">*</span></label>
                       <select value={dropoffReason} onChange={(e) => setDropoffReason(e.target.value)} required
@@ -983,8 +1161,19 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
                     Save as Draft
                   </button>
                   <button type="submit"
-                    className="h-11 rounded-lg bg-primary px-6 font-sans text-sm font-bold text-white shadow-md hover:bg-primary-hover cursor-pointer transition-all">
-                    {editingId ? "Update Drop-Off Record" : "Submit Drop-Off Record"}
+                    className={`h-11 rounded-lg px-6 font-sans text-sm font-bold shadow-md cursor-pointer transition-all flex items-center justify-center gap-2 ${
+                      deltaInfo.isOver48
+                        ? "bg-amber-600 hover:bg-amber-700 text-white"
+                        : "bg-primary hover:bg-primary-hover text-white"
+                    }`}>
+                    {deltaInfo.isOver48 ? (
+                      <>
+                        <Send className="h-4 w-4" />
+                        <span>Send for Approval</span>
+                      </>
+                    ) : (
+                      editingId ? "Update Drop-Off Record" : "Submit Drop-Off Record"
+                    )}
                   </button>
                 </div>
               </div>

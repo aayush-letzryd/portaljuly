@@ -21,6 +21,8 @@ const MODULE_CONFIG: Record<string, { label: string; textClass: string }> = {
   operator_onboarding: { label: "Operator Onboarding", textClass: "text-indigo-600 font-semibold" },
   vehicle_onboarding: { label: "Vehicle Onboarding", textClass: "text-purple-600 font-semibold" },
   adjustment_form: { label: "Adjustment Form", textClass: "text-orange-600 font-semibold" },
+  allocation: { label: "Vehicle Allocation", textClass: "text-emerald-600 font-semibold" },
+  dropoff: { label: "Vehicle Drop-Off", textClass: "text-teal-600 font-semibold" },
 };
 
 const STATUS_TEXT_CLASSES: Record<string, string> = {
@@ -711,6 +713,34 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
                 <span>Vehicle Onboarding</span>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] ${selectedCategory === "vehicle_onboarding" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-800"}`}>
                   {getCategoryCount("vehicle_onboarding")}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedCategory("allocation")}
+                className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+                  selectedCategory === "allocation" ? "bg-emerald-600 text-white shadow-xs" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                <FileText className="w-3.5 h-3.5" />
+                <span>Vehicle Allocation</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] ${selectedCategory === "allocation" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-800"}`}>
+                  {getCategoryCount("allocation")}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setSelectedCategory("dropoff")}
+                className={`px-4 py-2 rounded-xl text-xs font-extrabold transition-all flex items-center gap-2 cursor-pointer whitespace-nowrap ${
+                  selectedCategory === "dropoff" ? "bg-emerald-600 text-white shadow-xs" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                <ArrowDown className="w-3.5 h-3.5" />
+                <span>Vehicle Drop-Off</span>
+                <span className={`px-2 py-0.5 rounded-full text-[10px] ${selectedCategory === "dropoff" ? "bg-white/20 text-white" : "bg-slate-200 text-slate-800"}`}>
+                  {getCategoryCount("dropoff")}
                 </span>
               </button>
             </div>

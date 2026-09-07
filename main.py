@@ -854,7 +854,10 @@ def startup_event():
                 "security_cheque_4 TEXT",
                 "security_cheques TEXT",
                 "police_verification_doc TEXT",
-                "vehicle_driver_photo TEXT"
+                "vehicle_driver_photo TEXT",
+                "event_date_time TIMESTAMP WITH TIME ZONE",
+                "approved_by INTEGER",
+                "approval_remarks TEXT"
             ]:
                 cur.execute(f"ALTER TABLE july_allocation_form ADD COLUMN IF NOT EXISTS {col};")
 
@@ -1820,9 +1823,14 @@ class AllocationData(BaseModel):
     security_cheques: Optional[Any] = None
     police_verification_doc: Optional[Any] = None
     vehicle_driver_photo: Optional[Any] = None
+    allocation_date_time: Optional[str] = None
+    approval_status: Optional[str] = None
+    current_approver_id: Optional[int] = None
+    approval_remarks: Optional[str] = None
 
 class DropOffData(BaseModel):
     dropoff_date: Optional[str] = None
+    dropoff_date_time: Optional[str] = None
     dropoff_reason: Optional[str] = None
     city_name: Optional[str] = "Hyderabad"
     dropoff_location: Optional[str] = "Hub"
@@ -1858,6 +1866,9 @@ class DropOffData(BaseModel):
     insp_stepney_photo: Optional[Any] = None
     dropoff_notes: Optional[str] = None
     status: Optional[str] = "Submitted"
+    approval_status: Optional[str] = None
+    current_approver_id: Optional[int] = None
+    approval_remarks: Optional[str] = None
 
 
 class ExpenseData(BaseModel):
@@ -5828,6 +5839,39 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
     uid   = user["portal_user_id"] if user else None
     uname = user["name"]           if user else "System"
 
+    # 48-Hour Delta Approval Check
+    alloc_dt_str = data.allocation_date_time or data.allocation_date
+    is_pending_approval = False
+    diff_hours = 0.0
+    dt_val = None
+    now_utc = dt_module.datetime.now()
+    if alloc_dt_str:
+        try:
+            raw_dt = alloc_dt_str.replace("Z", "").split("+")[0]
+            if "T" in raw_dt:
+                dt_val = dt_module.datetime.fromisoformat(raw_dt)
+            else:
+                dt_val = dt_module.datetime.strptime(raw_dt[:10], "%Y-%m-%d")
+            diff_hours = abs((dt_val - now_utc).total_seconds()) / 3600.0
+            if diff_hours > 48.0 or data.approval_status == "Pending Approval":
+                is_pending_approval = True
+        except Exception:
+            if data.approval_status == "Pending Approval":
+                is_pending_approval = True
+
+    if data.status == "Draft":
+        target_status = "Draft"
+        target_approval_status = "Draft"
+        target_approver = None
+    elif is_pending_approval:
+        target_status = "Pending Approval"
+        target_approval_status = "Pending Approval"
+        target_approver = data.current_approver_id
+    else:
+        target_status = data.status or "Submitted"
+        target_approval_status = "Approved"
+        target_approver = None
+
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
@@ -5847,7 +5891,7 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
                 dropoff_location, manual_dropoff_location, duplicate_key_status,
                 fastag_balance_amount, fastag_balance_proof,
                 damage_penalty, deposit_refund_status, pending_dues,
-                status, approval_status, created_by, created_at,
+                status, approval_status, current_approver_id, approval_remarks, event_date_time, created_by, created_at,
                 driver_agreement_doc, security_cheque_1, security_cheque_2, security_cheque_3, security_cheque_4, security_cheques, police_verification_doc, vehicle_driver_photo
             ) VALUES (
                 %s,%s,%s,%s,
@@ -5864,11 +5908,12 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
                 %s,%s,%s,
                 %s,%s,
                 %s,%s,%s,
-                %s,%s,%s, NOW(),
+                %s,%s,%s,%s,%s,%s, NOW(),
                 %s,%s,%s,%s,%s,%s,%s,%s
             ) RETURNING id;
         """, (
-            data.allocation_date, data.allocation_type, data.sub_type, data.city_name,
+            data.allocation_date.split("T")[0] if "T" in data.allocation_date else data.allocation_date,
+            data.allocation_type, data.sub_type, data.city_name,
             data.driver_id, data.driver_name, data.driver_phone,
             data.driver_plan, data.type_of_plan, data.car_model,
             data.vehicle_number, data.gps_active,
@@ -5893,8 +5938,11 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
             float(data.damage_penalty) if data.damage_penalty is not None and str(data.damage_penalty).strip() != "" else None,
             data.deposit_refund_status or "Pending Assessment",
             float(data.pending_dues) if data.pending_dues is not None and str(data.pending_dues).strip() != "" else None,
-            data.status or "Submitted",
-            data.status or "Submitted",
+            target_status,
+            target_approval_status,
+            target_approver,
+            data.approval_remarks,
+            alloc_dt_str,
             data.created_by or uid,
             extract_image(data.driver_agreement_doc),
             extract_image(data.security_cheque_1),
@@ -5907,18 +5955,27 @@ def create_allocation_record(data: AllocationData, authorization: Optional[str] 
         ))
         new_id = cur.fetchone()[0]
 
-        # Update vehicle status in onboarding table to Allocated
-        if data.vehicle_number and data.vehicle_number.strip():
+        # Update vehicle status in onboarding table to Allocated ONLY IF approved
+        if target_approval_status == "Approved" and data.vehicle_number and data.vehicle_number.strip():
             cur.execute("""
                 UPDATE july_vehicle_onboarding 
                 SET received_allocated = 'Allocated' 
                 WHERE UPPER(vehicle_number) = UPPER(%s);
             """, (data.vehicle_number.strip(),))
 
+        # Write approval log if pending approval
+        if is_pending_approval and data.status != "Draft":
+            dir_text = "earlier" if (dt_val and dt_val < now_utc) else "in advance"
+            log_remarks = data.approval_remarks or f"Submitted for 48h deviation approval ({round(diff_hours, 1)} hrs {dir_text})"
+            cur.execute("""
+                INSERT INTO july_approval_chain_logs (module_name, record_id, from_user_id, to_user_id, action, remarks)
+                VALUES ('allocation', %s, %s, %s, 'SUBMITTED', %s);
+            """, (new_id, uid, target_approver, log_remarks))
+
         # Write CREATE log
         _write_alloc_log(
             cur, new_id, "CREATE",
-            old_status=None, new_status=data.status or "Submitted",
+            old_status=None, new_status=target_status,
             changed_fields=None, previous_data=None,
             new_data={
                 "driver_id":       data.driver_id,
@@ -6092,6 +6149,39 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
             pass
     uid = user["portal_user_id"] if user else None
 
+    # 48-Hour Delta Approval Check
+    drop_dt_str = data.dropoff_date_time or data.dropoff_date
+    is_pending_approval = False
+    diff_hours = 0.0
+    dt_val = None
+    now_utc = dt_module.datetime.now()
+    if drop_dt_str:
+        try:
+            raw_dt = drop_dt_str.replace("Z", "").split("+")[0]
+            if "T" in raw_dt:
+                dt_val = dt_module.datetime.fromisoformat(raw_dt)
+            else:
+                dt_val = dt_module.datetime.strptime(raw_dt[:10], "%Y-%m-%d")
+            diff_hours = abs((dt_val - now_utc).total_seconds()) / 3600.0
+            if diff_hours > 48.0 or data.approval_status == "Pending Approval":
+                is_pending_approval = True
+        except Exception:
+            if data.approval_status == "Pending Approval":
+                is_pending_approval = True
+
+    if data.status == "Draft":
+        target_status = "Draft"
+        target_approval_status = "Draft"
+        target_approver = None
+    elif is_pending_approval:
+        target_status = "Pending Approval"
+        target_approval_status = "Pending Approval"
+        target_approver = data.current_approver_id
+    else:
+        target_status = data.status or "Submitted"
+        target_approval_status = "Approved"
+        target_approver = None
+
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
@@ -6108,8 +6198,8 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
                 fastag_balance_proof,
                 insp_jack, insp_jack_rod, insp_spanner, insp_parking_triangle,
                 insp_fire_extinguishers, insp_seat_cover, insp_floor_carpet, insp_music_system,
-                insp_stepney, insp_stepney_photo, status, approval_status, created_by,
-                created_at
+                insp_stepney, insp_stepney_photo, status, approval_status, current_approver_id,
+                approval_remarks, event_date_time, created_by, created_at
             ) VALUES (
                 %s, 'Drop-Off', %s, %s,
                 %s, %s, %s,
@@ -6123,10 +6213,12 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
                 %s, %s, %s, %s,
                 %s, %s, %s, %s,
                 %s, %s, %s, %s, %s,
+                %s, %s, %s,
                 NOW()
             ) RETURNING id;
         """, (
-            data.dropoff_date, data.dropoff_reason, data.city_name,
+            data.dropoff_date.split("T")[0] if (data.dropoff_date and "T" in data.dropoff_date) else data.dropoff_date,
+            data.dropoff_reason, data.city_name,
             data.dropoff_location, data.manual_dropoff_location, data.customer_address,
             data.driver_id, data.driver_name, data.driver_phone,
             data.vehicle_number,
@@ -6146,12 +6238,13 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
             data.insp_jack or "Available", data.insp_jack_rod or "Available", data.insp_spanner or "Available", data.insp_parking_triangle or "Available",
             data.insp_fire_extinguishers or "Available", data.insp_seat_cover or "Available", data.insp_floor_carpet or "Available", data.insp_music_system or "Available",
             data.insp_stepney or "Available", extract_image(data.insp_stepney_photo),
-            data.status or "Submitted", data.status or "Submitted", uid
+            target_status, target_approval_status, target_approver,
+            data.approval_remarks, drop_dt_str, uid
         ))
         new_id = cur.fetchone()[0]
 
-        # Link End-to-End: Update vehicle status in onboarding table to Ready for Deployment
-        if data.vehicle_number and data.vehicle_number.strip():
+        # Link End-to-End: Update vehicle status in onboarding table to Ready for Deployment ONLY IF approved
+        if target_approval_status == "Approved" and data.vehicle_number and data.vehicle_number.strip():
             cur.execute("""
                 UPDATE july_vehicle_onboarding 
                 SET received_allocated = 'Ready for Deployment' 
@@ -6163,9 +6256,18 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
                 UPDATE july_allocation_form 
                 SET status = 'Returned', approval_status = 'Returned'
                 WHERE UPPER(vehicle_number) = UPPER(%s) 
-                  AND allocation_type = 'Allocation' 
+                  AND allocation_type != 'Drop-Off' 
                   AND (status IS NULL OR status NOT IN ('Returned', 'Completed'));
             """, (data.vehicle_number.strip(),))
+
+        # Write approval log if pending approval
+        if is_pending_approval and data.status != "Draft":
+            dir_text = "earlier" if (dt_val and dt_val < now_utc) else "in advance"
+            log_remarks = data.approval_remarks or f"Submitted for 48h deviation approval ({round(diff_hours, 1)} hrs {dir_text})"
+            cur.execute("""
+                INSERT INTO july_approval_chain_logs (module_name, record_id, from_user_id, to_user_id, action, remarks)
+                VALUES ('dropoff', %s, %s, %s, 'SUBMITTED', %s);
+            """, (new_id, uid, target_approver, log_remarks))
 
         conn.commit()
         return {"success": True, "id": new_id}
@@ -6186,6 +6288,39 @@ def update_dropoff(id: int, data: DropOffData, authorization: Optional[str] = He
             pass
     uid = user["portal_user_id"] if user else None
 
+    # 48-Hour Delta Approval Check
+    drop_dt_str = data.dropoff_date_time or data.dropoff_date
+    is_pending_approval = False
+    diff_hours = 0.0
+    dt_val = None
+    now_utc = dt_module.datetime.now()
+    if drop_dt_str:
+        try:
+            raw_dt = drop_dt_str.replace("Z", "").split("+")[0]
+            if "T" in raw_dt:
+                dt_val = dt_module.datetime.fromisoformat(raw_dt)
+            else:
+                dt_val = dt_module.datetime.strptime(raw_dt[:10], "%Y-%m-%d")
+            diff_hours = abs((dt_val - now_utc).total_seconds()) / 3600.0
+            if diff_hours > 48.0 or data.approval_status == "Pending Approval":
+                is_pending_approval = True
+        except Exception:
+            if data.approval_status == "Pending Approval":
+                is_pending_approval = True
+
+    if data.status == "Draft":
+        target_status = "Draft"
+        target_approval_status = "Draft"
+        target_approver = None
+    elif is_pending_approval:
+        target_status = "Pending Approval"
+        target_approval_status = "Pending Approval"
+        target_approver = data.current_approver_id
+    else:
+        target_status = data.status or "Submitted"
+        target_approval_status = data.approval_status or "Approved"
+        target_approver = None
+
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
@@ -6203,11 +6338,13 @@ def update_dropoff(id: int, data: DropOffData, authorization: Optional[str] = He
                 insp_jack=%s, insp_jack_rod=%s, insp_spanner=%s, insp_parking_triangle=%s,
                 insp_fire_extinguishers=%s, insp_seat_cover=%s, insp_floor_carpet=%s, insp_music_system=%s,
                 insp_stepney=%s, insp_stepney_photo=%s, status=%s, approval_status=%s,
+                current_approver_id=%s, approval_remarks=%s, event_date_time=%s,
                 updated_by=%s, updated_at=NOW()
             WHERE id=%s
             RETURNING id;
         """, (
-            data.dropoff_date, data.dropoff_reason, data.city_name,
+            data.dropoff_date.split("T")[0] if (data.dropoff_date and "T" in data.dropoff_date) else data.dropoff_date,
+            data.dropoff_reason, data.city_name,
             data.dropoff_location, data.manual_dropoff_location, data.customer_address,
             data.driver_id, data.driver_name, data.driver_phone,
             data.vehicle_number,
@@ -6227,11 +6364,38 @@ def update_dropoff(id: int, data: DropOffData, authorization: Optional[str] = He
             data.insp_jack or "Available", data.insp_jack_rod or "Available", data.insp_spanner or "Available", data.insp_parking_triangle or "Available",
             data.insp_fire_extinguishers or "Available", data.insp_seat_cover or "Available", data.insp_floor_carpet or "Available", data.insp_music_system or "Available",
             data.insp_stepney or "Available", extract_image(data.insp_stepney_photo),
-            data.status or "Submitted", data.status or "Submitted",
+            target_status, target_approval_status, target_approver,
+            data.approval_remarks, drop_dt_str,
             uid, id
         ))
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Drop-off record not found")
+
+        # If approved, update vehicle status and close active allocation
+        if target_approval_status == "Approved" and data.vehicle_number and data.vehicle_number.strip():
+            cur.execute("""
+                UPDATE july_vehicle_onboarding 
+                SET received_allocated = 'Ready for Deployment' 
+                WHERE UPPER(vehicle_number) = UPPER(%s);
+            """, (data.vehicle_number.strip(),))
+            
+            cur.execute("""
+                UPDATE july_allocation_form 
+                SET status = 'Returned', approval_status = 'Returned'
+                WHERE UPPER(vehicle_number) = UPPER(%s) 
+                  AND allocation_type != 'Drop-Off' 
+                  AND (status IS NULL OR status NOT IN ('Returned', 'Completed'));
+            """, (data.vehicle_number.strip(),))
+
+        # Write approval log if pending approval
+        if is_pending_approval and data.status != "Draft":
+            dir_text = "earlier" if (dt_val and dt_val < now_utc) else "in advance"
+            log_remarks = data.approval_remarks or f"Resubmitted for 48h deviation approval ({round(diff_hours, 1)} hrs {dir_text})"
+            cur.execute("""
+                INSERT INTO july_approval_chain_logs (module_name, record_id, from_user_id, to_user_id, action, remarks)
+                VALUES ('dropoff', %s, %s, %s, 'SUBMITTED', %s);
+            """, (id, uid, target_approver, log_remarks))
+
         conn.commit()
         return {"success": True, "id": id}
     except HTTPException:
@@ -6290,6 +6454,39 @@ def update_allocation_record(id: int, data: AllocationData, authorization: Optio
             if prev_data.get(df) and hasattr(prev_data[df], "isoformat"):
                 prev_data[df] = prev_data[df].isoformat()
 
+        # 48-Hour Delta Approval Check
+        alloc_dt_str = data.allocation_date_time or data.allocation_date
+        is_pending_approval = False
+        diff_hours = 0.0
+        dt_val = None
+        now_utc = dt_module.datetime.now()
+        if alloc_dt_str:
+            try:
+                raw_dt = alloc_dt_str.replace("Z", "").split("+")[0]
+                if "T" in raw_dt:
+                    dt_val = dt_module.datetime.fromisoformat(raw_dt)
+                else:
+                    dt_val = dt_module.datetime.strptime(raw_dt[:10], "%Y-%m-%d")
+                diff_hours = abs((dt_val - now_utc).total_seconds()) / 3600.0
+                if diff_hours > 48.0 or data.approval_status == "Pending Approval":
+                    is_pending_approval = True
+            except Exception:
+                if data.approval_status == "Pending Approval":
+                    is_pending_approval = True
+
+        if data.status == "Draft":
+            target_status = "Draft"
+            target_approval_status = "Draft"
+            target_approver = None
+        elif is_pending_approval:
+            target_status = "Pending Approval"
+            target_approval_status = "Pending Approval"
+            target_approver = data.current_approver_id
+        else:
+            target_status = data.status or "Submitted"
+            target_approval_status = data.approval_status or "Approved"
+            target_approver = None
+
         cur.execute("""
             UPDATE july_allocation_form SET
                 allocation_date=%s, allocation_type=%s, sub_type=%s, city_name=%s,
@@ -6307,10 +6504,11 @@ def update_allocation_record(id: int, data: AllocationData, authorization: Optio
                 fastag_balance_amount=%s, fastag_balance_proof=%s,
                 damage_penalty=%s, deposit_refund_status=%s, pending_dues=%s,
                 driver_agreement_doc=%s, security_cheque_1=%s, security_cheque_2=%s, security_cheque_3=%s, security_cheque_4=%s, security_cheques=%s, police_verification_doc=%s, vehicle_driver_photo=%s,
-                status=%s, approval_status=%s, updated_by=%s, updated_at=NOW()
+                status=%s, approval_status=%s, current_approver_id=%s, approval_remarks=%s, event_date_time=%s, updated_by=%s, updated_at=NOW()
             WHERE id=%s RETURNING id;
         """, (
-            data.allocation_date, data.allocation_type, data.sub_type, data.city_name,
+            data.allocation_date.split("T")[0] if "T" in data.allocation_date else data.allocation_date,
+            data.allocation_type, data.sub_type, data.city_name,
             data.driver_id, data.driver_name, data.driver_phone,
             data.driver_plan, data.type_of_plan, data.car_model,
             data.vehicle_number, data.gps_active,
@@ -6343,15 +6541,35 @@ def update_allocation_record(id: int, data: AllocationData, authorization: Optio
             extract_image(data.security_cheques),
             extract_image(data.police_verification_doc),
             extract_image(data.vehicle_driver_photo),
-            data.status or "Submitted",
-            data.status or "Submitted",
+            target_status,
+            target_approval_status,
+            target_approver,
+            data.approval_remarks,
+            alloc_dt_str,
             uid, id
         ))
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Allocation record not found")
 
-        new_stat = data.status or "Submitted"
+        # If approved, update vehicle status to Allocated
+        if target_approval_status == "Approved" and data.vehicle_number and data.vehicle_number.strip():
+            cur.execute("""
+                UPDATE july_vehicle_onboarding 
+                SET received_allocated = 'Allocated' 
+                WHERE UPPER(vehicle_number) = UPPER(%s);
+            """, (data.vehicle_number.strip(),))
+
+        # Write approval log if pending approval
+        if is_pending_approval and data.status != "Draft":
+            dir_text = "earlier" if (dt_val and dt_val < now_utc) else "in advance"
+            log_remarks = data.approval_remarks or f"Resubmitted for 48h deviation approval ({round(diff_hours, 1)} hrs {dir_text})"
+            cur.execute("""
+                INSERT INTO july_approval_chain_logs (module_name, record_id, from_user_id, to_user_id, action, remarks)
+                VALUES ('allocation', %s, %s, %s, 'SUBMITTED', %s);
+            """, (id, uid, target_approver, log_remarks))
+
+        new_stat = target_status
         _write_alloc_log(
             cur, id, "UPDATE",
             old_status=old_status, new_status=new_stat,
@@ -8905,6 +9123,46 @@ def get_pending_approvals(authorization: Optional[str] = Header(None)):
                             "daily_rent": 0.0,
                             "security_deposit": 0.0})
 
+        # Allocation and Drop-off pending approvals
+        cur.execute(f"""
+            SELECT a.id, 
+                   CASE WHEN a.allocation_type = 'Drop-Off' THEN 'dropoff' ELSE 'allocation' END AS module,
+                   COALESCE(a.vehicle_number, 'NO-VEH') || ' — ' || COALESCE(a.driver_name, 'Unknown Driver') AS title,
+                   a.city_name AS city,
+                   CASE WHEN a.allocation_type = 'Drop-Off' 
+                        THEN COALESCE(a.sub_type, 'Drop-Off')
+                        ELSE COALESCE(a.allocation_type, 'Allocation') || ' — ' || COALESCE(a.car_model, 'EV')
+                   END AS subtitle,
+                   COALESCE(a.approval_status, 'Pending Approval') AS approval_status,
+                   COALESCE(a.event_date_time, a.created_at) AS created_at,
+                   sub.username AS submitted_by,
+                   COALESCE(sub_e.first_name || ' ' || COALESCE(sub_e.last_name,'') || ' (' || COALESCE(sub_r.role_name, 'Executive') || ' — ' || COALESCE(sub_e.city, 'Hyderabad') || ')', sub.username, 'Executive') AS submitted_by_name,
+                   app_u.username AS current_approver,
+                   COALESCE(app_e.first_name || ' ' || COALESCE(app_e.last_name,'') || ' (' || COALESCE(app_r.role_name, 'Manager') || ' — ' || COALESCE(app_e.city, 'Hyderabad') || ')', app_u.username, 'Manager') AS current_approver_name
+            FROM july_allocation_form a
+            LEFT JOIN july_portal_users sub ON sub.portal_user_id = a.created_by
+            LEFT JOIN july_employees sub_e ON sub_e.employee_id = sub.employee_id
+            LEFT JOIN july_roles sub_r ON sub_r.role_id = sub.role_id
+            LEFT JOIN july_portal_users app_u ON app_u.portal_user_id = a.current_approver_id
+            LEFT JOIN july_employees app_e ON app_e.employee_id = app_u.employee_id
+            LEFT JOIN july_roles app_r ON app_r.role_id = app_u.role_id
+            WHERE (a.current_approver_id = {uid} OR (a.current_approver_id IS NULL AND LOWER(COALESCE(a.city_name, '')) = '{user_city}') OR {str(is_global).lower()})
+              AND (a.approval_status LIKE 'Pending%%')
+            ORDER BY COALESCE(a.updated_at, a.created_at) DESC;
+        """)
+        for r in cur.fetchall():
+            mod = r[1]
+            mod_lbl = "Vehicle Drop-Off" if mod == "dropoff" else "Vehicle Allocation"
+            pending.append({
+                "id": r[0], "module": mod, "module_label": mod_lbl,
+                "title": r[2], "city": r[3], "subtitle": r[4],
+                "approval_status": r[5], "created_at": to_ist_iso(r[6]),
+                "submitted_by": r[7], "submitted_by_name": (r[8] or "").strip(),
+                "current_approver": r[9], "current_approver_name": (r[10] or "").strip(),
+                "daily_rent": 0.0,
+                "security_deposit": 0.0
+            })
+
         return pending
 
     finally:
@@ -9012,6 +9270,46 @@ def get_my_submissions(authorization: Optional[str] = Header(None)):
                                 "daily_rent": 0.0,
                                 "security_deposit": 0.0})
 
+        # Allocations and Dropoffs submissions
+        cur.execute("""
+            SELECT a.id,
+                   CASE WHEN a.allocation_type = 'Drop-Off' THEN 'dropoff' ELSE 'allocation' END AS module,
+                   CASE WHEN a.allocation_type = 'Drop-Off' THEN 'Vehicle Drop-Off' ELSE 'Vehicle Allocation' END AS module_label,
+                   COALESCE(a.vehicle_number, 'NO-VEH') || ' — ' || COALESCE(a.driver_name, 'Unknown Driver') AS title,
+                   a.city_name AS city,
+                   CASE WHEN a.allocation_type = 'Drop-Off' 
+                        THEN COALESCE(a.sub_type, 'Drop-Off')
+                        ELSE COALESCE(a.allocation_type, 'Allocation') || ' — ' || COALESCE(a.car_model, 'EV')
+                   END AS subtitle,
+                   COALESCE(a.approval_status, a.status, 'Submitted') AS approval_status,
+                   COALESCE(a.event_date_time, a.created_at) AS created_at,
+                   app_u.username,
+                   COALESCE(app_e.first_name || ' ' || COALESCE(app_e.last_name,'') || ' (' || COALESCE(app_r.role_name, 'Manager') || ' — ' || COALESCE(app_e.city, 'Hyderabad') || ')', app_u.username, 'Manager') AS current_approver_name,
+                   a.approval_remarks,
+                   sub.username,
+                   COALESCE(sub_e.first_name || ' ' || COALESCE(sub_e.last_name,'') || ' (' || COALESCE(sub_r.role_name, 'Executive') || ' — ' || COALESCE(sub_e.city, 'Hyderabad') || ')', sub.username, 'Executive') AS submitted_by_name
+            FROM july_allocation_form a
+            LEFT JOIN july_portal_users app_u ON app_u.portal_user_id = a.current_approver_id
+            LEFT JOIN july_employees app_e ON app_e.employee_id = app_u.employee_id
+            LEFT JOIN july_roles app_r ON app_r.role_id = app_u.role_id
+            LEFT JOIN july_portal_users sub ON sub.portal_user_id = a.created_by
+            LEFT JOIN july_employees sub_e ON sub_e.employee_id = sub.employee_id
+            LEFT JOIN july_roles sub_r ON sub_r.role_id = sub.role_id
+            WHERE a.created_by = %s OR a.updated_by = %s 
+               OR a.id IN (SELECT record_id FROM july_approval_chain_logs WHERE module_name IN ('allocation', 'dropoff') AND from_user_id = %s)
+            ORDER BY COALESCE(a.updated_at, a.created_at) DESC;
+        """, (uid, uid, uid))
+        for r in cur.fetchall():
+            submissions.append({"id": r[0], "module": r[1], "module_label": r[2],
+                                "title": r[3], "city": r[4], "subtitle": r[5],
+                                "approval_status": r[6],
+                                "created_at": to_ist_iso(r[7]),
+                                "current_approver": r[8], "current_approver_name": (r[9] or "").strip(),
+                                "approval_remarks": r[10],
+                                "submitted_by": r[11], "submitted_by_name": (r[12] or "").strip(),
+                                "daily_rent": 0.0,
+                                "security_deposit": 0.0})
+
         return submissions
     finally:
         postgreSQL_pool.putconn(conn)
@@ -9033,6 +9331,8 @@ MODULE_TABLE_MAP = {
     "accidents_form": ("july_accidents_registry", "id"),
     "expenses_form": ("july_partner_expenses", "id"),
     "workshops_desk": ("july_maintenance_registry", "id"),
+    "allocation": ("july_allocation_form", "id"),
+    "dropoff": ("july_allocation_form", "id"),
 }
 
 
@@ -9136,6 +9436,34 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
                     VALUES (%s, %s, %s, NULL, 'APPROVED', %s);
                 """, (module, record_id, uid, body.remarks))
 
+                if module == "allocation":
+                    cur.execute("""
+                        UPDATE july_vehicle_onboarding 
+                        SET received_allocated = 'Allocated' 
+                        WHERE UPPER(vehicle_number) = (
+                            SELECT UPPER(vehicle_number) FROM july_allocation_form WHERE id = %s
+                        );
+                    """, (record_id,))
+                    cur.execute("UPDATE july_allocation_form SET status = 'Submitted' WHERE id = %s;", (record_id,))
+                elif module == "dropoff":
+                    cur.execute("""
+                        UPDATE july_vehicle_onboarding 
+                        SET received_allocated = 'Ready for Deployment' 
+                        WHERE UPPER(vehicle_number) = (
+                            SELECT UPPER(vehicle_number) FROM july_allocation_form WHERE id = %s
+                        );
+                    """, (record_id,))
+                    cur.execute("""
+                        UPDATE july_allocation_form 
+                        SET status = 'Returned', approval_status = 'Returned'
+                        WHERE UPPER(vehicle_number) = (
+                            SELECT UPPER(vehicle_number) FROM july_allocation_form WHERE id = %s
+                        )
+                          AND allocation_type != 'Drop-Off'
+                          AND (status IS NULL OR status NOT IN ('Returned', 'Completed'));
+                    """, (record_id,))
+                    cur.execute("UPDATE july_allocation_form SET status = 'Submitted' WHERE id = %s;", (record_id,))
+
 
         elif body.action == "REJECT":
             cur.execute(f"""
@@ -9152,6 +9480,9 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
                     SET approval_status = 'Rejected', current_approver_id = NULL, approved_by = %s, approval_note = %s, updated_by = %s, updated_at = NOW()
                     WHERE id = %s;
                 """, (uid, body.remarks, uid, record_id))
+
+            if module in ["allocation", "dropoff"]:
+                cur.execute("UPDATE july_allocation_form SET status = 'Rejected' WHERE id = %s;", (record_id,))
 
             cur.execute("""
                 INSERT INTO july_approval_chain_logs (module_name, record_id, from_user_id, to_user_id, action, remarks)
@@ -9313,6 +9644,34 @@ def process_batch_approval(body: BatchApprovalAction, authorization: Optional[st
                             SET approval_status = 'Approved', current_approver_id = NULL, approved_by = %s, approval_note = %s, updated_by = %s, updated_at = NOW()
                             WHERE id = %s;
                         """, (uid, body.remarks, uid, rec_id))
+
+                    if mod == "allocation":
+                        cur.execute("""
+                            UPDATE july_vehicle_onboarding 
+                            SET received_allocated = 'Allocated' 
+                            WHERE UPPER(vehicle_number) = (
+                                SELECT UPPER(vehicle_number) FROM july_allocation_form WHERE id = %s
+                            );
+                        """, (rec_id,))
+                        cur.execute("UPDATE july_allocation_form SET status = 'Submitted' WHERE id = %s;", (rec_id,))
+                    elif mod == "dropoff":
+                        cur.execute("""
+                            UPDATE july_vehicle_onboarding 
+                            SET received_allocated = 'Ready for Deployment' 
+                            WHERE UPPER(vehicle_number) = (
+                                SELECT UPPER(vehicle_number) FROM july_allocation_form WHERE id = %s
+                            );
+                        """, (rec_id,))
+                        cur.execute("""
+                            UPDATE july_allocation_form 
+                            SET status = 'Returned', approval_status = 'Returned'
+                            WHERE UPPER(vehicle_number) = (
+                                SELECT UPPER(vehicle_number) FROM july_allocation_form WHERE id = %s
+                            )
+                              AND allocation_type != 'Drop-Off'
+                              AND (status IS NULL OR status NOT IN ('Returned', 'Completed'));
+                        """, (rec_id,))
+                        cur.execute("UPDATE july_allocation_form SET status = 'Submitted' WHERE id = %s;", (rec_id,))
 
                     cur.execute("""
                         INSERT INTO july_approval_chain_logs (module_name, record_id, from_user_id, to_user_id, action, remarks)

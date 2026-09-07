@@ -3,7 +3,8 @@ import React, { useState, useMemo, useEffect } from "react";
 import { 
   Calendar, MapPin, User, Phone, FileText, CheckCircle, 
   Clock, ArrowLeft, Download, Search, Trash2, Edit, Camera, 
-  Upload, X, RefreshCw, Key, Plus, ChevronLeft, ChevronRight, Settings, Database
+  Upload, X, RefreshCw, Key, Plus, ChevronLeft, ChevronRight, Settings, Database,
+  AlertTriangle, Send, ShieldAlert
 } from "lucide-react";
 import { AllocationRecord, User as UserSession, CITIES } from "../types";
 import CameraCapture from "./CameraCapture";
@@ -84,10 +85,95 @@ export default function AllocationForm({
     return () => clearInterval(timer);
   }, []);
 
+  const getInitialLocalDateTime = () => {
+    const d = new Date();
+    const pad = (n: number) => String(n).padStart(2, '0');
+    const year = d.getFullYear();
+    const month = pad(d.getMonth() + 1);
+    const day = pad(d.getDate());
+    const hours = pad(d.getHours());
+    const minutes = pad(d.getMinutes());
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  };
+
   // Vehicle Allocation Form Fields State
   const [editingId, setEditingId] = useState<number | null>(null);
-  const [allocationDate, setAllocationDate] = useState(new Date().toISOString().split("T")[0]);
+  const [allocationDate, setAllocationDate] = useState<string>(getInitialLocalDateTime());
   const [transactionType, setTransactionType] = useState<"New Allocation" | "Reallocation" | "Rejoining" | "Swap">("New Allocation");
+
+  // Managerial Approval & 48-Hour Deviation States
+  const [approverId, setApproverId] = useState<number | null>(null);
+  const [approvalRemarks, setApprovalRemarks] = useState<string>("");
+  const [portalUsers, setPortalUsers] = useState<Array<{ id: number; username: string; name: string; role: string; city?: string }>>([]);
+
+  const fetchPortalUsers = async () => {
+    try {
+      const token = localStorage.getItem("token") || localStorage.getItem("lr_token") || localStorage.getItem("auth_token") || sessionStorage.getItem("token");
+      const res = await fetch("/api/portal-users", {
+        headers: token ? { Authorization: `Bearer ${token}` } : {}
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setPortalUsers(data);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching portal users:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchPortalUsers();
+  }, []);
+
+  const normalizeCity = (c?: string): string => {
+    if (!c) return "";
+    const s = c.trim().toLowerCase();
+    if (s === "bengaluru" || s === "bangalore" || s === "blr") return "bangalore";
+    if (s === "mumbai" || s === "bom") return "mumbai";
+    if (s === "hyderabad" || s === "hyd") return "hyderabad";
+    if (s === "chennai" || s === "maa") return "chennai";
+    if (s === "delhi" || s === "new delhi" || s === "del") return "delhi";
+    return s;
+  };
+
+  // Filter approvers strictly by the currently filled city
+  const filteredApprovers = useMemo(() => {
+    try {
+      if (!cityName || !cityName.trim()) return portalUsers;
+      const targetNorm = normalizeCity(cityName);
+      const matched = portalUsers.filter(u => normalizeCity(u.city) === targetNorm);
+      return matched.length > 0 ? matched : portalUsers;
+    } catch (err) {
+      console.error("Error filtering approvers by city in AllocationForm:", err);
+      return portalUsers;
+    }
+  }, [portalUsers, cityName]);
+
+  // 48-Hour Deviation Calculation
+  const deltaInfo = useMemo(() => {
+    if (!allocationDate) return { isOver48: false, diffHours: 0, days: 0, remainingHours: 0, direction: "earlier" };
+    const selectedTime = new Date(allocationDate).getTime();
+    const now = Date.now();
+    if (isNaN(selectedTime)) return { isOver48: false, diffHours: 0, days: 0, remainingHours: 0, direction: "earlier" };
+
+    const diffMs = selectedTime - now;
+    const absDiffHours = Math.abs(diffMs) / (1000 * 60 * 60);
+    const isOver48 = absDiffHours > 48;
+    const roundedHours = Math.round(absDiffHours);
+    const days = Math.floor(roundedHours / 24);
+    const remainingHours = roundedHours % 24;
+    const direction = diffMs < 0 ? "earlier" : "later";
+
+    return {
+      isOver48,
+      diffHours: roundedHours,
+      days,
+      remainingHours,
+      direction
+    };
+  }, [allocationDate]);
 
   // New allocation fields state
   const [olaNegativeBalance, setOlaNegativeBalance] = useState("");
@@ -373,7 +459,19 @@ export default function AllocationForm({
       const data = await res.json();
       
       setEditingId(data.id);
-      setAllocationDate(data.allocation_date ? String(data.allocation_date).split("T")[0] : new Date().toISOString().split("T")[0]);
+      const rawDt = data.event_date_time || data.allocation_date_time || data.allocation_date;
+      if (rawDt) {
+        const s = String(rawDt);
+        if (s.includes("T")) {
+          setAllocationDate(s.substring(0, 16));
+        } else {
+          setAllocationDate(`${s}T12:00`);
+        }
+      } else {
+        setAllocationDate(getInitialLocalDateTime());
+      }
+      setApproverId(data.current_approver_id || data.approved_by || null);
+      setApprovalRemarks(data.approval_remarks || "");
       setTransactionType(data.allocation_type || "New Allocation");
       setCityName(data.city_name || "Hyderabad");
       setDriverId(data.driver_id != null ? String(data.driver_id) : "");
@@ -445,7 +543,9 @@ export default function AllocationForm({
 
   const resetForm = () => {
     setEditingId(null);
-    setAllocationDate(new Date().toISOString().split("T")[0]);
+    setAllocationDate(getInitialLocalDateTime());
+    setApproverId(null);
+    setApprovalRemarks("");
     setTransactionType("New Allocation");
     setCityName("Hyderabad");
     setDriverId("");
@@ -526,6 +626,10 @@ export default function AllocationForm({
       if (!pdiCompleted && stepney === "Available" && !stepneyPhoto) {
         return alert("Stepney photo is required for vehicle inspection before allocation.");
       }
+
+      if (deltaInfo.isOver48 && !approverId) {
+        return alert(`Please select a designated approver for ${cityName} since the allocation date deviates by more than 48 hours.`);
+      }
     }
 
     try {
@@ -541,7 +645,7 @@ export default function AllocationForm({
           },
           body: JSON.stringify({
             vehicle_number: String(vehicleNumber).trim().toUpperCase(),
-            inspection_date: allocationDate,
+            inspection_date: allocationDate ? allocationDate.split("T")[0] : allocationDate,
             odometer_reading: odometerReading || "0",
             jack,
             jack_rod: jackRod,
@@ -559,7 +663,11 @@ export default function AllocationForm({
 
       // Submit Allocation Payload
       const payload = {
-        allocation_date: allocationDate,
+        allocation_date: allocationDate ? allocationDate.split("T")[0] : new Date().toISOString().split("T")[0],
+        allocation_date_time: allocationDate,
+        approval_status: isDraft ? "Draft" : (deltaInfo.isOver48 ? "Pending Approval" : "Approved"),
+        current_approver_id: approverId,
+        approval_remarks: approvalRemarks || null,
         allocation_type: transactionType,
         sub_type: transactionType,
         city_name: cityName,
@@ -628,7 +736,11 @@ export default function AllocationForm({
         throw new Error(errorText || "Failed to submit allocation record");
       }
 
-      alert(isDraft ? (editingId ? "Draft Allocation Updated Successfully!" : "Draft Allocation Saved Successfully!") : (editingId ? "Vehicle Allocation Record Updated Successfully!" : "Vehicle Allocation Saved Successfully!"));
+      if (deltaInfo.isOver48 && !isDraft) {
+        alert("Vehicle Allocation Record Submitted and Sent for Managerial Approval!");
+      } else {
+        alert(isDraft ? (editingId ? "Draft Allocation Updated Successfully!" : "Draft Allocation Saved Successfully!") : (editingId ? "Vehicle Allocation Record Updated Successfully!" : "Vehicle Allocation Saved Successfully!"));
+      }
       resetForm();
       fetchStats();
       fetchRecords();
@@ -910,15 +1022,67 @@ export default function AllocationForm({
                       </div>
 
                       <div>
-                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Date of Allocation <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1">
+                          Date & Time of Allocation <span className="text-red-500">*</span>
+                        </label>
                         <input 
-                          type="date" 
+                          type="datetime-local" 
                           value={allocationDate}
                           onChange={(e) => setAllocationDate(e.target.value)}
                           required
-                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20 outline-none transition-all shadow-2xs cursor-pointer"
+                          className={`w-full h-10 rounded-xl border bg-white px-3 text-xs font-medium text-slate-800 outline-none transition-all shadow-2xs cursor-pointer ${
+                            deltaInfo.isOver48 
+                              ? "border-amber-400 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20" 
+                              : "border-slate-200 focus:border-emerald-600 focus:ring-1 focus:ring-emerald-600/20"
+                          }`}
                         />
                       </div>
+
+                      {deltaInfo.isOver48 && (
+                        <div className="rounded-xl border border-amber-300 bg-amber-50/90 p-3 text-amber-900 shadow-2xs space-y-2.5">
+                          <div className="flex items-start gap-2">
+                            <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
+                            <div className="text-[11px] leading-snug">
+                              <span className="font-bold text-amber-950 block">Approval Required (&gt; 48h Delta)</span>
+                              <span>
+                                Date is <strong>{deltaInfo.diffHours} hours ({deltaInfo.days} days{deltaInfo.remainingHours > 0 ? ` ${deltaInfo.remainingHours}h` : ''}) {deltaInfo.direction}</strong> than current time. This record requires manager approval.
+                              </span>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block font-sans text-[11px] font-semibold text-amber-950 mb-1">
+                              Designated Approver ({cityName}) <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                              value={approverId || ""}
+                              onChange={(e) => setApproverId(e.target.value ? parseInt(e.target.value) : null)}
+                              required={deltaInfo.isOver48}
+                              className="w-full h-9 rounded-lg border border-amber-300 bg-white px-2.5 text-xs font-medium text-slate-800 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 outline-none cursor-pointer"
+                            >
+                              <option value="">{cityName ? `Select Approver for ${cityName}` : "Select Approver"}</option>
+                              {filteredApprovers.map((u) => (
+                                <option key={u.id} value={u.id}>
+                                  {u.name || u.username} ({u.role || "Manager"}) {u.city ? `• ${u.city}` : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block font-sans text-[11px] font-semibold text-amber-950 mb-1">
+                              Reason for Deviation / Note
+                            </label>
+                            <input
+                              type="text"
+                              placeholder="Reason for backdated / future entry..."
+                              value={approvalRemarks}
+                              onChange={(e) => setApprovalRemarks(e.target.value)}
+                              className="w-full h-8 rounded-lg border border-amber-300 bg-white px-2.5 text-xs text-slate-800 focus:border-amber-500 focus:ring-1 focus:ring-amber-500/20 outline-none"
+                            />
+                          </div>
+                        </div>
+                      )}
 
                       <div>
                         <label className="block font-sans text-xs font-medium text-slate-700 mb-1">Operating City <span className="text-red-500">*</span></label>
@@ -1717,9 +1881,20 @@ export default function AllocationForm({
                     <button 
                       type="submit" 
                       onClick={(e) => handleSubmit(e, "Submitted")}
-                      className="h-11 rounded-lg bg-primary hover:bg-primary-hover text-white px-6 font-sans text-sm font-semibold shadow-md cursor-pointer transition-colors"
+                      className={`h-11 rounded-lg px-6 font-sans text-sm font-semibold shadow-md cursor-pointer transition-all flex items-center justify-center gap-2 ${
+                        deltaInfo.isOver48
+                          ? "bg-amber-600 hover:bg-amber-700 text-white"
+                          : "bg-primary hover:bg-primary-hover text-white"
+                      }`}
                     >
-                      {editingId ? "Update Allocation Entry" : "Save Allocation Entry"}
+                      {deltaInfo.isOver48 ? (
+                        <>
+                          <Send className="h-4 w-4" />
+                          <span>Send for Approval</span>
+                        </>
+                      ) : (
+                        editingId ? "Update Allocation Entry" : "Save Allocation Entry"
+                      )}
                     </button>
                   </div>
                 </div>
@@ -1997,6 +2172,7 @@ export default function AllocationForm({
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">CONTACT</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">VEHICLE NO</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">TRANSACTION TYPE</th>
+                      <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">STATUS</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">RECORDED BY</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-left">DATE &amp; TIME CREATED</th>
                       <th className="px-4 py-3.5 font-sans text-[11px] font-bold uppercase tracking-wider text-slate-500 text-center">ACTION</th>
@@ -2005,7 +2181,7 @@ export default function AllocationForm({
                   <tbody className="divide-y divide-slate-100">
                     {filteredRecords.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="px-6 py-12 text-center text-slate-500 font-sans bg-slate-50/50 text-xs">
+                        <td colSpan={11} className="px-6 py-12 text-center text-slate-500 font-sans bg-slate-50/50 text-xs">
                           No matching allocation records found in the database.
                         </td>
                       </tr>
@@ -2042,6 +2218,17 @@ export default function AllocationForm({
                             <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-700">
                               <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200/60 font-semibold text-[11px]">
                                 {r.sub_type || r.allocation_type || "New Allocation"}
+                              </span>
+                            </td>
+                            <td className="px-4 py-3.5 font-sans text-xs font-medium">
+                              <span className={`px-2.5 py-1 rounded-lg border font-semibold text-[11px] ${
+                                r.approval_status === "Pending Approval"
+                                  ? "bg-amber-50 text-amber-800 border-amber-300"
+                                  : r.approval_status === "Rejected"
+                                  ? "bg-rose-50 text-rose-800 border-rose-300"
+                                  : "bg-emerald-50 text-emerald-800 border-emerald-300"
+                              }`}>
+                                {r.approval_status || "Approved"}
                               </span>
                             </td>
                             <td className="px-4 py-3.5 font-sans text-xs text-slate-800">
