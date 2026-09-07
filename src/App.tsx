@@ -21,6 +21,8 @@ import RolesPermissionsForm from "./components/RolesPermissionsForm";
 import TicketsForm from "./components/TicketsForm";
 import EmployeesForm from "./components/EmployeesForm";
 import MaintenanceForm from "./components/MaintenanceForm";
+import MaintenanceInForm from "./components/MaintenanceInForm";
+import MaintenanceOutForm from "./components/MaintenanceOutForm";
 import ChallansForm from "./components/ChallansForm";
 import ApprovalsDesk from "./components/ApprovalsDashboard";
 import { User, CITIES } from "./types";
@@ -29,7 +31,7 @@ const LOCAL_STORAGE_TOKEN_KEY = "lr_token";
 
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
-  const [screen, setScreen] = useState<"login" | "selector" | "walkin" | "onboarding" | "operator_onboarding" | "adjustment" | "allocation" | "dropoff" | "expenses" | "vehicle_onboarding" | "workshops" | "hubs_parking" | "rents" | "accident" | "inspection" | "users" | "vehicle_models" | "cities" | "roles" | "tickets" | "employees" | "maintenance" | "challans" | "approvals">("login");
+  const [screen, setScreen] = useState<"login" | "selector" | "walkin" | "onboarding" | "operator_onboarding" | "adjustment" | "allocation" | "dropoff" | "expenses" | "vehicle_onboarding" | "workshops" | "hubs_parking" | "rents" | "accident" | "inspection" | "users" | "vehicle_models" | "cities" | "roles" | "tickets" | "employees" | "maintenance" | "maintenance_in" | "maintenance_out" | "challans" | "approvals">("login");
   const [editTarget, setEditTarget] = useState<{ formType: string; id: number; isReview?: boolean } | null>(null);
   const [activeApprovalsTab, setActiveApprovalsTab] = useState<"pending" | "my-submissions" | "revisions">("pending");
   const [isInitializing, setIsInitializing] = useState(true);
@@ -292,6 +294,20 @@ export default function App() {
       )}
       {screen === "maintenance" && user && (
         <MaintenanceForm 
+          user={user} 
+          onBackToSelector={() => setScreen("selector")} 
+          onLogout={handleLogout} 
+        />
+      )}
+      {screen === "maintenance_in" && user && (
+        <MaintenanceInForm 
+          user={user} 
+          onBackToSelector={() => setScreen("selector")} 
+          onLogout={handleLogout} 
+        />
+      )}
+      {screen === "maintenance_out" && user && (
+        <MaintenanceOutForm 
           user={user} 
           onBackToSelector={() => setScreen("selector")} 
           onLogout={handleLogout} 

@@ -1362,6 +1362,69 @@ def startup_event():
             );
         """)
 
+        # ── july_maintenance_in ─────────────────────────────────
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS july_maintenance_in (
+                id SERIAL PRIMARY KEY,
+                created_at TIMESTAMP DEFAULT NOW(),
+                created_by INTEGER,
+                user_email VARCHAR(255),
+                city_name VARCHAR(100) NOT NULL,
+                vehicle_number VARCHAR(100) NOT NULL,
+                vehicle_location TEXT,
+                vehicle_in_date_time VARCHAR(50) NOT NULL,
+                vehicle_k_m_s VARCHAR(50) NOT NULL,
+                repair_type VARCHAR(100),
+                workshop_name VARCHAR(255) NOT NULL,
+                estimated_delivery_date VARCHAR(50),
+                estimated_amount VARCHAR(50),
+                insurance_claimed VARCHAR(50) DEFAULT 'No',
+                insurance_brokerage VARCHAR(255),
+                claim_number VARCHAR(100),
+                approved_by VARCHAR(100),
+                approval_date VARCHAR(50),
+                approval_file TEXT,
+                vehicle_damage_photos TEXT,
+                remarks TEXT,
+                is_closed BOOLEAN DEFAULT FALSE,
+                closed_at TIMESTAMP,
+                closed_by INTEGER
+            );
+            CREATE INDEX IF NOT EXISTS idx_maint_in_veh_closed ON july_maintenance_in (vehicle_number, is_closed);
+        """)
+
+        # ── july_maintenance_out ────────────────────────────────
+        cur.execute("""
+            CREATE TABLE IF NOT EXISTS july_maintenance_out (
+                id SERIAL PRIMARY KEY,
+                inward_id INTEGER REFERENCES july_maintenance_in(id),
+                vehicle_number VARCHAR(100) NOT NULL,
+                created_at TIMESTAMP DEFAULT NOW(),
+                created_by INTEGER,
+                user_email VARCHAR(255),
+                rfd_date VARCHAR(50),
+                vehicle_out_date_time VARCHAR(50) NOT NULL,
+                vehicle_out_k_m_s VARCHAR(50) NOT NULL,
+                invoice_no VARCHAR(100),
+                invoice_date VARCHAR(50),
+                invoice_amount VARCHAR(50),
+                insurance_liability_discounts VARCHAR(50) DEFAULT '0',
+                letzryd_payable VARCHAR(50),
+                invoice_file TEXT,
+                type_of_payment VARCHAR(50),
+                payment_status VARCHAR(50) DEFAULT 'Pending',
+                utr_no VARCHAR(100),
+                approved_by VARCHAR(100),
+                approval_date VARCHAR(50),
+                approval_file TEXT,
+                vehicle_out_photos TEXT,
+                final_status VARCHAR(50) DEFAULT 'Completed & RFD',
+                remarks TEXT
+            );
+            CREATE INDEX IF NOT EXISTS idx_maint_out_veh ON july_maintenance_out (vehicle_number);
+            CREATE INDEX IF NOT EXISTS idx_maint_out_inward_id ON july_maintenance_out (inward_id);
+        """)
+
         # ── july_rent_ledger ──────────────────────────────────
         cur.execute("""
             CREATE TABLE IF NOT EXISTS july_rent_ledger (
@@ -1462,7 +1525,7 @@ def get_current_user(authorization: Optional[str] = Header(None)):
         ALL_ADMIN_FORMS = ["walkin","onboarding","allocation","dropoff","adjustment","rents",
                            "vehicle_onboarding","expenses","workshops","hubs_parking",
                            "accident","inspection","users","vehicle_models","cities",
-                           "roles","tickets","employees","maintenance","challans","approvals"]
+                           "roles","tickets","employees","maintenance","maintenance_in","maintenance_out","challans","approvals"]
 
         def _fetch_allowed_forms(uid):
             """Fetch form access list from july_user_form_access."""
@@ -2155,7 +2218,7 @@ def login(req: LoginRequest, request: Request):
         ALL_ADMIN_FORMS = ["walkin","onboarding","allocation","dropoff","adjustment","rents",
                            "vehicle_onboarding","expenses","workshops","hubs_parking",
                            "accident","inspection","users","vehicle_models","cities",
-                           "roles","tickets","employees","maintenance","challans","approvals"]
+                           "roles","tickets","employees","maintenance","maintenance_in","maintenance_out","challans","approvals"]
 
         def _fetch_allowed_forms(uid):
             try:
@@ -2480,6 +2543,43 @@ class AppUserUpdateData(BaseModel):
     role_id: Optional[int] = None
     employee_id: Optional[str] = None
     email: Optional[str] = None
+
+@app.get("/api/portal-users")
+def get_portal_users(authorization: Optional[str] = Header(None)):
+    """Return active portal users/executives for selection in approver and assignment dropdowns."""
+    try:
+        if authorization:
+            get_current_user(authorization)
+    except Exception:
+        pass
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT pu.portal_user_id,
+                   pu.username,
+                   COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username) AS name,
+                   COALESCE(r.role_name, pu.role, 'Staff') AS role_name,
+                   COALESCE(e.city, pu.city, '') AS city
+            FROM july_portal_users pu
+            LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
+            LEFT JOIN july_roles r ON r.role_id = pu.role_id
+            WHERE COALESCE(pu.account_status, 'Active') = 'Active'
+            ORDER BY name ASC;
+        """)
+        rows = cur.fetchall()
+        result = []
+        for r in rows:
+            result.append({
+                "id": r[0],
+                "username": r[1],
+                "name": r[2],
+                "role": r[3],
+                "city": r[4]
+            })
+        return result
+    finally:
+        postgreSQL_pool.putconn(conn)
 
 @app.get("/api/users")
 def list_app_users(authorization: Optional[str] = Header(None)):
@@ -7861,6 +7961,569 @@ def delete_maintenance_job(id: int, authorization: Optional[str] = Header(None))
             raise HTTPException(status_code=404, detail="Maintenance job not found")
         conn.commit()
         return {"success": True}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+
+# ─────────────────────────────────────────────────────────
+# Maintenance IN & OUT API Endpoints
+# ─────────────────────────────────────────────────────────
+
+class MaintenanceInCreate(BaseModel):
+    city_name: str
+    vehicle_number: str
+    vehicle_location: Optional[str] = None
+    vehicle_in_date_time: str
+    vehicle_k_m_s: str
+    repair_type: Optional[str] = None
+    workshop_name: str
+    estimated_delivery_date: Optional[str] = None
+    estimated_amount: Optional[str] = None
+    insurance_claimed: Optional[str] = "No"
+    insurance_brokerage: Optional[str] = None
+    claim_number: Optional[str] = None
+    approved_by: Optional[str] = None
+    approval_date: Optional[str] = None
+    approval_file: Optional[str] = None
+    vehicle_damage_photos: Optional[Union[str, List[str]]] = None
+    remarks: Optional[str] = None
+
+class MaintenanceOutCreate(BaseModel):
+    inward_id: Optional[int] = None
+    vehicle_number: str
+    rfd_date: Optional[str] = None
+    vehicle_out_date_time: str
+    vehicle_out_k_m_s: str
+    invoice_no: Optional[str] = None
+    invoice_date: Optional[str] = None
+    invoice_amount: Optional[str] = None
+    insurance_liability_discounts: Optional[str] = "0"
+    letzryd_payable: Optional[str] = None
+    invoice_file: Optional[str] = None
+    type_of_payment: Optional[str] = None
+    payment_status: Optional[str] = "Pending"
+    utr_no: Optional[str] = None
+    approved_by: Optional[str] = None
+    approval_date: Optional[str] = None
+    approval_file: Optional[str] = None
+    vehicle_out_photos: Optional[Union[str, List[str]]] = None
+    final_status: Optional[str] = "Completed & RFD"
+    remarks: Optional[str] = None
+
+@app.post("/api/maintenance-in")
+def create_maintenance_in(data: MaintenanceInCreate, authorization: Optional[str] = Header(None)):
+    user = get_current_user(authorization)
+    uid = user.get("portal_user_id") or user.get("user_id")
+    u_email = user.get("username") or user.get("name")
+    
+    photos_val = data.vehicle_damage_photos
+    if isinstance(photos_val, list):
+        photos_val = json.dumps(photos_val)
+    elif not photos_val:
+        photos_val = "[]"
+
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        vnum = data.vehicle_number.strip().upper()
+
+        # Check if an active (unclosed) inward ticket already exists for this vehicle
+        cur.execute("""
+            SELECT id, workshop_name, vehicle_in_date_time 
+            FROM july_maintenance_in 
+            WHERE UPPER(TRIM(vehicle_number)) = %s AND is_closed = FALSE 
+            ORDER BY id DESC LIMIT 1;
+        """, (vnum,))
+        existing_active = cur.fetchone()
+        if existing_active:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Vehicle {vnum} already has an active inward maintenance ticket (#{existing_active[0]} at {existing_active[1] or 'Workshop'}). A new inward ticket cannot be created until the vehicle is checked out via Maintenance Out. Please edit the existing ticket instead."
+            )
+
+        cur.execute("""
+            INSERT INTO july_maintenance_in (
+                created_by, user_email, city_name, vehicle_number, vehicle_location,
+                vehicle_in_date_time, vehicle_k_m_s, repair_type, workshop_name,
+                estimated_delivery_date, estimated_amount, insurance_claimed,
+                insurance_brokerage, claim_number, approved_by, approval_date,
+                approval_file, vehicle_damage_photos, remarks, is_closed
+            ) VALUES (
+                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s, FALSE
+            ) RETURNING id, created_at;
+        """, (
+            uid, u_email, data.city_name.strip(), vnum, data.vehicle_location,
+            data.vehicle_in_date_time, data.vehicle_k_m_s, data.repair_type, data.workshop_name.strip(),
+            data.estimated_delivery_date, data.estimated_amount, data.insurance_claimed,
+            data.insurance_brokerage, data.claim_number, data.approved_by, data.approval_date,
+            data.approval_file, photos_val, data.remarks
+        ))
+        row = cur.fetchone()
+        conn.commit()
+        return {"success": True, "id": row[0], "created_at": row[1].isoformat(), "message": "Vehicle inward entry created successfully"}
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+@app.get("/api/maintenance-in")
+def list_maintenance_in(
+    search: Optional[str] = None,
+    status: Optional[str] = "all",
+    city: Optional[str] = None,
+    limit: int = 200,
+    offset: int = 0,
+    authorization: Optional[str] = Header(None)
+):
+    get_current_user(authorization)
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        conditions = []
+        params = []
+
+        if status == "open":
+            conditions.append("is_closed = FALSE")
+        elif status == "closed":
+            conditions.append("is_closed = TRUE")
+
+        if city and city.lower() != "all":
+            conditions.append("LOWER(city_name) = LOWER(%s)")
+            params.append(city.strip())
+
+        if search and search.strip():
+            s = f"%{search.strip().lower()}%"
+            conditions.append("(LOWER(vehicle_number) LIKE %s OR LOWER(workshop_name) LIKE %s OR LOWER(COALESCE(repair_type, '')) LIKE %s)")
+            params.extend([s, s, s])
+
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        query = f"""
+            SELECT id, created_at, created_by, user_email, city_name, vehicle_number,
+                   vehicle_location, vehicle_in_date_time, vehicle_k_m_s, repair_type,
+                   workshop_name, estimated_delivery_date, estimated_amount,
+                   insurance_claimed, insurance_brokerage, claim_number, approved_by,
+                   approval_date, approval_file, vehicle_damage_photos, remarks,
+                   is_closed, closed_at, closed_by
+            FROM july_maintenance_in
+            {where_clause}
+            ORDER BY id DESC
+            LIMIT %s OFFSET %s;
+        """
+        params.extend([limit, offset])
+        cur.execute(query, params)
+        colnames = [desc[0] for desc in cur.description]
+        records = []
+        for r in cur.fetchall():
+            row_dict = dict(zip(colnames, r))
+            if row_dict.get("created_at"):
+                row_dict["created_at"] = row_dict["created_at"].isoformat()
+            if row_dict.get("closed_at"):
+                row_dict["closed_at"] = row_dict["closed_at"].isoformat()
+            records.append(row_dict)
+        return records
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+@app.get("/api/maintenance-in/check-active")
+def check_active_maintenance_in(vehicle_number: str, authorization: Optional[str] = Header(None)):
+    get_current_user(authorization)
+    vnum = vehicle_number.strip().upper()
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, city_name, vehicle_number, workshop_name, vehicle_in_date_time,
+                   vehicle_k_m_s, repair_type, estimated_delivery_date, estimated_amount,
+                   insurance_claimed, insurance_brokerage, claim_number,
+                   approved_by, approval_date, approval_file, vehicle_damage_photos,
+                   remarks, created_at, user_email
+            FROM july_maintenance_in
+            WHERE UPPER(TRIM(vehicle_number)) = %s AND is_closed = FALSE
+            ORDER BY id DESC LIMIT 1;
+        """, (vnum,))
+        row = cur.fetchone()
+        if not row:
+            return {"active": False, "message": f"No active inward ticket found for {vnum}"}
+        colnames = [desc[0] for desc in cur.description]
+        rec = dict(zip(colnames, row))
+        if rec.get("created_at"):
+            rec["created_at"] = rec["created_at"].isoformat()
+        return {"active": True, "record": rec}
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+@app.get("/api/maintenance-in/{id}")
+def get_maintenance_in(id: int, authorization: Optional[str] = Header(None)):
+    get_current_user(authorization)
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT * FROM july_maintenance_in WHERE id = %s;", (id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Inward record not found")
+        colnames = [desc[0] for desc in cur.description]
+        res = dict(zip(colnames, row))
+        if res.get("created_at"):
+            res["created_at"] = res["created_at"].isoformat()
+        if res.get("closed_at"):
+            res["closed_at"] = res["closed_at"].isoformat()
+        return res
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+@app.put("/api/maintenance-in/{id}")
+def update_maintenance_in(id: int, data: MaintenanceInCreate, authorization: Optional[str] = Header(None)):
+    user = get_current_user(authorization)
+    uid = user.get("portal_user_id") or user.get("user_id")
+    
+    photos_val = data.vehicle_damage_photos
+    if isinstance(photos_val, list):
+        photos_val = json.dumps(photos_val)
+    elif not photos_val:
+        photos_val = "[]"
+
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE july_maintenance_in
+            SET city_name = %s,
+                vehicle_number = %s,
+                vehicle_location = %s,
+                vehicle_in_date_time = %s,
+                vehicle_k_m_s = %s,
+                repair_type = %s,
+                workshop_name = %s,
+                estimated_delivery_date = %s,
+                estimated_amount = %s,
+                insurance_claimed = %s,
+                insurance_brokerage = %s,
+                claim_number = %s,
+                approved_by = %s,
+                approval_date = %s,
+                approval_file = %s,
+                vehicle_damage_photos = %s,
+                remarks = %s
+            WHERE id = %s RETURNING id;
+        """, (
+            data.city_name.strip(), data.vehicle_number.strip().upper(), data.vehicle_location,
+            data.vehicle_in_date_time, data.vehicle_k_m_s, data.repair_type, data.workshop_name.strip(),
+            data.estimated_delivery_date, data.estimated_amount, data.insurance_claimed,
+            data.insurance_brokerage, data.claim_number, data.approved_by, data.approval_date,
+            data.approval_file, photos_val, data.remarks, id
+        ))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Maintenance In record not found")
+        conn.commit()
+        return {"success": True, "id": id, "message": "Vehicle inward entry updated successfully"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+@app.delete("/api/maintenance-in/{id}")
+def delete_maintenance_in(id: int, authorization: Optional[str] = Header(None)):
+    get_current_user(authorization)
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute("DELETE FROM july_maintenance_out WHERE inward_id = %s;", (id,))
+        cur.execute("DELETE FROM july_maintenance_in WHERE id = %s RETURNING id;", (id,))
+        deleted = cur.fetchone()
+        if not deleted:
+            raise HTTPException(status_code=404, detail="Inward record not found")
+        conn.commit()
+        return {"success": True, "message": "Inward record deleted"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+@app.get("/api/maintenance-out/search-vehicle")
+def search_maintenance_vehicle(vehicle_number: str, authorization: Optional[str] = Header(None)):
+    get_current_user(authorization)
+    vnum = vehicle_number.strip().upper()
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT id, city_name, vehicle_number, vehicle_location, vehicle_in_date_time,
+                   vehicle_k_m_s, repair_type, workshop_name, estimated_delivery_date,
+                   estimated_amount, insurance_claimed, insurance_brokerage, claim_number,
+                   approved_by, approval_date, approval_file, vehicle_damage_photos,
+                   remarks, created_at, user_email
+            FROM july_maintenance_in
+            WHERE UPPER(TRIM(vehicle_number)) = %s AND is_closed = FALSE
+            ORDER BY id DESC LIMIT 1;
+        """, (vnum,))
+        row = cur.fetchone()
+        if not row:
+            return {"found": False, "message": f"No active open maintenance record found for {vnum}"}
+        colnames = [desc[0] for desc in cur.description]
+        rec = dict(zip(colnames, row))
+        if rec.get("created_at"):
+            rec["created_at"] = rec["created_at"].isoformat()
+        return {"found": True, "record": rec}
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+@app.post("/api/maintenance-out")
+def create_maintenance_out(data: MaintenanceOutCreate, authorization: Optional[str] = Header(None)):
+    user = get_current_user(authorization)
+    uid = user.get("portal_user_id") or user.get("user_id")
+    u_email = user.get("username") or user.get("name")
+    
+    photos_val = data.vehicle_out_photos
+    if isinstance(photos_val, list):
+        photos_val = json.dumps(photos_val)
+    elif not photos_val:
+        photos_val = "[]"
+
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        vnum = data.vehicle_number.strip().upper()
+        if data.inward_id:
+            cur.execute("SELECT id, is_closed FROM july_maintenance_in WHERE id = %s;", (data.inward_id,))
+            inw = cur.fetchone()
+            if not inw:
+                raise HTTPException(status_code=404, detail="Associated inward maintenance record not found")
+            if inw[1]:  # Already closed
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Inward ticket #{data.inward_id} is already closed. Vehicle {vnum} cannot be checked out again until a new Maintenance In entry is created."
+                )
+        else:
+            # Require an active open inward ticket for this vehicle
+            cur.execute("""
+                SELECT id, is_closed FROM july_maintenance_in 
+                WHERE UPPER(TRIM(vehicle_number)) = %s AND is_closed = FALSE 
+                ORDER BY id DESC LIMIT 1;
+            """, (vnum,))
+            inw = cur.fetchone()
+            if not inw:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Cannot check out vehicle {vnum}: No active open maintenance inward ticket exists for this vehicle. A vehicle cannot be Maintenance Out unless Maintenance In has been filled first."
+                )
+            data.inward_id = inw[0]
+        
+        payable = data.letzryd_payable
+        if not payable and data.invoice_amount:
+            try:
+                inv = float(re.sub(r"[^\d.]", "", data.invoice_amount))
+                disc = float(re.sub(r"[^\d.]", "", data.insurance_liability_discounts or "0"))
+                payable = str(round(max(0.0, inv - disc), 2))
+            except Exception:
+                payable = data.invoice_amount
+
+        cur.execute("""
+            INSERT INTO july_maintenance_out (
+                inward_id, vehicle_number, created_by, user_email, rfd_date,
+                vehicle_out_date_time, vehicle_out_k_m_s, invoice_no, invoice_date,
+                invoice_amount, insurance_liability_discounts, letzryd_payable,
+                invoice_file, type_of_payment, payment_status, utr_no,
+                approved_by, approval_date, approval_file, vehicle_out_photos,
+                final_status, remarks
+            ) VALUES (
+                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s
+            ) RETURNING id, created_at;
+        """, (
+            data.inward_id, data.vehicle_number.strip().upper(), uid, u_email, data.rfd_date,
+            data.vehicle_out_date_time, data.vehicle_out_k_m_s, data.invoice_no, data.invoice_date,
+            data.invoice_amount, data.insurance_liability_discounts, payable,
+            data.invoice_file, data.type_of_payment, data.payment_status, data.utr_no,
+            data.approved_by, data.approval_date, data.approval_file, photos_val,
+            data.final_status, data.remarks
+        ))
+        out_row = cur.fetchone()
+        out_id = out_row[0]
+
+        if data.inward_id:
+            cur.execute("""
+                UPDATE july_maintenance_in
+                SET is_closed = TRUE, closed_at = NOW(), closed_by = %s
+                WHERE id = %s;
+            """, (uid, data.inward_id))
+
+        conn.commit()
+        return {
+            "success": True,
+            "id": out_id,
+            "inward_id": data.inward_id,
+            "created_at": out_row[1].isoformat(),
+            "message": "Vehicle outward entry recorded and inward maintenance ticket successfully closed" if data.inward_id else "Vehicle outward entry recorded successfully"
+        }
+    except HTTPException:
+        conn.rollback()
+        raise
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+@app.get("/api/maintenance-out")
+def list_maintenance_out(
+    search: Optional[str] = None,
+    limit: int = 200,
+    offset: int = 0,
+    authorization: Optional[str] = Header(None)
+):
+    get_current_user(authorization)
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        conditions = []
+        params = []
+
+        if search and search.strip():
+            s = f"%{search.strip().lower()}%"
+            conditions.append("(LOWER(o.vehicle_number) LIKE %s OR LOWER(COALESCE(o.invoice_no, '')) LIKE %s OR LOWER(COALESCE(i.workshop_name, '')) LIKE %s)")
+            params.extend([s, s, s])
+
+        where_clause = f"WHERE {' AND '.join(conditions)}" if conditions else ""
+        query = f"""
+            SELECT o.id, o.inward_id, o.vehicle_number, o.created_at, o.created_by, o.user_email,
+                   o.rfd_date, o.vehicle_out_date_time, o.vehicle_out_k_m_s, o.invoice_no,
+                   o.invoice_date, o.invoice_amount, o.insurance_liability_discounts,
+                   o.letzryd_payable, o.invoice_file, o.type_of_payment, o.payment_status,
+                   o.utr_no, o.approved_by, o.approval_date, o.approval_file,
+                   o.vehicle_out_photos, o.final_status, o.remarks,
+                   i.workshop_name, i.vehicle_in_date_time, i.city_name, i.vehicle_k_m_s as vehicle_in_kms
+            FROM july_maintenance_out o
+            LEFT JOIN july_maintenance_in i ON i.id = o.inward_id
+            {where_clause}
+            ORDER BY o.id DESC
+            LIMIT %s OFFSET %s;
+        """
+        params.extend([limit, offset])
+        cur.execute(query, params)
+        colnames = [desc[0] for desc in cur.description]
+        records = []
+        for r in cur.fetchall():
+            row_dict = dict(zip(colnames, r))
+            if row_dict.get("created_at"):
+                row_dict["created_at"] = row_dict["created_at"].isoformat()
+            records.append(row_dict)
+        return records
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+@app.get("/api/maintenance-out/{id}")
+def get_maintenance_out(id: int, authorization: Optional[str] = Header(None)):
+    get_current_user(authorization)
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            SELECT o.*, i.workshop_name, i.vehicle_in_date_time, i.city_name, i.vehicle_k_m_s as vehicle_in_kms
+            FROM july_maintenance_out o
+            LEFT JOIN july_maintenance_in i ON i.id = o.inward_id
+            WHERE o.id = %s;
+        """, (id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Outward record not found")
+        colnames = [desc[0] for desc in cur.description]
+        res = dict(zip(colnames, row))
+        if res.get("created_at"):
+            res["created_at"] = res["created_at"].isoformat()
+        return res
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+@app.put("/api/maintenance-out/{id}")
+def update_maintenance_out(id: int, data: MaintenanceOutCreate, authorization: Optional[str] = Header(None)):
+    user = get_current_user(authorization)
+    uid = user.get("portal_user_id") or user.get("user_id")
+
+    photos_val = data.vehicle_out_photos
+    if isinstance(photos_val, list):
+        photos_val = json.dumps(photos_val)
+    elif not photos_val:
+        photos_val = "[]"
+
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute("""
+            UPDATE july_maintenance_out
+            SET vehicle_number = %s,
+                rfd_date = %s,
+                vehicle_out_date_time = %s,
+                vehicle_out_k_m_s = %s,
+                invoice_no = %s,
+                invoice_date = %s,
+                invoice_amount = %s,
+                invoice_file = %s,
+                payment_status = %s,
+                approved_by = %s,
+                approval_date = %s,
+                approval_file = %s,
+                vehicle_out_photos = %s,
+                final_status = %s,
+                remarks = %s
+            WHERE id = %s RETURNING id;
+        """, (
+            data.vehicle_number.strip().upper(), data.rfd_date,
+            data.vehicle_out_date_time, data.vehicle_out_k_m_s,
+            data.invoice_no, data.invoice_date, data.invoice_amount,
+            data.invoice_file, data.payment_status or "Pending",
+            data.approved_by, data.approval_date, data.approval_file,
+            photos_val, data.final_status, data.remarks, id
+        ))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Maintenance Out record not found")
+        conn.commit()
+        return {"success": True, "id": id, "message": "Vehicle outward entry updated successfully"}
+    except Exception as e:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        postgreSQL_pool.putconn(conn)
+
+@app.delete("/api/maintenance-out/{id}")
+def delete_maintenance_out(id: int, authorization: Optional[str] = Header(None)):
+    get_current_user(authorization)
+    conn = postgreSQL_pool.getconn()
+    try:
+        cur = conn.cursor()
+        cur.execute("SELECT inward_id FROM july_maintenance_out WHERE id = %s;", (id,))
+        row = cur.fetchone()
+        if not row:
+            raise HTTPException(status_code=404, detail="Outward record not found")
+        inw_id = row[0]
+
+        cur.execute("DELETE FROM july_maintenance_out WHERE id = %s;", (id,))
+        cur.execute("UPDATE july_maintenance_in SET is_closed = FALSE, closed_at = NULL, closed_by = NULL WHERE id = %s;", (inw_id,))
+        conn.commit()
+        return {"success": True, "message": "Outward record deleted and inward ticket re-opened"}
     except Exception as e:
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))

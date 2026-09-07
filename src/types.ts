@@ -532,3 +532,62 @@ export interface ChallanRecord {
   challan_photo?: string;
   created_at?: string;
 }
+
+export interface MaintenanceInRecord {
+  id: number;
+  created_at: string;
+  created_by?: number;
+  user_email?: string;
+  city_name: string;
+  vehicle_number: string;
+  vehicle_location?: string;
+  vehicle_in_date_time: string;
+  vehicle_k_m_s: string;
+  repair_type?: string;
+  workshop_name: string;
+  estimated_delivery_date?: string;
+  estimated_amount?: string;
+  insurance_claimed?: string;
+  insurance_brokerage?: string;
+  claim_number?: string;
+  approved_by?: string;
+  approval_date?: string;
+  approval_file?: string;
+  vehicle_damage_photos?: string;
+  remarks?: string;
+  is_closed: boolean;
+  closed_at?: string;
+  closed_by?: number;
+}
+
+export interface MaintenanceOutRecord {
+  id: number;
+  inward_id?: number | null;
+  vehicle_number: string;
+  created_at: string;
+  created_by?: number;
+  user_email?: string;
+  rfd_date?: string;
+  vehicle_out_date_time: string;
+  vehicle_out_k_m_s: string;
+  invoice_no?: string;
+  invoice_date?: string;
+  invoice_amount?: string;
+  insurance_liability_discounts?: string;
+  letzryd_payable?: string;
+  invoice_file?: string;
+  type_of_payment?: string;
+  payment_status?: string;
+  utr_no?: string;
+  approved_by?: string;
+  approval_date?: string;
+  approval_file?: string;
+  vehicle_out_photos?: string;
+  final_status?: string;
+  remarks?: string;
+  // Joined fields from inward
+  workshop_name?: string;
+  vehicle_in_date_time?: string;
+  city_name?: string;
+  vehicle_in_kms?: string;
+}

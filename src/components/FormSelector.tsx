@@ -1,9 +1,9 @@
-import { ClipboardList, UserCheck, Settings, Key, LogOut, Truck, AlertTriangle, Wrench, MapPin, IndianRupee, Users, ShieldCheck, TicketIcon, UserCircle, Lock, Inbox } from "lucide-react";
+import { ClipboardList, UserCheck, Settings, Key, LogOut, Truck, AlertTriangle, Wrench, MapPin, IndianRupee, Users, ShieldCheck, TicketIcon, UserCircle, Lock, Inbox, CheckCircle } from "lucide-react";
 import { User } from "../types";
 
 interface FormSelectorProps {
   user: User;
-  onSelectForm: (form: "walkin" | "onboarding" | "operator_onboarding" | "adjustment" | "allocation" | "dropoff" | "expenses" | "vehicle_onboarding" | "workshops" | "hubs_parking" | "rents" | "accident" | "inspection" | "users" | "vehicle_models" | "cities" | "roles" | "tickets" | "employees" | "maintenance" | "challans" | "approvals") => void;
+  onSelectForm: (form: "walkin" | "onboarding" | "operator_onboarding" | "adjustment" | "allocation" | "dropoff" | "expenses" | "vehicle_onboarding" | "workshops" | "hubs_parking" | "rents" | "accident" | "inspection" | "users" | "vehicle_models" | "cities" | "roles" | "tickets" | "employees" | "maintenance" | "maintenance_in" | "maintenance_out" | "challans" | "approvals") => void;
   onLogout: () => void;
 }
 
@@ -17,6 +17,8 @@ const CARDS = [
   { key: "vehicle_onboarding",  label: "Vehicle Onboarding",     sub: "Add vehicles to fleet",               icon: Truck,         iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: WRITE_ACCESS_ROLES, isCompleted: true },
   { key: "allocation",          label: "Vehicle Allocation Form", sub: "Assign vehicle to driver",           icon: Key,           iconBg: "bg-green text-white", iconColor: "text-white", hover: "hover:border-green-500", allowedRoles: ALL_ROLES, isCompleted: true },
   { key: "dropoff",             label: "Vehicle Drop-Off Form",   sub: "Record vehicle returns",              icon: Truck,         iconBg: "bg-amber-600 text-white", iconColor: "text-white", hover: "hover:border-amber-500", allowedRoles: ALL_ROLES, isCompleted: true },
+  { key: "maintenance_in",      label: "Maintenance In",         sub: "Vehicle check-in & inward",           icon: Wrench,        iconBg: "bg-indigo-600 text-white", iconColor: "text-white", hover: "hover:border-indigo-500", allowedRoles: ALL_ROLES, isCompleted: true },
+  { key: "maintenance_out",     label: "Maintenance Out",        sub: "Vehicle check-out & billing",         icon: CheckCircle,   iconBg: "bg-emerald-600 text-white", iconColor: "text-white", hover: "hover:border-emerald-500", allowedRoles: ALL_ROLES, isCompleted: true },
   { key: "adjustment",          label: "Adjustment Form",        sub: "Wallet adjustments",                  icon: Settings,      iconBg: "bg-yellow-light",iconColor: "text-amber-600",   hover: "hover:border-amber-500",   allowedRoles: ALL_ROLES },
   { key: "expenses",            label: "Expenses Form",          sub: "Record operational expenses",         icon: ClipboardList, iconBg: "bg-red-50",     iconColor: "text-red-600",     hover: "hover:border-rose-500",    allowedRoles: ALL_ROLES },
   { key: "workshops",           label: "Workshops Form",         sub: "Garages & service vendors",           icon: Wrench,        iconBg: "bg-green-light", iconColor: "text-green",       hover: "hover:border-green",       allowedRoles: ALL_ROLES },
@@ -113,6 +115,9 @@ export default function FormSelector({ user, onSelectForm, onLogout }: FormSelec
 
             // SA & Business Head always see all forms
             if (isAdmin) return true;
+
+            // Maintenance In & Maintenance Out are accessible to all portal users
+            if (key === "maintenance_in" || key === "maintenance_out") return true;
 
             // Use per-user allowed_forms from DB if available
             if (user.allowed_forms && user.allowed_forms.length > 0) {
