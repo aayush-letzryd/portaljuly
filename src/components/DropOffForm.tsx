@@ -377,6 +377,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout }: DropOf
         return alert("Customer Address is mandatory for Forced Recovery.");
       }
       if (!odometerReading.trim()) return alert("Please enter Odometer Reading.");
+      if (!odometerPhoto) return alert("Please upload or capture Odometer Photo.");
       if (deltaInfo.isOver48 && !approverId) {
         return alert(`Please select a designated approver for ${cityName} since the drop-off date deviates by more than 48 hours.`);
       }

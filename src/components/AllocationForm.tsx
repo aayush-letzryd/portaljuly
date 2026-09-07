@@ -100,6 +100,7 @@ export default function AllocationForm({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [allocationDate, setAllocationDate] = useState<string>(getInitialLocalDateTime());
   const [transactionType, setTransactionType] = useState<"New Allocation" | "Reallocation" | "Rejoining" | "Swap">("New Allocation");
+  const [cityName, setCityName] = useState("Hyderabad");
 
   // Managerial Approval & 48-Hour Deviation States
   const [approverId, setApproverId] = useState<number | null>(null);
@@ -209,7 +210,6 @@ export default function AllocationForm({
   const [musicSystem, setMusicSystem] = useState("Available");
   const [oldMusicSystem, setOldMusicSystem] = useState("Available");
 
-  const [cityName, setCityName] = useState("Hyderabad");
   const [driverId, setDriverId] = useState("");
   const [driverName, setDriverName] = useState("");
   const [driverPhone, setDriverPhone] = useState("");
