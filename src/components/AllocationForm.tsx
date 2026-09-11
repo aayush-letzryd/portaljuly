@@ -778,6 +778,13 @@ export default function AllocationForm({
     const now = new Date();
     return records
       .filter((r) => {
+        // Exclude Drop-Off records or drop-off sub_types
+        if (
+          r.allocation_type === "Drop-Off" ||
+          ["drop-off", "voluntary return", "vehicle breakdown / maintenance", "contract completion", "non-payment / default", "driver attrition"].includes((r.sub_type || "").toLowerCase())
+        ) {
+          return false;
+        }
         // City filter (case-insensitive)
         if (filterCity !== "all" && (r.city_name || "").toLowerCase() !== filterCity.toLowerCase()) return false;
         // Type filter (case-insensitive)
@@ -819,8 +826,20 @@ export default function AllocationForm({
   const totalPages = Math.ceil(filteredRecords.length / PAGE_SIZE) || 1;
   const paginatedRecords = filteredRecords.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
-  const draftTotalPages = Math.ceil(draftRecords.length / PAGE_SIZE) || 1;
-  const paginatedDrafts = draftRecords.slice((draftPage - 1) * PAGE_SIZE, draftPage * PAGE_SIZE);
+  const filteredDrafts = useMemo(() => {
+    return draftRecords.filter((r) => {
+      if (
+        r.allocation_type === "Drop-Off" ||
+        ["drop-off", "voluntary return", "vehicle breakdown / maintenance", "contract completion", "non-payment / default", "driver attrition"].includes((r.sub_type || "").toLowerCase())
+      ) {
+        return false;
+      }
+      return true;
+    });
+  }, [draftRecords]);
+
+  const draftTotalPages = Math.ceil(filteredDrafts.length / PAGE_SIZE) || 1;
+  const paginatedDrafts = filteredDrafts.slice((draftPage - 1) * PAGE_SIZE, draftPage * PAGE_SIZE);
 
   const handleExportCSV = () => {
     if (filteredRecords.length === 0) return alert("No records to export");
@@ -1994,7 +2013,7 @@ export default function AllocationForm({
                             <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">{r.vehicle_number || "—"}</td>
                             <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-700">
                               <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200/60 font-semibold text-[11px]">
-                                {r.sub_type || r.allocation_type || "New Allocation"}
+                                {r.allocation_type || r.sub_type || "New Allocation"}
                               </span>
                             </td>
                             <td className="px-4 py-3.5 font-sans text-xs text-slate-800">
@@ -2227,7 +2246,7 @@ export default function AllocationForm({
                             <td className="px-4 py-3.5 font-sans text-xs font-bold text-slate-900">{r.vehicle_number || "—"}</td>
                             <td className="px-4 py-3.5 font-sans text-xs font-medium text-slate-700">
                               <span className="px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200/60 font-semibold text-[11px]">
-                                {r.sub_type || r.allocation_type || "New Allocation"}
+                                {r.allocation_type || r.sub_type || "New Allocation"}
                               </span>
                             </td>
                             <td className="px-4 py-3.5 font-sans text-xs font-medium">

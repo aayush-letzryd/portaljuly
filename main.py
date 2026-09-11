@@ -904,6 +904,38 @@ def startup_event():
                 );
             """)
 
+            # Additional columns for july_vehicle_dropoffs
+            for col_def in [
+                "dropoff_date_time VARCHAR(50)",
+                "event_date_time VARCHAR(50)",
+                "approval_status VARCHAR(50) DEFAULT 'Approved'",
+                "current_approver_id INTEGER",
+                "approval_remarks TEXT",
+                "manual_dropoff_location VARCHAR(255)",
+                "customer_address TEXT",
+                "ola_negative_balance NUMERIC(12,2) DEFAULT 0",
+                "ola_negative_balance_proof TEXT",
+                "fastag_balance_amount NUMERIC(12,2) DEFAULT 0",
+                "fastag_balance_proof TEXT",
+                "insp_jack VARCHAR(50)",
+                "insp_jack_rod VARCHAR(50)",
+                "insp_spanner VARCHAR(50)",
+                "insp_parking_triangle VARCHAR(50)",
+                "insp_fire_extinguishers VARCHAR(50)",
+                "insp_seat_cover VARCHAR(50)",
+                "insp_floor_carpet VARCHAR(50)",
+                "insp_music_system VARCHAR(50)",
+                "insp_stepney VARCHAR(50)",
+                "insp_stepney_photo TEXT",
+                "created_by INTEGER",
+                "driver_type VARCHAR(50) DEFAULT 'Individual'",
+                "return_date DATE",
+                "return_type VARCHAR(100)",
+                "remarks TEXT",
+                "updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP"
+            ]:
+                cur.execute(f"ALTER TABLE july_vehicle_dropoffs ADD COLUMN IF NOT EXISTS {col_def};")
+
             # Indexes for july_allocation_form
             for idx_sql in [
                 "CREATE INDEX IF NOT EXISTS idx_jaf_driver_id       ON july_allocation_form (driver_id);",
@@ -5525,7 +5557,8 @@ def get_allocations(
             SELECT a.*, COALESCE(u.username, 'Onboarding Executive 1') AS executive_name
             FROM july_allocation_form a
             LEFT JOIN july_portal_users u ON a.created_by = u.portal_user_id
-            WHERE 1=1
+            WHERE (a.allocation_type IS NULL OR a.allocation_type != 'Drop-Off')
+              AND (a.sub_type IS NULL OR a.sub_type NOT IN ('Drop-Off','Voluntary Return','Contract Completion','Non-payment / Default','Vehicle Breakdown / Maintenance','Other','Driver Attrition'))
         """
         params = []
 
@@ -5803,33 +5836,34 @@ def get_allocation_stats(authorization: Optional[str] = Header(None)):
     try:
         cur = conn.cursor()
 
-        cur.execute("SELECT COUNT(*) FROM july_allocation_form;")
+        cur.execute("SELECT COUNT(*) FROM july_allocation_form WHERE allocation_type != 'Drop-Off';")
         total = cur.fetchone()[0]
 
         cur.execute("""
             SELECT COUNT(*) FROM july_allocation_form
-            WHERE allocation_type = 'Allocation'
-              AND sub_type IN ('New Allocation', 'Rejoining');
+            WHERE (allocation_type IN ('New Allocation', 'Allocation', 'Fresh Allocation')
+                   OR (allocation_type = 'Allocation' AND sub_type IN ('New Allocation', 'Rejoining')))
+              AND allocation_type != 'Drop-Off';
         """)
         new_alloc = cur.fetchone()[0]
 
         cur.execute("""
             SELECT COUNT(*) FROM july_allocation_form
-            WHERE allocation_type = 'Allocation' AND sub_type = 'Swap';
+            WHERE (allocation_type = 'Swap' OR sub_type = 'Swap') AND allocation_type != 'Drop-Off';
         """)
         swap_alloc = cur.fetchone()[0]
 
         cur.execute("""
             SELECT COUNT(*) FROM july_allocation_form
-            WHERE allocation_type = 'Drop-Off';
+            WHERE (allocation_type = 'Reallocation' OR sub_type = 'Reallocation') AND allocation_type != 'Drop-Off';
         """)
-        dropoffs = cur.fetchone()[0]
+        realloc_count = cur.fetchone()[0]
 
         return {
             "total_allocations": total,
             "new_allocations":   new_alloc,
             "car_swaps":         swap_alloc,
-            "reallocations":     dropoffs      # kept for frontend compat
+            "reallocations":     realloc_count
         }
     finally:
         postgreSQL_pool.putconn(conn)
@@ -6038,7 +6072,7 @@ def get_dropoffs(status: Optional[str] = None, authorization: Optional[str] = He
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        where = "(a.allocation_type = 'Drop-Off' OR a.sub_type IN ('Drop-Off','Voluntary Return','Contract Completion','Non-payment / Default','Vehicle Breakdown / Maintenance','Other'))"
+        where = "1=1"
         params = []
         if status in ("all", "all_including_draft"):
             pass
@@ -6050,24 +6084,24 @@ def get_dropoffs(status: Optional[str] = None, authorization: Optional[str] = He
         cur.execute(f"""
             SELECT
                 a.id,
-                a.allocation_date  AS dropoff_date,
-                a.sub_type         AS dropoff_reason,
+                a.dropoff_date,
+                a.dropoff_reason,
                 a.city_name,
                 a.dropoff_location,
                 a.manual_dropoff_location,
                 a.customer_address,
                 a.driver_id, a.driver_name, a.driver_phone, a.vehicle_number,
-                COALESCE(a.odometer_reading::text, a.dropoff_odometer::text) AS odometer_reading,
-                a.dropoff_remarks  AS dropoff_notes,
+                a.odometer_reading::text,
+                a.dropoff_notes,
                 a.photo_lh_side,
                 a.photo_rh_side,
                 a.photo_front_side,
                 a.photo_back_side,
-                COALESCE(a.odometer_photo, a.dropoff_photo) AS odometer_photo,
+                a.odometer_photo,
                 a.battery_photo,
                 a.ola_negative_balance,
                 a.ola_negative_balance_proof,
-                COALESCE(a.pending_dues, a.fastag_balance_amount) AS pending_dues,
+                a.pending_dues,
                 a.damage_penalty,
                 a.deposit_refund_status,
                 a.fastag_balance_amount,
@@ -6091,7 +6125,7 @@ def get_dropoffs(status: Optional[str] = None, authorization: Optional[str] = He
                 COALESCE(u.username, 'Executive') AS created_by_name,
                 a.created_at,
                 a.updated_at
-            FROM july_allocation_form a
+            FROM july_vehicle_dropoffs a
             LEFT JOIN july_portal_users u ON u.portal_user_id = a.created_by
             WHERE {where}
             ORDER BY COALESCE(a.updated_at, a.created_at) DESC, a.id DESC;
@@ -6124,24 +6158,24 @@ def get_single_dropoff(id: int, authorization: Optional[str] = Header(None)):
         cur.execute("""
             SELECT
                 a.id,
-                a.allocation_date  AS dropoff_date,
-                a.sub_type         AS dropoff_reason,
+                a.dropoff_date,
+                a.dropoff_reason,
                 a.city_name,
                 a.dropoff_location,
                 a.manual_dropoff_location,
                 a.customer_address,
                 a.driver_id, a.driver_name, a.driver_phone, a.vehicle_number,
-                COALESCE(a.odometer_reading::text, a.dropoff_odometer::text) AS odometer_reading,
-                a.dropoff_remarks  AS dropoff_notes,
+                a.odometer_reading::text,
+                a.dropoff_notes,
                 a.photo_lh_side,
                 a.photo_rh_side,
                 a.photo_front_side,
                 a.photo_back_side,
-                COALESCE(a.odometer_photo, a.dropoff_photo) AS odometer_photo,
+                a.odometer_photo,
                 a.battery_photo,
                 a.ola_negative_balance,
                 a.ola_negative_balance_proof,
-                COALESCE(a.pending_dues, a.fastag_balance_amount) AS pending_dues,
+                a.pending_dues,
                 a.damage_penalty,
                 a.deposit_refund_status,
                 a.fastag_balance_amount,
@@ -6165,11 +6199,62 @@ def get_single_dropoff(id: int, authorization: Optional[str] = Header(None)):
                 COALESCE(u.username, 'Executive') AS created_by_name,
                 a.created_at,
                 a.updated_at
-            FROM july_allocation_form a
+            FROM july_vehicle_dropoffs a
             LEFT JOIN july_portal_users u ON u.portal_user_id = a.created_by
             WHERE a.id = %s;
         """, (id,))
         row = cur.fetchone()
+        if not row:
+            # Fallback to july_allocation_form
+            cur.execute("""
+                SELECT
+                    a.id,
+                    a.allocation_date AS dropoff_date,
+                    a.sub_type AS dropoff_reason,
+                    a.city_name,
+                    a.dropoff_location,
+                    a.manual_dropoff_location,
+                    a.customer_address,
+                    a.driver_id, a.driver_name, a.driver_phone, a.vehicle_number,
+                    COALESCE(a.odometer_reading::text, a.dropoff_odometer::text) AS odometer_reading,
+                    a.dropoff_remarks AS dropoff_notes,
+                    a.photo_lh_side,
+                    a.photo_rh_side,
+                    a.photo_front_side,
+                    a.photo_back_side,
+                    COALESCE(a.odometer_photo, a.dropoff_photo) AS odometer_photo,
+                    a.battery_photo,
+                    a.ola_negative_balance,
+                    a.ola_negative_balance_proof,
+                    COALESCE(a.pending_dues, a.fastag_balance_amount) AS pending_dues,
+                    a.damage_penalty,
+                    a.deposit_refund_status,
+                    a.fastag_balance_amount,
+                    a.fastag_balance_proof,
+                    a.insp_jack,
+                    a.insp_jack_rod,
+                    a.insp_spanner,
+                    a.insp_parking_triangle,
+                    a.insp_fire_extinguishers,
+                    a.insp_seat_cover,
+                    a.insp_floor_carpet,
+                    a.insp_music_system,
+                    a.insp_stepney,
+                    a.insp_stepney_photo,
+                    a.status,
+                    a.approval_status,
+                    a.current_approver_id,
+                    a.approval_remarks,
+                    a.event_date_time,
+                    a.created_by,
+                    COALESCE(u.username, 'Executive') AS created_by_name,
+                    a.created_at,
+                    a.updated_at
+                FROM july_allocation_form a
+                LEFT JOIN july_portal_users u ON u.portal_user_id = a.created_by
+                WHERE a.id = %s;
+            """, (id,))
+            row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Drop-off record not found")
         cols = [d[0] for d in cur.description]
@@ -6291,6 +6376,77 @@ def create_dropoff(data: DropOffData, authorization: Optional[str] = Header(None
             data.approval_remarks, db_event_dt, uid
         ))
         new_id = cur.fetchone()[0]
+
+        # Synchronize into july_vehicle_dropoffs
+        cur.execute("""
+            INSERT INTO july_vehicle_dropoffs (
+                id, dropoff_date, dropoff_reason, city_name,
+                dropoff_location, manual_dropoff_location, customer_address,
+                driver_id, driver_name, driver_phone,
+                vehicle_number, odometer_reading, dropoff_notes,
+                photo_lh_side, photo_rh_side, photo_front_side, photo_back_side,
+                odometer_photo, battery_photo,
+                ola_negative_balance, ola_negative_balance_proof,
+                fastag_balance_amount, pending_dues, damage_penalty, deposit_refund_status,
+                fastag_balance_proof,
+                insp_jack, insp_jack_rod, insp_spanner, insp_parking_triangle,
+                insp_fire_extinguishers, insp_seat_cover, insp_floor_carpet, insp_music_system,
+                insp_stepney, insp_stepney_photo, status, approval_status, current_approver_id,
+                approval_remarks, event_date_time, created_by, created_at,
+                driver_type, return_date, return_type, remarks
+            ) VALUES (
+                %s, %s, %s, %s,
+                %s, %s, %s,
+                %s, %s, %s,
+                %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s,
+                %s, %s,
+                %s, %s, %s, %s,
+                %s,
+                %s, %s, %s, %s,
+                %s, %s, %s, %s,
+                %s, %s, %s, %s, %s,
+                %s, %s, %s, NOW(),
+                'Individual', %s, %s, %s
+            )
+            ON CONFLICT (id) DO UPDATE SET
+                dropoff_date = EXCLUDED.dropoff_date,
+                dropoff_reason = EXCLUDED.dropoff_reason,
+                city_name = EXCLUDED.city_name,
+                driver_id = EXCLUDED.driver_id,
+                driver_name = EXCLUDED.driver_name,
+                vehicle_number = EXCLUDED.vehicle_number,
+                status = EXCLUDED.status,
+                approval_status = EXCLUDED.approval_status,
+                current_approver_id = EXCLUDED.current_approver_id;
+        """, (
+            new_id,
+            data.dropoff_date.split("T")[0] if (data.dropoff_date and "T" in data.dropoff_date) else data.dropoff_date,
+            data.dropoff_reason, data.city_name,
+            data.dropoff_location, data.manual_dropoff_location, data.customer_address,
+            data.driver_id, data.driver_name, data.driver_phone,
+            data.vehicle_number,
+            float(data.odometer_reading) if data.odometer_reading is not None and str(data.odometer_reading).strip() != "" else None,
+            data.dropoff_notes,
+            extract_image(data.photo_lh_side), extract_image(data.photo_rh_side),
+            extract_image(data.photo_front_side), extract_image(data.photo_back_side),
+            extract_image(data.odometer_photo), extract_image(data.battery_photo),
+            float(data.ola_negative_balance) if data.ola_negative_balance is not None and str(data.ola_negative_balance).strip() != "" else None,
+            extract_image(data.ola_negative_balance_proof),
+            float(data.fastag_balance_amount) if data.fastag_balance_amount is not None and str(data.fastag_balance_amount).strip() != "" else (float(data.pending_dues) if data.pending_dues is not None and str(data.pending_dues).strip() != "" else None),
+            float(data.pending_dues) if data.pending_dues is not None and str(data.pending_dues).strip() != "" else None,
+            float(data.damage_penalty) if data.damage_penalty is not None and str(data.damage_penalty).strip() != "" else None,
+            data.deposit_refund_status or "Pending Assessment",
+            extract_image(data.fastag_balance_proof),
+            data.insp_jack or "Available", data.insp_jack_rod or "Available", data.insp_spanner or "Available", data.insp_parking_triangle or "Available",
+            data.insp_fire_extinguishers or "Available", data.insp_seat_cover or "Available", data.insp_floor_carpet or "Available", data.insp_music_system or "Available",
+            data.insp_stepney or "Available", extract_image(data.insp_stepney_photo),
+            target_status, target_approval_status, target_approver,
+            data.approval_remarks, db_event_dt, uid,
+            (data.dropoff_date.split("T")[0] if (data.dropoff_date and "T" in data.dropoff_date) else data.dropoff_date) or None,
+            data.dropoff_reason, data.dropoff_notes
+        ))
 
         # Link End-to-End: Update vehicle status in onboarding table to Ready for Deployment ONLY IF approved
         if target_approval_status == "Approved" and data.vehicle_number and data.vehicle_number.strip():
@@ -6423,6 +6579,53 @@ def update_dropoff(id: int, data: DropOffData, authorization: Optional[str] = He
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Drop-off record not found")
 
+        # Synchronize update into july_vehicle_dropoffs
+        cur.execute("""
+            UPDATE july_vehicle_dropoffs SET
+                dropoff_date=%s, dropoff_reason=%s, city_name=%s,
+                dropoff_location=%s, manual_dropoff_location=%s, customer_address=%s,
+                driver_id=%s, driver_name=%s, driver_phone=%s,
+                vehicle_number=%s, odometer_reading=%s, dropoff_notes=%s,
+                photo_lh_side=%s, photo_rh_side=%s, photo_front_side=%s, photo_back_side=%s,
+                odometer_photo=%s, battery_photo=%s,
+                ola_negative_balance=%s, ola_negative_balance_proof=%s,
+                fastag_balance_amount=%s, pending_dues=%s, damage_penalty=%s, deposit_refund_status=%s,
+                fastag_balance_proof=%s,
+                insp_jack=%s, insp_jack_rod=%s, insp_spanner=%s, insp_parking_triangle=%s,
+                insp_fire_extinguishers=%s, insp_seat_cover=%s, insp_floor_carpet=%s, insp_music_system=%s,
+                insp_stepney=%s, insp_stepney_photo=%s, status=%s, approval_status=%s,
+                current_approver_id=%s, approval_remarks=%s, event_date_time=%s,
+                return_date=%s, return_type=%s, remarks=%s,
+                updated_at=NOW()
+            WHERE id=%s;
+        """, (
+            data.dropoff_date.split("T")[0] if (data.dropoff_date and "T" in data.dropoff_date) else data.dropoff_date,
+            data.dropoff_reason, data.city_name,
+            data.dropoff_location, data.manual_dropoff_location, data.customer_address,
+            data.driver_id, data.driver_name, data.driver_phone,
+            data.vehicle_number,
+            float(data.odometer_reading) if data.odometer_reading is not None and str(data.odometer_reading).strip() != "" else None,
+            data.dropoff_notes,
+            extract_image(data.photo_lh_side), extract_image(data.photo_rh_side),
+            extract_image(data.photo_front_side), extract_image(data.photo_back_side),
+            extract_image(data.odometer_photo), extract_image(data.battery_photo),
+            float(data.ola_negative_balance) if data.ola_negative_balance is not None and str(data.ola_negative_balance).strip() != "" else None,
+            extract_image(data.ola_negative_balance_proof),
+            float(data.fastag_balance_amount) if data.fastag_balance_amount is not None and str(data.fastag_balance_amount).strip() != "" else (float(data.pending_dues) if data.pending_dues is not None and str(data.pending_dues).strip() != "" else None),
+            float(data.pending_dues) if data.pending_dues is not None and str(data.pending_dues).strip() != "" else None,
+            float(data.damage_penalty) if data.damage_penalty is not None and str(data.damage_penalty).strip() != "" else None,
+            data.deposit_refund_status or "Pending Assessment",
+            extract_image(data.fastag_balance_proof),
+            data.insp_jack or "Available", data.insp_jack_rod or "Available", data.insp_spanner or "Available", data.insp_parking_triangle or "Available",
+            data.insp_fire_extinguishers or "Available", data.insp_seat_cover or "Available", data.insp_floor_carpet or "Available", data.insp_music_system or "Available",
+            data.insp_stepney or "Available", extract_image(data.insp_stepney_photo),
+            target_status, target_approval_status, target_approver,
+            data.approval_remarks, db_event_dt,
+            (data.dropoff_date.split("T")[0] if (data.dropoff_date and "T" in data.dropoff_date) else data.dropoff_date) or None,
+            data.dropoff_reason, data.dropoff_notes,
+            id
+        ))
+
         # If approved, update vehicle status and close active allocation
         if target_approval_status == "Approved" and data.vehicle_number and data.vehicle_number.strip():
             cur.execute("""
@@ -6465,7 +6668,10 @@ def delete_dropoff(id: int, authorization: Optional[str] = Header(None)):
     try:
         cur = conn.cursor()
         cur.execute("DELETE FROM july_allocation_form WHERE id=%s RETURNING id;", (id,))
-        if not cur.fetchone():
+        del1 = cur.fetchone()
+        cur.execute("DELETE FROM july_vehicle_dropoffs WHERE id=%s RETURNING id;", (id,))
+        del2 = cur.fetchone()
+        if not del1 and not del2:
             raise HTTPException(status_code=404, detail="Drop-off record not found")
         conn.commit()
         return {"success": True}
@@ -9532,7 +9738,18 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
                           AND allocation_type != 'Drop-Off'
                           AND (status IS NULL OR status NOT IN ('Returned', 'Completed'));
                     """, (record_id,))
-                    cur.execute("UPDATE july_allocation_form SET status = 'Submitted' WHERE id = %s;", (record_id,))
+                    cur.execute("""
+                        UPDATE july_allocation_form 
+                        SET status = 'Submitted', approval_status = 'Approved',
+                            current_approver_id = NULL, approval_remarks = %s, updated_at = NOW()
+                        WHERE id = %s;
+                    """, (body.remarks, record_id))
+                    cur.execute("""
+                        UPDATE july_vehicle_dropoffs 
+                        SET approval_status = 'Approved', current_approver_id = NULL,
+                            approval_remarks = %s, status = 'Submitted', updated_at = NOW()
+                        WHERE id = %s;
+                    """, (body.remarks, record_id))
 
 
         elif body.action == "REJECT":
@@ -9553,6 +9770,13 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
 
             if module in ["allocation", "dropoff"]:
                 cur.execute("UPDATE july_allocation_form SET status = 'Rejected' WHERE id = %s;", (record_id,))
+            if module == "dropoff":
+                cur.execute("""
+                    UPDATE july_vehicle_dropoffs 
+                    SET approval_status = 'Rejected', current_approver_id = NULL,
+                        approval_remarks = %s, status = 'Rejected', updated_at = NOW()
+                    WHERE id = %s;
+                """, (body.remarks, record_id))
 
             cur.execute("""
                 INSERT INTO july_approval_chain_logs (module_name, record_id, from_user_id, to_user_id, action, remarks)
@@ -9576,6 +9800,13 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
                     WHERE id = %s;
                 """, (body.forward_to_user_id, body.forward_to_user_id, body.remarks, uid, record_id))
 
+            if module == "dropoff":
+                cur.execute("""
+                    UPDATE july_vehicle_dropoffs 
+                    SET current_approver_id = %s, approval_remarks = %s, updated_at = NOW()
+                    WHERE id = %s;
+                """, (body.forward_to_user_id, body.remarks, record_id))
+
             cur.execute("""
                 INSERT INTO july_approval_chain_logs (module_name, record_id, from_user_id, to_user_id, action, remarks)
                 VALUES (%s, %s, %s, %s, 'FORWARDED', %s);
@@ -9596,6 +9827,14 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
                     SET approval_status = 'Changes Requested', current_approver_id = created_by, approval_note = %s, updated_by = %s, updated_at = NOW()
                     WHERE id = %s;
                 """, (body.remarks, uid, record_id))
+
+            if module == "dropoff":
+                cur.execute("""
+                    UPDATE july_vehicle_dropoffs 
+                    SET approval_status = 'Changes Requested', current_approver_id = created_by,
+                        approval_remarks = %s, updated_at = NOW()
+                    WHERE id = %s;
+                """, (body.remarks, record_id))
 
             cur.execute("""
                 INSERT INTO july_approval_chain_logs (module_name, record_id, from_user_id, to_user_id, action, remarks)
@@ -9741,7 +9980,18 @@ def process_batch_approval(body: BatchApprovalAction, authorization: Optional[st
                               AND allocation_type != 'Drop-Off'
                               AND (status IS NULL OR status NOT IN ('Returned', 'Completed'));
                         """, (rec_id,))
-                        cur.execute("UPDATE july_allocation_form SET status = 'Submitted' WHERE id = %s;", (rec_id,))
+                        cur.execute("""
+                            UPDATE july_allocation_form 
+                            SET status = 'Submitted', approval_status = 'Approved',
+                                current_approver_id = NULL, approval_remarks = %s, updated_at = NOW()
+                            WHERE id = %s;
+                        """, (body.remarks, rec_id))
+                        cur.execute("""
+                            UPDATE july_vehicle_dropoffs 
+                            SET approval_status = 'Approved', current_approver_id = NULL,
+                                approval_remarks = %s, status = 'Submitted', updated_at = NOW()
+                            WHERE id = %s;
+                        """, (body.remarks, rec_id))
 
                     cur.execute("""
                         INSERT INTO july_approval_chain_logs (module_name, record_id, from_user_id, to_user_id, action, remarks)
