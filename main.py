@@ -2649,12 +2649,19 @@ def list_app_users(authorization: Optional[str] = Header(None)):
     try:
         cur = conn.cursor()
         cur.execute("""
-            SELECT au.id, au.username, u.name, u.role, au.created_at, au.raw_password, 
-                   au.role_id, ar.name, COALESCE(au.employee_id, u.employee_id), COALESCE(au.email, u.email)
-            FROM july_app_users au
-            JOIN july_portal_users u ON u.id = au.executive_id
-            LEFT JOIN app_roles ar ON ar.id = au.role_id
-            ORDER BY au.id DESC;
+            SELECT pu.portal_user_id AS id, pu.username,
+                   COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', COALESCE(e.last_name, ''))), ''), pu.username) AS name,
+                   COALESCE(r.role_name, pu.role, 'Executive') AS role,
+                   pu.created_at,
+                   '••••••••' AS raw_password,
+                   pu.role_id,
+                   COALESCE(r.role_name, 'User') AS role_name,
+                   COALESCE(e.employee_id::text, pu.employee_id::text, ''),
+                   COALESCE(pu.email, e.company_email, '')
+            FROM july_portal_users pu
+            LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
+            LEFT JOIN july_roles r ON r.role_id = pu.role_id
+            ORDER BY pu.portal_user_id DESC;
         """)
         rows = cur.fetchall()
         result = []
@@ -2665,7 +2672,7 @@ def list_app_users(authorization: Optional[str] = Header(None)):
                 "name": r[2],
                 "role": r[3],
                 "created_at": r[4].isoformat() if r[4] else None,
-                "raw_password": r[5] or "letzryd123",
+                "raw_password": r[5],
                 "role_id": r[6],
                 "role_name": r[7],
                 "employee_id": r[8],
@@ -2685,38 +2692,20 @@ def create_app_user(req: AppUserData, authorization: Optional[str] = Header(None
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT id FROM july_app_users WHERE username = %s;", (username_cleaned,))
+        cur.execute("SELECT portal_user_id FROM july_portal_users WHERE LOWER(username) = %s;", (username_cleaned,))
         if cur.fetchone():
             raise HTTPException(status_code=400, detail="Username already exists")
         
-        executive_id = None
-        if req.employee_id and req.employee_id.strip():
-            cur.execute("SELECT id FROM july_portal_users WHERE employee_id = %s;", (req.employee_id.strip(),))
-            row = cur.fetchone()
-            if row:
-                executive_id = row[0]
-                cur.execute(
-                    "UPDATE july_portal_users SET name = %s, role = %s, email = COALESCE(email, %s) WHERE id = %s;",
-                    (req.name.strip(), req.role.strip(), req.email, executive_id)
-                )
-
-        if not executive_id:
-            cur.execute(
-                "INSERT INTO july_portal_users (name, role, employee_id, email) VALUES (%s, %s, %s, %s) RETURNING id;",
-                (req.name.strip(), req.role.strip(), req.employee_id, req.email)
-            )
-            executive_id = cur.fetchone()[0]
-        
         hashed_password = pwd_context.hash(req.password)
         cur.execute(
-            """INSERT INTO july_app_users (username, password_hash, executive_id, raw_password, role_id, employee_id, email) 
-               VALUES (%s, %s, %s, %s, %s, %s, %s) RETURNING id;""",
-            (username_cleaned, hashed_password, executive_id, req.password, req.role_id, req.employee_id, req.email)
+            """INSERT INTO july_portal_users (username, password_hash, role, role_id, email, account_status, created_at) 
+               VALUES (%s, %s, %s, %s, %s, 'Active', NOW()) RETURNING portal_user_id;""",
+            (username_cleaned, hashed_password, req.role.strip(), req.role_id, req.email)
         )
         user_id = cur.fetchone()[0]
         
         conn.commit()
-        return {"success": True, "user_id": user_id, "executive_id": executive_id}
+        return {"success": True, "user_id": user_id, "executive_id": user_id}
     except Exception as e:
         conn.rollback()
         if isinstance(e, HTTPException):
@@ -2734,38 +2723,19 @@ def update_app_user(id: int, req: AppUserUpdateData, authorization: Optional[str
     try:
         cur = conn.cursor()
         
-        cur.execute("SELECT executive_id FROM july_app_users WHERE id = %s;", (id,))
+        cur.execute("SELECT portal_user_id FROM july_portal_users WHERE portal_user_id = %s;", (id,))
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="User not found")
-        exec_id = row[0]
         
-        cur.execute("SELECT id FROM july_app_users WHERE username = %s AND id != %s;", (username_cleaned, id))
+        cur.execute("SELECT portal_user_id FROM july_portal_users WHERE LOWER(username) = %s AND portal_user_id != %s;", (username_cleaned, id))
         if cur.fetchone():
             raise HTTPException(status_code=400, detail="Username already exists")
             
-        if req.employee_id and req.employee_id.strip():
-            cur.execute("SELECT id FROM july_portal_users WHERE employee_id = %s;", (req.employee_id.strip(),))
-            emp_row = cur.fetchone()
-            if emp_row:
-                new_exec_id = emp_row[0]
-                if new_exec_id != exec_id:
-                    cur.execute("UPDATE july_app_users SET executive_id = %s WHERE id = %s;", (new_exec_id, id))
-                    exec_id = new_exec_id
-                cur.execute(
-                    "UPDATE july_portal_users SET name = %s, role = %s, email = COALESCE(email, %s) WHERE id = %s;",
-                    (req.name.strip(), req.role.strip(), req.email, exec_id)
-                )
-            else:
-                cur.execute(
-                    "UPDATE july_portal_users SET name = %s, role = %s, employee_id = %s, email = %s WHERE id = %s;",
-                    (req.name.strip(), req.role.strip(), req.employee_id, req.email, exec_id)
-                )
-        else:
-            cur.execute(
-                "UPDATE july_portal_users SET name = %s, role = %s WHERE id = %s;",
-                (req.name.strip(), req.role.strip(), exec_id)
-            )
+        cur.execute(
+            "UPDATE july_portal_users SET username = %s, role = %s, role_id = %s, email = %s WHERE portal_user_id = %s;",
+            (username_cleaned, req.role.strip(), req.role_id, req.email, id)
+        )
         
         if req.password:
             hashed_password = pwd_context.hash(req.password)
@@ -8210,16 +8180,34 @@ def get_tickets(authorization: Optional[str] = Header(None)):
     try:
         cur = conn.cursor()
         cur.execute("""
-            SELECT t.id, t.title, t.description, t.source, t.status, 
-                   t.created_by_name, t.assigned_to, u.name as assignee_name, 
-                   t.created_at, t.resolved_at, t.resolution_notes
+            SELECT t.ticket_id AS id, 
+                   COALESCE(NULLIF(t.issue_type, ''), t.ticket_number, 'Ticket #' || t.ticket_id) AS title, 
+                   t.description, 
+                   COALESCE(t.city, 'Internal') AS source, 
+                   COALESCE(t.ticket_status, 'Open') AS status, 
+                   COALESCE(sub.username, 'System') AS created_by_name, 
+                   t.current_approver_id AS assigned_to, 
+                   COALESCE(NULLIF(TRIM(CONCAT(app_e.first_name, ' ', COALESCE(app_e.last_name, ''))), ''), app_u.username, 'Unassigned') AS assignee_name, 
+                   t.created_at, 
+                   CASE WHEN t.ticket_status = 'Resolved' THEN t.updated_at ELSE NULL END AS resolved_at, 
+                   t.approval_remarks AS resolution_notes
             FROM july_tickets t
-            LEFT JOIN july_app_users au ON au.id = t.assigned_to
-            LEFT JOIN july_portal_users u ON u.id = au.executive_id
+            LEFT JOIN july_portal_users sub ON sub.portal_user_id = t.created_by
+            LEFT JOIN july_portal_users app_u ON app_u.portal_user_id = t.current_approver_id
+            LEFT JOIN july_employees app_e ON app_e.employee_id = app_u.employee_id
             ORDER BY t.created_at DESC;
         """)
         keys = ["id", "title", "description", "source", "status", "created_by_name", "assigned_to", "assignee_name", "created_at", "resolved_at", "resolution_notes"]
-        return [dict(zip(keys, row)) for row in cur.fetchall()]
+        rows = cur.fetchall()
+        result = []
+        for r in rows:
+            d = dict(zip(keys, r))
+            if d.get("created_at"):
+                d["created_at"] = to_ist_iso(d["created_at"])
+            if d.get("resolved_at"):
+                d["resolved_at"] = to_ist_iso(d["resolved_at"])
+            result.append(d)
+        return result
     finally:
         postgreSQL_pool.putconn(conn)
 
@@ -8229,10 +8217,12 @@ def create_ticket(req: TicketData, authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
+        uid = user.get("portal_user_id") or user.get("id") or 3
+        ticket_num = f"TCK-{datetime.now().strftime('%m%d%H%M%S')}"
         cur.execute("""
-            INSERT INTO july_tickets (title, description, source, status, created_by_name, assigned_to)
-            VALUES (%s, %s, %s, %s, %s, %s) RETURNING id;
-        """, (req.title, req.description, req.source, req.status, user["name"], req.assigned_to))
+            INSERT INTO july_tickets (ticket_number, issue_type, description, city, ticket_status, created_by, current_approver_id, created_at)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, NOW()) RETURNING ticket_id;
+        """, (ticket_num, req.title, req.description, req.source, req.status or "Open", uid, req.assigned_to))
         ticket_id = cur.fetchone()[0]
         conn.commit()
         return {"success": True, "id": ticket_id}
@@ -8251,8 +8241,8 @@ def resolve_ticket(id: int, data: dict, authorization: Optional[str] = Header(No
         cur = conn.cursor()
         cur.execute("""
             UPDATE july_tickets 
-            SET status = 'Resolved', resolved_at = NOW(), resolution_notes = %s 
-            WHERE id = %s RETURNING id;
+            SET ticket_status = 'Resolved', updated_at = NOW(), approval_remarks = %s 
+            WHERE ticket_id = %s RETURNING ticket_id;
         """, (notes, id))
         if not cur.fetchone():
             raise HTTPException(status_code=404, detail="Ticket not found")
@@ -9162,7 +9152,8 @@ def get_july_user(authorization: Optional[str] = Header(None)):
         # 1. Try direct match on july_portal_users.portal_user_id
         cur.execute("""
             SELECT pu.portal_user_id, COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'User'), 
-                   COALESCE(r.role_name, pu.role, 'Executive'), pu.username, COALESCE(pu.city, e.city, 'Hyderabad'), pu.role_id
+                   COALESCE(r.role_name, pu.role, 'Executive'), pu.username, COALESCE(pu.city, e.city, 'Hyderabad'), pu.role_id,
+                   COALESCE(r.role_code, 'EXEC')
             FROM july_app_sessions s
             JOIN july_portal_users pu ON pu.portal_user_id = s.user_id
             LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
@@ -9199,7 +9190,8 @@ def get_july_user(authorization: Optional[str] = Header(None)):
 
                 cur.execute("""
                     SELECT pu.portal_user_id, COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'User'), 
-                           COALESCE(r.role_name, pu.role, 'Executive'), pu.username, COALESCE(pu.city, e.city, 'Hyderabad'), pu.role_id
+                           COALESCE(r.role_name, pu.role, 'Executive'), pu.username, COALESCE(pu.city, e.city, 'Hyderabad'), pu.role_id,
+                           COALESCE(r.role_code, 'EXEC')
                     FROM july_portal_users pu
                     LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
                     LEFT JOIN july_roles r ON r.role_id = pu.role_id
@@ -9211,7 +9203,8 @@ def get_july_user(authorization: Optional[str] = Header(None)):
         if not row:
             cur.execute("""
                 SELECT pu.portal_user_id, COALESCE(NULLIF(TRIM(CONCAT(e.first_name, ' ', e.last_name)), ''), pu.username, 'User'), 
-                       COALESCE(r.role_name, pu.role, 'Executive'), pu.username, COALESCE(pu.city, e.city, 'Hyderabad'), pu.role_id
+                       COALESCE(r.role_name, pu.role, 'Executive'), pu.username, COALESCE(pu.city, e.city, 'Hyderabad'), pu.role_id,
+                       COALESCE(r.role_code, 'SA')
                 FROM july_portal_users pu
                 LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
                 LEFT JOIN july_roles r ON r.role_id = pu.role_id
@@ -9222,6 +9215,7 @@ def get_july_user(authorization: Optional[str] = Header(None)):
 
         if row:
             role_name = row[2]
+            role_code = row[6] if len(row) > 6 and row[6] else "EXEC"
             return {
                 "portal_user_id": row[0],
                 "name": row[1].strip(),
@@ -9229,7 +9223,8 @@ def get_july_user(authorization: Optional[str] = Header(None)):
                 "username": row[3],
                 "city": row[4],
                 "role_id": row[5],
-                "is_super_admin_or_dev": role_name in ["Developer", "Super Admin"]
+                "role_code": role_code,
+                "is_super_admin_or_dev": role_name in ["Developer", "Super Admin"] or role_code in ["SA", "DEV"]
             }
         
         raise HTTPException(status_code=401, detail="Invalid session")
@@ -9294,18 +9289,29 @@ def get_pending_approvals(authorization: Optional[str] = Header(None)):
         is_city_manager = user.get("role_code") in ["CM"] or "City Manager" in (user.get("role") or "")
         user_city = (user.get("city") or "Hyderabad").strip().lower()
 
+        if user_city in ["bangalore", "bengaluru"]:
+            city_sql_o = "LOWER(COALESCE(o.city, '')) IN ('bangalore', 'bengaluru')"
+            city_sql_v = "LOWER(COALESCE(v.city_name, '')) IN ('bangalore', 'bengaluru')"
+            city_sql_a = "LOWER(COALESCE(a.city_name, '')) IN ('bangalore', 'bengaluru')"
+            city_sql_t = "LOWER(COALESCE(t.city, '')) IN ('bangalore', 'bengaluru')"
+        else:
+            city_sql_o = f"LOWER(COALESCE(o.city, '')) = '{user_city}'"
+            city_sql_v = f"LOWER(COALESCE(v.city_name, '')) = '{user_city}'"
+            city_sql_a = f"LOWER(COALESCE(a.city_name, '')) = '{user_city}'"
+            city_sql_t = f"LOWER(COALESCE(t.city, '')) = '{user_city}'"
+
         if is_global:
             where_cond = "WHERE (o.approval_status LIKE 'Pending%%' OR o.approval_status = 'Submitted')"
             where_v_cond = "WHERE (v.approval_status LIKE 'Pending%%' OR v.approval_status = 'Submitted')"
             where_t_cond = "WHERE (t.approval_status LIKE 'Pending%%' OR t.approval_status = 'Submitted')"
         elif is_city_manager:
-            where_cond = f"WHERE (o.current_approver_id = {uid} OR (o.current_approver_id IS NULL AND LOWER(COALESCE(o.city, '')) = '{user_city}')) AND (o.approval_status LIKE 'Pending%%' OR o.approval_status = 'Submitted')"
-            where_v_cond = f"WHERE (v.current_approver_id = {uid} OR (v.current_approver_id IS NULL AND LOWER(COALESCE(v.city, '')) = '{user_city}')) AND (v.approval_status LIKE 'Pending%%' OR v.approval_status = 'Submitted')"
-            where_t_cond = f"WHERE (t.current_approver_id = {uid} OR (t.current_approver_id IS NULL AND LOWER(COALESCE(t.city, '')) = '{user_city}')) AND (t.approval_status LIKE 'Pending%%' OR t.approval_status = 'Submitted')"
+            where_cond = f"WHERE (o.current_approver_id = {uid} OR (o.current_approver_id IS NULL AND {city_sql_o})) AND (o.approval_status LIKE 'Pending%%' OR o.approval_status = 'Submitted')"
+            where_v_cond = f"WHERE (v.current_approver_id = {uid} OR (v.current_approver_id IS NULL AND {city_sql_v})) AND (v.approval_status LIKE 'Pending%%' OR v.approval_status = 'Submitted')"
+            where_t_cond = f"WHERE (t.current_approver_id = {uid} OR (t.current_approver_id IS NULL AND {city_sql_t})) AND (t.approval_status LIKE 'Pending%%' OR t.approval_status = 'Submitted')"
         else:
-            where_cond = f"WHERE (o.current_approver_id = {uid} OR (o.current_approver_id IS NULL AND LOWER(COALESCE(o.city, '')) = '{user_city}')) AND (o.approval_status LIKE 'Pending%%' OR o.approval_status = 'Submitted')"
-            where_v_cond = f"WHERE (v.current_approver_id = {uid} OR (v.current_approver_id IS NULL AND LOWER(COALESCE(v.city, '')) = '{user_city}')) AND (v.approval_status LIKE 'Pending%%' OR v.approval_status = 'Submitted')"
-            where_t_cond = f"WHERE (t.current_approver_id = {uid} OR (t.current_approver_id IS NULL AND LOWER(COALESCE(t.city, '')) = '{user_city}')) AND (t.approval_status LIKE 'Pending%%' OR t.approval_status = 'Submitted')"
+            where_cond = f"WHERE (o.current_approver_id = {uid} OR (o.current_approver_id IS NULL AND {city_sql_o})) AND (o.approval_status LIKE 'Pending%%' OR o.approval_status = 'Submitted')"
+            where_v_cond = f"WHERE (v.current_approver_id = {uid} OR (v.current_approver_id IS NULL AND {city_sql_v})) AND (v.approval_status LIKE 'Pending%%' OR v.approval_status = 'Submitted')"
+            where_t_cond = f"WHERE (t.current_approver_id = {uid} OR (t.current_approver_id IS NULL AND {city_sql_t})) AND (v.approval_status LIKE 'Pending%%' OR v.approval_status = 'Submitted')"
 
         # Onboarding pending
         cur.execute(f"""
@@ -9354,7 +9360,7 @@ def get_pending_approvals(authorization: Optional[str] = Header(None)):
             LEFT JOIN july_portal_users app_u ON app_u.portal_user_id = v.current_approver_id
             LEFT JOIN july_employees app_e ON app_e.employee_id = app_u.employee_id
             LEFT JOIN july_roles app_r ON app_r.role_id = app_u.role_id
-            WHERE (v.current_approver_id = {uid} OR (v.current_approver_id IS NULL AND LOWER(COALESCE(v.city_name, '')) = '{user_city}') OR {str(is_global).lower()})
+            WHERE (v.current_approver_id = {uid} OR (v.current_approver_id IS NULL AND {city_sql_v}) OR {str(is_global).lower()})
               AND (v.approval_status LIKE 'Pending%%' OR v.approval_status = 'Submitted')
             ORDER BY v.created_at DESC;
         """)
@@ -9386,7 +9392,7 @@ def get_pending_approvals(authorization: Optional[str] = Header(None)):
             LEFT JOIN july_portal_users app_u ON app_u.portal_user_id = a.current_approver_id
             LEFT JOIN july_employees app_e ON app_e.employee_id = app_u.employee_id
             LEFT JOIN july_roles app_r ON app_r.role_id = app_u.role_id
-            WHERE (a.current_approver_id = {uid} OR (a.current_approver_id IS NULL AND LOWER(COALESCE(a.city_name, '')) = '{user_city}') OR {str(is_global).lower()})
+            WHERE (a.current_approver_id = {uid} OR (a.current_approver_id IS NULL AND {city_sql_a}) OR {str(is_global).lower()})
               AND (a.approval_status LIKE 'Pending%%')
             ORDER BY COALESCE(a.updated_at, a.created_at) DESC;
         """)
@@ -9422,7 +9428,7 @@ def get_pending_approvals(authorization: Optional[str] = Header(None)):
             LEFT JOIN july_portal_users app_u ON app_u.portal_user_id = a.current_approver_id
             LEFT JOIN july_employees app_e ON app_e.employee_id = app_u.employee_id
             LEFT JOIN july_roles app_r ON app_r.role_id = app_u.role_id
-            WHERE (a.current_approver_id = {uid} OR (a.current_approver_id IS NULL AND LOWER(COALESCE(a.city_name, '')) = '{user_city}') OR {str(is_global).lower()})
+            WHERE (a.current_approver_id = {uid} OR (a.current_approver_id IS NULL AND {city_sql_a}) OR {str(is_global).lower()})
               AND (a.approval_status LIKE 'Pending%%')
             ORDER BY COALESCE(a.updated_at, a.created_at) DESC;
         """)

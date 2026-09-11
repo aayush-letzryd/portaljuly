@@ -109,6 +109,12 @@ export default function App() {
     setScreen("login");
   };
 
+  const handleBackToSelector = () => {
+    const dest = editTarget ? "approvals" : "selector";
+    setEditTarget(null);
+    setScreen(dest);
+  };
+
   if (isInitializing) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-bg">
@@ -135,18 +141,14 @@ export default function App() {
       {screen === "walkin" && user && (
         <WalkInForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
         />
       )}
       {screen === "onboarding" && user && (
         <OnboardingForm 
           user={user} 
-          onBackToSelector={() => {
-            const dest = editTarget ? "approvals" : "selector";
-            setEditTarget(null);
-            setScreen(dest);
-          }} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout}
           initialEditId={(editTarget?.formType === "individual_onboarding" || editTarget?.formType === "operator_onboarding") ? editTarget.id : undefined}
           initialStep={1}
@@ -156,11 +158,7 @@ export default function App() {
       {screen === "operator_onboarding" && user && (
         <OperatorOnboardingForm 
           user={user} 
-          onBackToSelector={() => {
-            const dest = editTarget ? "approvals" : "selector";
-            setEditTarget(null);
-            setScreen(dest);
-          }} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout}
           initialEditId={editTarget?.formType === "operator_onboarding" ? editTarget.id : undefined}
           initialStep={1}
@@ -170,18 +168,14 @@ export default function App() {
       {screen === "adjustment" && user && (
         <AdjustmentForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
         />
       )}
       {screen === "allocation" && user && (
         <AllocationForm 
           user={user} 
-          onBackToSelector={() => {
-            const dest = editTarget ? "approvals" : "selector";
-            setEditTarget(null);
-            setScreen(dest);
-          }} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
           initialEditId={(editTarget?.formType === "allocation" || editTarget?.formType === "vehicle_allocation") ? editTarget.id : undefined}
           isReviewMode={editTarget?.isReview}
@@ -190,11 +184,7 @@ export default function App() {
       {screen === "dropoff" && user && (
         <DropOffForm 
           user={user} 
-          onBackToSelector={() => {
-            const dest = editTarget ? "approvals" : "selector";
-            setEditTarget(null);
-            setScreen(dest);
-          }} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
           initialEditId={(editTarget?.formType === "dropoff" || editTarget?.formType === "vehicle_dropoff") ? editTarget.id : undefined}
           isReviewMode={editTarget?.isReview}
@@ -203,19 +193,15 @@ export default function App() {
       {screen === "expenses" && user && (
         <ExpensesForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
         />
       )}
       {screen === "vehicle_onboarding" && user && (
         <VehicleOnboardingForm 
           user={user} 
-          onBackToSelector={() => {
-            const dest = editTarget ? "approvals" : "selector";
-            setEditTarget(null);
-            setScreen(dest);
-          }} 
-          onLogout={handleLogout}
+          onBackToSelector={handleBackToSelector} 
+          onLogout={handleLogout} 
           initialEditId={editTarget?.formType === "vehicle_onboarding" ? editTarget.id : undefined}
           initialStep={1}
           isReviewMode={editTarget?.isReview}
@@ -224,105 +210,105 @@ export default function App() {
       {screen === "workshops" && user && (
         <WorkshopsForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
         />
       )}
       {screen === "hubs_parking" && user && (
         <HubsParkingForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
         />
       )}
       {screen === "rents" && user && (
         <RentForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
         />
       )}
       {screen === "accident" && user && (
         <AccidentsForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
         />
       )}
       {screen === "inspection" && user && (
         <InspectionForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
         />
       )}
       {screen === "users" && user && (
         <UsersForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
         />
       )}
       {screen === "vehicle_models" && user && (
         <VehicleModelsForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
         />
       )}
       {screen === "cities" && user && (
         <CitiesForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
         />
       )}
       {screen === "roles" && user && (
         <RolesPermissionsForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
         />
       )}
       {screen === "tickets" && user && (
         <TicketsForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
         />
       )}
       {screen === "employees" && user && (
         <EmployeesForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
         />
       )}
       {screen === "maintenance" && user && (
         <MaintenanceForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
         />
       )}
       {screen === "maintenance_in" && user && (
         <MaintenanceInForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
         />
       )}
       {screen === "maintenance_out" && user && (
         <MaintenanceOutForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
         />
       )}
       {screen === "challans" && user && (
         <ChallansForm 
           user={user} 
-          onBackToSelector={() => setScreen("selector")} 
+          onBackToSelector={handleBackToSelector} 
           onLogout={handleLogout} 
         />
       )}
@@ -331,6 +317,7 @@ export default function App() {
         <ApprovalsDesk 
           user={user as any} 
           initialTab={activeApprovalsTab}
+          onTabChange={(tab) => setActiveApprovalsTab(tab)}
           onBackToSelector={() => setScreen("selector")} 
           onLogout={handleLogout} 
           onEditRecord={(module, id, isReview, fromTab) => {

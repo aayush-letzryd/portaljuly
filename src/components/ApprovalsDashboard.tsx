@@ -14,6 +14,7 @@ interface Props {
   onLogout: () => void;
   onEditRecord?: (module: string, id: number, isReview?: boolean, fromTab?: "pending" | "my-submissions" | "revisions") => void;
   initialTab?: "pending" | "my-submissions" | "revisions";
+  onTabChange?: (tab: "pending" | "my-submissions" | "revisions") => void;
 }
 
 const MODULE_CONFIG: Record<string, { label: string; textClass: string }> = {
@@ -23,6 +24,8 @@ const MODULE_CONFIG: Record<string, { label: string; textClass: string }> = {
   adjustment_form: { label: "Adjustment Form", textClass: "text-orange-600 font-semibold" },
   allocation: { label: "Vehicle Allocation", textClass: "text-emerald-600 font-semibold" },
   dropoff: { label: "Vehicle Drop-Off", textClass: "text-teal-600 font-semibold" },
+  accidents_form: { label: "Accidents & Claims", textClass: "text-rose-600 font-semibold" },
+  tickets_desk: { label: "Tickets Desk", textClass: "text-amber-600 font-semibold" },
 };
 
 const STATUS_TEXT_CLASSES: Record<string, string> = {
@@ -55,8 +58,12 @@ function parseNameDetails(str?: string) {
   return { name: str, details: "" };
 }
 
-export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEditRecord, initialTab }: Props) {
-  const [activeTab, setActiveTab] = useState<"pending" | "my-submissions" | "revisions">(initialTab || "pending");
+export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEditRecord, initialTab, onTabChange }: Props) {
+  const [activeTab, setActiveTab] = useState<"pending" | "my-submissions" | "revisions">(() => {
+    const saved = sessionStorage.getItem("lr_approvals_tab");
+    if (saved === "pending" || saved === "my-submissions" || saved === "revisions") return saved;
+    return initialTab || "pending";
+  });
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -64,6 +71,14 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
   const [mySubmissions, setMySubmissions] = useState<any[]>([]);
   const [approvers, setApprovers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+
+  const switchTab = (tab: "pending" | "my-submissions" | "revisions") => {
+    setActiveTab(tab);
+    setSelectedCategory("all");
+    setSearchQuery("");
+    sessionStorage.setItem("lr_approvals_tab", tab);
+    onTabChange?.(tab);
+  };
 
   // Pagination state
   const [currentPage, setCurrentPage] = useState(1);
@@ -137,9 +152,27 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
         fetch("/api/july/my-submissions", { headers: { Authorization: `Bearer ${token()}` } }),
         fetch("/api/july/approvers", { headers: { Authorization: `Bearer ${token()}` } }),
       ]);
-      if (pendingRes.ok) setPendingItems(await pendingRes.json());
-      if (subRes.ok) setMySubmissions(await subRes.json());
-      if (appRes.ok) setApprovers(await appRes.json());
+      const pending = pendingRes.ok ? await pendingRes.json() : [];
+      const sub = subRes.ok ? await subRes.json() : [];
+      const apps = appRes.ok ? await appRes.json() : [];
+      
+      setPendingItems(pending);
+      setMySubmissions(sub);
+      setApprovers(apps);
+
+      // Smart default: If user has 0 pending items and >0 submissions,
+      // and has no explicit tab preference saved, auto-switch to "my-submissions" so they don't see a blank screen
+      const savedTab = sessionStorage.getItem("lr_approvals_tab");
+      if (!savedTab && (!initialTab || initialTab === "pending")) {
+        if (pending.length === 0 && sub.length > 0) {
+          setActiveTab("my-submissions");
+          onTabChange?.("my-submissions");
+        }
+      }
+
+      if (!pendingRes.ok && pendingRes.status === 401) {
+        showToast("Session expired, please sign in again", "error");
+      }
     } catch (e) {
       showToast("Failed to load data", "error");
     } finally {
@@ -576,7 +609,7 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
           {/* Inbox / Submissions Switcher */}
           <div className="bg-white border border-slate-200 rounded-2xl p-1.5 shadow-xs flex flex-col gap-1">
             <button
-              onClick={() => { setActiveTab("pending"); setSelectedCategory("all"); }}
+              onClick={() => switchTab("pending")}
               className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all ${activeTab === "pending" ? "bg-emerald-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-50"}`}
             >
               <div className="flex items-center gap-2">
@@ -589,7 +622,7 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
             </button>
 
             <button
-              onClick={() => { setActiveTab("revisions"); setSelectedCategory("all"); }}
+              onClick={() => switchTab("revisions")}
               className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all ${activeTab === "revisions" ? "bg-orange-500 text-white shadow-xs" : "text-slate-600 hover:bg-slate-50"}`}
             >
               <div className="flex items-center gap-2">
@@ -602,7 +635,7 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
             </button>
 
             <button
-              onClick={() => { setActiveTab("my-submissions"); setSelectedCategory("all"); }}
+              onClick={() => switchTab("my-submissions")}
               className={`flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-extrabold transition-all ${activeTab === "my-submissions" ? "bg-emerald-600 text-white shadow-xs" : "text-slate-600 hover:bg-slate-50"}`}
             >
               <div className="flex items-center gap-2">
