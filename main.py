@@ -9688,6 +9688,13 @@ def process_approval(module: str, record_id: int, body: ApprovalAction,
                             approval_note = %s, updated_by = %s, updated_at = NOW()
                         WHERE id = %s;
                     """, (next_approver_id, body.remarks, uid, record_id))
+                if module == "dropoff":
+                    cur.execute("""
+                        UPDATE july_vehicle_dropoffs 
+                        SET approval_status = 'Pending L2 Approval', current_approver_id = %s,
+                            approval_remarks = %s, updated_at = NOW()
+                        WHERE id = %s;
+                    """, (next_approver_id, body.remarks, record_id))
                 cur.execute("""
                     INSERT INTO july_approval_chain_logs (module_name, record_id, from_user_id, to_user_id, action, remarks)
                     VALUES (%s, %s, %s, %s, 'APPROVED_L1', %s);
@@ -9864,8 +9871,35 @@ def get_approval_logs(module: str, record_id: int, authorization: Optional[str] 
         cur = conn.cursor()
         logs = []
 
-        # 1. Synthesize initial SUBMITTED log by creator if record exists
-        if module in MODULE_TABLE_MAP:
+        # 1. Fetch all chain logs from table
+        cur.execute("""
+            SELECT l.action, l.remarks, l.action_at,
+                   fe.first_name || ' ' || COALESCE(fe.last_name,'') AS from_name, fu.username AS from_user,
+                   te.first_name || ' ' || COALESCE(te.last_name,'') AS to_name, tu.username AS to_user
+            FROM july_approval_chain_logs l
+            LEFT JOIN july_portal_users fu ON fu.portal_user_id = l.from_user_id
+            LEFT JOIN july_employees fe ON fe.employee_id = fu.employee_id
+            LEFT JOIN july_portal_users tu ON tu.portal_user_id = l.to_user_id
+            LEFT JOIN july_employees te ON te.employee_id = tu.employee_id
+            WHERE (l.module_name = %s OR (l.module_name IN ('individual_onboarding', 'operator_onboarding', 'onboarding') AND %s IN ('individual_onboarding', 'operator_onboarding', 'onboarding'))) AND l.record_id = %s
+            ORDER BY l.action_at ASC;
+        """, (module, module, record_id))
+        has_submitted_log = False
+        for r in cur.fetchall():
+            if r[0] == "SUBMITTED":
+                has_submitted_log = True
+            logs.append({
+                "action": r[0],
+                "remarks": r[1],
+                "action_at": to_ist_iso(r[2]),
+                "from_name": r[3].strip() if r[3] else r[4],
+                "from_user": r[4],
+                "to_name": r[5].strip() if r[5] else r[6],
+                "to_user": r[6]
+            })
+
+        # 2. Synthesize initial SUBMITTED log by creator only if no SUBMITTED log already exists
+        if not has_submitted_log and module in MODULE_TABLE_MAP:
             table, pk = MODULE_TABLE_MAP[module]
             cur.execute(f"""
                 SELECT r.created_at, r.created_by,
@@ -9880,39 +9914,16 @@ def get_approval_logs(module: str, record_id: int, authorization: Optional[str] 
             """, (record_id,))
             rec = cur.fetchone()
             if rec:
-                logs.append({
+                mod_desc = "drop-off review & approval" if module == "dropoff" else ("allocation review & approval" if module == "allocation" else "review & approval")
+                logs.insert(0, {
                     "action": "SUBMITTED",
-                    "remarks": "Submitted for onboarding review & approval",
+                    "remarks": f"Submitted for {mod_desc}",
                     "action_at": to_ist_iso(rec[0]),
-                    "from_name": rec[2].strip() if rec[2] else "Neha Singh",
+                    "from_name": rec[2].strip() if rec[2] else (rec[3] or "Executive"),
                     "from_user": rec[3],
-                    "to_name": rec[4].strip() if rec[4] else "Mohan Kumar",
+                    "to_name": rec[4].strip() if rec[4] else (rec[5] or "Approver"),
                     "to_user": rec[5]
                 })
-
-        # 2. Fetch all subsequent chain logs (FORWARDED, APPROVED, REJECTED, etc.)
-        cur.execute("""
-            SELECT l.action, l.remarks, l.action_at,
-                   fe.first_name || ' ' || COALESCE(fe.last_name,'') AS from_name, fu.username AS from_user,
-                   te.first_name || ' ' || COALESCE(te.last_name,'') AS to_name, tu.username AS to_user
-            FROM july_approval_chain_logs l
-            LEFT JOIN july_portal_users fu ON fu.portal_user_id = l.from_user_id
-            LEFT JOIN july_employees fe ON fe.employee_id = fu.employee_id
-            LEFT JOIN july_portal_users tu ON tu.portal_user_id = l.to_user_id
-            LEFT JOIN july_employees te ON te.employee_id = tu.employee_id
-            WHERE (l.module_name = %s OR (l.module_name IN ('individual_onboarding', 'operator_onboarding', 'onboarding') AND %s IN ('individual_onboarding', 'operator_onboarding', 'onboarding'))) AND l.record_id = %s
-            ORDER BY l.action_at ASC;
-        """, (module, module, record_id))
-        for r in cur.fetchall():
-            logs.append({
-                "action": r[0],
-                "remarks": r[1],
-                "action_at": to_ist_iso(r[2]),
-                "from_name": r[3].strip() if r[3] else r[4],
-                "from_user": r[4],
-                "to_name": r[5].strip() if r[5] else r[6],
-                "to_user": r[6]
-            })
 
         return logs
     finally:
