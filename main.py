@@ -1715,7 +1715,7 @@ class OnboardingData(BaseModel):
     lead_source: Optional[str] = None
     pan_number: Optional[str] = None
     aadhaar_number: Optional[str] = None
-    pan_aadhaar_linked: Optional[str] = None
+    pan_aadhaar_linked: Optional[Union[str, bool]] = None
     selfie_photo: Optional[Any] = None
     dl_front: Optional[Any] = None
     dl_back: Optional[Any] = None
@@ -1733,7 +1733,7 @@ class OnboardingData(BaseModel):
     ref3_name: Optional[str] = None
     ref3_phone: Optional[str] = None
     ref3_address: Optional[str] = None
-    walkin_id: Optional[int] = None
+    walkin_id: Optional[Union[int, str]] = None
     vendor_name: Optional[str] = None
     vendor_id: Optional[str] = None
     aadhaar_card_photo: Optional[Any] = None
@@ -1748,10 +1748,10 @@ class OnboardingData(BaseModel):
     vendor_type: Optional[str] = "Individual"
     driver_id: Optional[str] = None
     custom_rent_amount: Optional[str] = None
-    operator_drivers: Optional[list[dict]] = None
+    operator_drivers: Optional[Union[list, dict, str]] = None
     platform_details: Optional[Union[dict, str]] = None
-    documents_verified: Optional[bool] = False
-    custom_rental_plan: Optional[bool] = False
+    documents_verified: Optional[Union[bool, str]] = False
+    custom_rental_plan: Optional[Union[bool, str]] = False
     cancelled_cheque_photo: Optional[Any] = None
     cheque2_photo: Optional[Any] = None
     cheque3_photo: Optional[Any] = None
@@ -1759,7 +1759,7 @@ class OnboardingData(BaseModel):
     security_cheque_files: Optional[Any] = None
     police_verification_status: Optional[str] = None
     police_verification_doc: Optional[Any] = None
-    reference_verified: Optional[bool] = False
+    reference_verified: Optional[Union[bool, str]] = False
     driver_manager_id: Optional[Union[int, str]] = None
     driver_manager_name: Optional[str] = None
     signature_photo: Optional[Any] = None
@@ -1769,12 +1769,12 @@ class OnboardingData(BaseModel):
     rental_model: Optional[str] = None
     security_deposit: Optional[str] = None
     letzown_cheques: Optional[str] = None
-    is_spring_verified: Optional[bool] = False
+    is_spring_verified: Optional[Union[bool, str]] = False
     gst_number: Optional[str] = None
     gst_certificate: Optional[Any] = None
     incorporation_doc: Optional[Any] = None
     approval_status: Optional[str] = None
-    approval_requested_to: Optional[int] = None
+    approval_requested_to: Optional[Union[int, str]] = None
     approval_note: Optional[str] = None
 
 class AdjustmentData(BaseModel):
@@ -4234,7 +4234,8 @@ def create_onboarding(data: OnboardingData, authorization: Optional[str] = Heade
             data.father_name or "", data.bank_name, data.other_bank_name,
             data.account_number, data.ifsc_code, data.upi_id,
             data.vendor_type or "Individual", data.driver_id, data.custom_rent_amount,
-            data.walkin_id, data.emergency_relationship, json.dumps(data.platform_details) if data.platform_details else None, data.documents_verified,
+            int(data.walkin_id) if data.walkin_id and str(data.walkin_id).isdigit() else None,
+            data.emergency_relationship, json.dumps(data.platform_details) if data.platform_details else None, data.documents_verified,
             data.custom_rental_plan, extract_image(data.cancelled_cheque_photo),
             extract_image(data.cheque2_photo), extract_image(data.cheque3_photo), extract_image(data.cheque4_photo),
             json.dumps(data.security_cheque_files) if isinstance(data.security_cheque_files, list) else extract_image(data.security_cheque_files),
@@ -4255,7 +4256,7 @@ def create_onboarding(data: OnboardingData, authorization: Optional[str] = Heade
         ))
         new_id = cur.fetchone()[0]
         
-        walkin_id = data.walkin_id
+        walkin_id = int(data.walkin_id) if data.walkin_id and str(data.walkin_id).isdigit() else None
         if not walkin_id and data.phone_number:
             cur.execute("SELECT id FROM july_walkins WHERE REPLACE(person_number, ' ', '') = %s LIMIT 1;", (data.phone_number.replace(" ", ""),))
             row = cur.fetchone()
@@ -4345,12 +4346,17 @@ def create_onboarding(data: OnboardingData, authorization: Optional[str] = Heade
 
         conn.commit()
         return {"success": True, "id": new_id}
+    except Exception as e:
+        conn.rollback()
+        if isinstance(e, HTTPException):
+            raise e
+        raise HTTPException(status_code=500, detail=str(e))
     finally:
         postgreSQL_pool.putconn(conn)
 
 
 class SendForApprovalRequest(BaseModel):
-    approver_id: Optional[int] = None   # Executive can override; defaults to city CM
+    approver_id: Optional[Union[int, str]] = None   # Executive can override; defaults to city CM
 
 
 @app.post("/api/onboarding/send-for-approval/{id}")
@@ -4395,7 +4401,8 @@ def send_onboarding_for_approval(
             )
 
         # ── Resolve approver: use submitter's L1 from approval chain first
-        approver_id = (body.approver_id if body and body.approver_id else None)
+        raw_approver_id = body.approver_id if (body and body.approver_id) else None
+        approver_id = int(raw_approver_id) if (raw_approver_id and str(raw_approver_id).isdigit()) else None
         if not approver_id or approver_id == submitter_id:
             # Look up the user's L1 approver role from july_user_approval_chain
             cur.execute("""

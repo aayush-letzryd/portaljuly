@@ -7,6 +7,7 @@ import {
   Wrench, Settings, IndianRupee, Layers, CheckSquare, Square, MessageSquare,
   MapPin, ShieldCheck, PauseCircle, DollarSign, Edit
 } from "lucide-react";
+import { formatErrorMessage } from "../utils/formatError";
 
 interface Props {
   user: any;
@@ -24,8 +25,6 @@ const MODULE_CONFIG: Record<string, { label: string; textClass: string }> = {
   adjustment_form: { label: "Adjustment Form", textClass: "text-orange-600 font-semibold" },
   allocation: { label: "Vehicle Allocation", textClass: "text-emerald-600 font-semibold" },
   dropoff: { label: "Vehicle Drop-Off", textClass: "text-teal-600 font-semibold" },
-  accidents_form: { label: "Accidents & Claims", textClass: "text-rose-600 font-semibold" },
-  tickets_desk: { label: "Tickets Desk", textClass: "text-amber-600 font-semibold" },
 };
 
 const STATUS_TEXT_CLASSES: Record<string, string> = {
@@ -161,13 +160,11 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
       setApprovers(apps);
 
       // Smart default: If user has 0 pending items and >0 submissions,
-      // and has no explicit tab preference saved, auto-switch to "my-submissions" so they don't see a blank screen
-      const savedTab = sessionStorage.getItem("lr_approvals_tab");
-      if (!savedTab && (!initialTab || initialTab === "pending")) {
-        if (pending.length === 0 && sub.length > 0) {
-          setActiveTab("my-submissions");
-          onTabChange?.("my-submissions");
-        }
+      // and current view is "pending", auto-switch to "my-submissions" so they don't see a blank screen
+      if (pending.length === 0 && sub.length > 0 && activeTab === "pending") {
+        setActiveTab("my-submissions");
+        onTabChange?.("my-submissions");
+        sessionStorage.setItem("lr_approvals_tab", "my-submissions");
       }
 
       if (!pendingRes.ok && pendingRes.status === 401) {
@@ -237,15 +234,15 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
           forward_to_user_id: forwardToId,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Forwarding failed");
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(formatErrorMessage(data, "Forwarding failed"));
       showToast("Approval request forwarded successfully!");
       setForwardModalItem(null);
       setForwardComment("");
       setForwardToId(null);
       loadAll();
     } catch (e: any) {
-      showToast(e.message || "Forwarding failed", "error");
+      showToast(formatErrorMessage(e, "Forwarding failed"), "error");
     } finally {
       setActionLoading(false);
     }
@@ -286,8 +283,8 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
           remarks: finalRemarks,
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Return for revision failed");
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(formatErrorMessage(data, "Return for revision failed"));
       showToast("Application returned for revision to executive!");
       setReturnRevisionModalItem(null);
       setRevisionComment("");
@@ -295,7 +292,7 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
       setSuggestedDeposit("");
       loadAll();
     } catch (e: any) {
-      showToast(e.message || "Return for revision failed", "error");
+      showToast(formatErrorMessage(e, "Return for revision failed"), "error");
     } finally {
       setActionLoading(false);
     }
@@ -318,14 +315,14 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
           remarks: rejectComment.trim(),
         }),
       });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.detail || "Rejection failed");
+      const data = await res.json().catch(() => null);
+      if (!res.ok) throw new Error(formatErrorMessage(data, "Rejection failed"));
       showToast("Application rejected successfully!");
       setRejectModalItem(null);
       setRejectComment("");
       loadAll();
     } catch (e: any) {
-      showToast(e.message || "Rejection failed", "error");
+      showToast(formatErrorMessage(e, "Rejection failed"), "error");
     } finally {
       setActionLoading(false);
     }
@@ -836,6 +833,18 @@ export default function ApprovalsDesk({ user, onBackToSelector, onLogout, onEdit
                   ? "No records have been returned for revision. All submissions are progressing normally."
                   : "No submissions recorded under this category."}
               </p>
+              {(selectedCategory !== "all" || searchQuery.trim() !== "") && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedCategory("all");
+                    setSearchQuery("");
+                  }}
+                  className="mt-4 px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer"
+                >
+                  Clear Filter (Show All {rawList.length} Records)
+                </button>
+              )}
             </div>
           ) : (
             <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-x-auto">

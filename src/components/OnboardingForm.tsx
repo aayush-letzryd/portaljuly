@@ -7,6 +7,7 @@ import {
 import { OnboardingRecord, User as UserSession, CITIES } from "../types";
 import CameraCapture from "./CameraCapture";
 import { compressImage } from "../utils/imageCompressor";
+import { formatErrorMessage } from "../utils/formatError";
 
 interface OnboardingFormProps {
   user: UserSession;
@@ -801,10 +802,13 @@ export default function OnboardingForm({
         method: 'DELETE',
         headers: { "Authorization": `Bearer ${localStorage.getItem("lr_token")}` }
       });
-      if (!res.ok) throw new Error("Failed to delete record");
+      if (!res.ok) {
+        const error = await res.json().catch(() => null);
+        throw new Error(formatErrorMessage(error, "Failed to delete record"));
+      }
       await fetchData();
     } catch (e: any) {
-      alert(e.message || "Error deleting record");
+      alert("Error: " + formatErrorMessage(e));
     }
   };
 
@@ -896,7 +900,7 @@ export default function OnboardingForm({
       dl_front: dlFront || null,
       dl_back: dlBack || null,
       pan_card_photo: panCardPhoto || null,
-      walkin_id: linkedWalkinId || null,
+      walkin_id: linkedWalkinId ? Number(linkedWalkinId) : null,
       vendor_name: vendorName.trim() || null,
       vendor_id: vendorId.trim() || null,
       aadhaar_card_photo: aadhaarPhoto || null,
@@ -916,7 +920,7 @@ export default function OnboardingForm({
       reference_verified: referenceVerified,
       police_verification_status: policeVerificationStatus,
       police_verification_doc: policeVerificationDoc || null,
-      driver_manager_id: driverManagerId || null,
+      driver_manager_id: driverManagerId ? Number(driverManagerId) : null,
       driver_manager_name: driverManagerName || null,
       father_name: fatherName.trim(),
       bank_name: bankName || null,
@@ -937,7 +941,7 @@ export default function OnboardingForm({
       signature_photo: signaturePhoto || null,
       platform_details: thirdPartyPlatform !== 'None' ? { [thirdPartyPlatform]: platformDetails[thirdPartyPlatform] || { id: "" } } : { None: { id: "" } },
       approval_status: targetStatus,
-      approval_requested_to: targetStatus === "Pending Approval" ? (approvalRequestedTo || null) : null,
+      approval_requested_to: targetStatus === "Pending Approval" ? (approvalRequestedTo ? Number(approvalRequestedTo) : null) : null,
       approval_note: approvalSubmissionNote.trim() || null
     };
 
@@ -956,22 +960,26 @@ export default function OnboardingForm({
       });
       
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.detail || "Failed to save record");
+        const error = await res.json().catch(() => null);
+        throw new Error(formatErrorMessage(error, "Failed to save record"));
       }
       
       const recordResult = await res.json();
       const savedRecordId = editingId || recordResult.id;
 
       if (targetStatus === "Pending Approval") {
-        await fetch(`/api/onboarding/send-for-approval/${savedRecordId}`, {
+        const sendRes = await fetch(`/api/onboarding/send-for-approval/${savedRecordId}`, {
           method: "POST",
           headers: { 
             "Content-Type": "application/json",
             "Authorization": `Bearer ${token}` 
           },
-          body: JSON.stringify({ approver_id: approvalRequestedTo })
+          body: JSON.stringify({ approver_id: approvalRequestedTo ? Number(approvalRequestedTo) : null })
         });
+        if (!sendRes.ok) {
+          const sendErr = await sendRes.json().catch(() => null);
+          throw new Error(formatErrorMessage(sendErr, "Record saved, but failed to send for approval"));
+        }
         const selectedApprover = approversList.find(a => a.id === approvalRequestedTo);
         const approverName = selectedApprover ? selectedApprover.name : "the assigned manager";
         const isEditing = Boolean(editingId);
@@ -993,7 +1001,7 @@ export default function OnboardingForm({
         setActiveTab("drafts");
       }
     } catch (err: any) {
-      alert("Error: " + err.message);
+      alert("Error: " + formatErrorMessage(err));
     }
   };
 
@@ -1005,13 +1013,13 @@ export default function OnboardingForm({
         headers: { "Authorization": `Bearer ${token}` }
       });
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.detail || "Failed to send for approval");
+        const error = await res.json().catch(() => null);
+        throw new Error(formatErrorMessage(error, "Failed to send for approval"));
       }
       alert("Application sent to City Manager 1 for approval!");
       fetchData();
     } catch (err: any) {
-      alert("Error: " + err.message);
+      alert("Error: " + formatErrorMessage(err));
     }
   };
 
@@ -1302,7 +1310,7 @@ export default function OnboardingForm({
       setRetrieveIdInput("");
       setCurrentStep(initialStep || 1);
     } catch (err: any) {
-      alert(err.message);
+      alert("Error: " + formatErrorMessage(err));
     }
   };
 
@@ -1334,13 +1342,13 @@ export default function OnboardingForm({
         })
       });
       if (!res.ok) {
-        const error = await res.json();
-        throw new Error(error.detail || "Action failed");
+        const error = await res.json().catch(() => null);
+        throw new Error(formatErrorMessage(error, "Action failed"));
       }
       alert(`Record ${actionType === "APPROVE" ? "Approved" : actionType === "REJECT" ? "Returned for Revision" : "Forwarded"} successfully!`);
       onBackToSelector();
     } catch (e: any) {
-      alert("Error: " + e.message);
+      alert("Error: " + formatErrorMessage(e));
     } finally {
       setActionLoading(false);
     }
@@ -1400,7 +1408,7 @@ export default function OnboardingForm({
         setWalkinSearchInput("");
       }
     } catch (err: any) {
-      alert(err.message);
+      alert("Error: " + formatErrorMessage(err));
     }
   };
 

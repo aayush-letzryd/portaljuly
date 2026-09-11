@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { AllocationRecord, User as UserSession, CITIES } from "../types";
 import CameraCapture from "./CameraCapture";
+import { formatErrorMessage } from "../utils/formatError";
 
 interface AllocationFormProps {
   user: UserSession;
@@ -734,7 +735,7 @@ export default function AllocationForm({
 
       if (!res.ok) {
         const errorText = await res.text();
-        throw new Error(errorText || "Failed to submit allocation record");
+        throw new Error(formatErrorMessage(errorText, "Failed to submit allocation record"));
       }
 
       if (deltaInfo.isOver48 && !isDraft) {
@@ -751,7 +752,7 @@ export default function AllocationForm({
         setActiveTab(isDraft ? "drafts" : "registry");
       }
     } catch (err: any) {
-      alert(err.message);
+      alert("Error: " + formatErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }

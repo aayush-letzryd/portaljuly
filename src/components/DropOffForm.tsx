@@ -8,6 +8,7 @@ import {
 } from "lucide-react";
 import { User as UserSession, CITIES } from "../types";
 import CameraCapture from "./CameraCapture";
+import { formatErrorMessage } from "../utils/formatError";
 
 interface DropOffFormProps {
   user: UserSession;
@@ -447,7 +448,10 @@ export default function DropOffForm({ user, onBackToSelector, onLogout, initialE
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
         body: JSON.stringify(payload),
       });
-      if (!res.ok) { const t = await res.text(); throw new Error(t || "Failed to submit"); }
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(formatErrorMessage(t, "Failed to submit drop-off record"));
+      }
 
       if (deltaInfo.isOver48 && !isDraft) {
         alert("Vehicle Drop-Off Record Submitted and Sent for Managerial Approval!");
@@ -464,7 +468,7 @@ export default function DropOffForm({ user, onBackToSelector, onLogout, initialE
         setActiveTab(isDraft ? "drafts" : "registry");
       }
     } catch (err: any) {
-      alert(err.message);
+      alert("Error: " + formatErrorMessage(err));
     } finally {
       setIsSubmitting(false);
     }
@@ -475,10 +479,15 @@ export default function DropOffForm({ user, onBackToSelector, onLogout, initialE
     try {
       const token = localStorage.getItem("lr_token");
       const res = await fetch(`/api/dropoffs/${id}`, { method: "DELETE", headers: { Authorization: `Bearer ${token}` } });
-      if (!res.ok) throw new Error("Delete failed");
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(formatErrorMessage(t, "Delete failed"));
+      }
       alert("Record deleted.");
       fetchRecords();
-    } catch (err: any) { alert(err.message); }
+    } catch (err: any) {
+      alert("Error: " + formatErrorMessage(err));
+    }
   };
 
   // Filtered & paginated registry

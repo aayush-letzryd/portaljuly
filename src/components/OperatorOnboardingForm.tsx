@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { OnboardingRecord, User as UserSession, CITIES } from "../types";
 import CameraCapture from "./CameraCapture";
+import { formatErrorMessage } from "../utils/formatError";
 
 interface OperatorOnboardingFormProps {
   user: UserSession;
@@ -401,7 +402,7 @@ export default function OperatorOnboardingForm({
       setCurrentStep(1);
       setRetrieveIdInput("");
     } catch (err: any) {
-      alert(err.message);
+      alert("Error: " + formatErrorMessage(err));
     }
   };
 
@@ -597,13 +598,16 @@ export default function OperatorOnboardingForm({
         body: JSON.stringify(payload)
       });
 
-      if (!res.ok) throw new Error("Onboarding submission failed");
+      if (!res.ok) {
+        const error = await res.json().catch(() => null);
+        throw new Error(formatErrorMessage(error, "Onboarding submission failed"));
+      }
       alert(editingId ? "Operator record updated successfully!" : "Operator and Drivers Onboarded successfully!");
       
       resetOperatorForm();
       setActiveTab("registry");
     } catch (err: any) {
-      alert(err.message || "An error occurred");
+      alert("Error: " + formatErrorMessage(err));
     }
   };
 
