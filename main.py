@@ -8488,7 +8488,7 @@ class MaintenanceOutCreate(BaseModel):
     vehicle_out_photos: Optional[Union[str, List[str]]] = None
     final_status: Optional[str] = "Completed & RFD"
     remarks: Optional[str] = None
-    handover: Optional[str] = "No"
+    handover: Optional[str] = "Hub"
     partner_id: Optional[str] = None
     partner_name: Optional[str] = None
     partner_phone: Optional[str] = None
@@ -8847,7 +8847,7 @@ def create_maintenance_out(data: MaintenanceOutCreate, authorization: Optional[s
             data.invoice_file, data.type_of_payment, data.payment_status, data.utr_no,
             data.approved_by, data.approval_date, data.approval_file, photos_val,
             data.final_status, data.remarks,
-            data.handover or "No", data.partner_id, data.partner_name, data.partner_phone,
+            data.handover or "Hub", data.partner_id, data.partner_name, data.partner_phone,
             data.driver_id, data.driver_name, data.driver_phone
         ))
         out_row = cur.fetchone()
@@ -9004,7 +9004,7 @@ def update_maintenance_out(id: int, data: MaintenanceOutCreate, authorization: O
             data.invoice_file, data.payment_status or "Pending",
             data.approved_by, data.approval_date, data.approval_file,
             photos_val, data.final_status, data.remarks,
-            data.handover or "No", data.partner_id, data.partner_name, data.partner_phone,
+            data.handover or "Hub", data.partner_id, data.partner_name, data.partner_phone,
             data.driver_id, data.driver_name, data.driver_phone,
             id
         ))

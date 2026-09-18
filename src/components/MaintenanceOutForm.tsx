@@ -238,10 +238,9 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
   const [finalStatus, setFinalStatus] = useState("Completed & RFD");
   const [remarks, setRemarks] = useState("");
 
-  // Handover & Partner/Driver States (All Optional)
-  const [handover, setHandover] = useState<string>("No");
-  const [partnerId, setPartnerId] = useState<string>("");
-  const [partnerPhone, setPartnerPhone] = useState<string>("");
+  // Handover & Driver Custody States (Hub vs Driver)
+  const [handoverTo, setHandoverTo] = useState<"Hub" | "Driver">("Hub");
+  const [driverId, setDriverId] = useState<string>("");
   const [driverName, setDriverName] = useState<string>("");
   const [driverPhone, setDriverPhone] = useState<string>("");
 
@@ -533,9 +532,8 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
       setPaymentStatus(r.payment_status || "Pending");
       setFinalStatus(r.final_status || "Completed & RFD");
       setRemarks(r.remarks || "");
-      setHandover(r.handover || "No");
-      setPartnerId(r.partner_id || "");
-      setPartnerPhone(r.partner_phone || "");
+      setHandoverTo(r.handover === "Driver" ? "Driver" : "Hub");
+      setDriverId(r.driver_id || "");
       setDriverName(r.driver_name || "");
       setDriverPhone(r.driver_phone || "");
 
@@ -576,9 +574,8 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
       setOutwardPhotos([]);
       setFinalStatus("Completed & RFD");
       setRemarks("");
-      setHandover("No");
-      setPartnerId("");
-      setPartnerPhone("");
+      setHandoverTo("Hub");
+      setDriverId("");
       setDriverName("");
       setDriverPhone("");
       setVehicleOutDateTime(getNowDateTimeString());
@@ -670,11 +667,12 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
         vehicle_out_photos: outwardPhotos,
         final_status: finalStatus.trim() || "Completed & RFD",
         remarks: remarks.trim() || null,
-        handover: handover.trim() || "No",
-        partner_id: partnerId.trim() || null,
-        partner_phone: partnerPhone.trim() || null,
-        driver_name: driverName.trim() || null,
-        driver_phone: driverPhone.trim() || null,
+        handover: handoverTo,
+        driver_id: handoverTo === "Driver" ? (driverId.trim() || null) : null,
+        driver_name: handoverTo === "Driver" ? (driverName.trim() || null) : null,
+        driver_phone: handoverTo === "Driver" ? (driverPhone.trim() || null) : null,
+        partner_id: null,
+        partner_phone: null,
       };
 
       const url = editingId ? `/api/maintenance-out/${editingId}` : "/api/maintenance-out";
@@ -732,7 +730,7 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
         "Outward ID", "Inward ID", "Vehicle Number", "Workshop", "In Date/Time",
         "Out Date/Time", "Out KMs", "RFD Date", "Invoice No", "Invoice Date",
         "Invoice Amount (₹)", "Payment Status", "Final Status", "Remarks",
-        "Handover", "Partner ID", "Partner Phone", "Driver Name", "Driver Phone"
+        "Handover To", "Driver ID", "Driver Name", "Driver Phone"
       ];
       const rows = registryRecords.map(r => {
         try {
@@ -751,9 +749,8 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
             r?.payment_status || "Pending",
             r?.final_status || "",
             (r?.remarks || "").replace(/[\r\n]+/g, " "),
-            r?.handover || "No",
-            r?.partner_id || "",
-            r?.partner_phone || "",
+            r?.handover || "Hub",
+            r?.driver_id || "",
             r?.driver_name || "",
             r?.driver_phone || ""
           ];
@@ -1088,29 +1085,25 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
                 </div>
               </div>
 
-              {/* Handover & Partner / Driver Info */}
-              {(viewingRecord.handover === "Yes" || viewingRecord.partner_id || viewingRecord.partner_phone || viewingRecord.driver_name || viewingRecord.driver_phone) && (
-                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
-                  <div className="flex items-center justify-between">
-                    <h4 className="text-xs font-bold text-slate-800 flex items-center gap-2">
-                      <User className="w-4 h-4 text-primary" /> Handover &amp; Custody Details
-                    </h4>
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                      viewingRecord.handover === "Yes"
-                        ? "bg-emerald-100 text-emerald-800"
-                        : "bg-slate-100 text-slate-600"
-                    }`}>
-                      Handover: {viewingRecord.handover || "No"}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+              {/* Handover & Driver Custody Info */}
+              <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-800 flex items-center gap-2">
+                    <User className="w-4 h-4 text-primary" /> Handover &amp; Custody Details
+                  </h4>
+                  <span className={`inline-block px-2.5 py-0.5 rounded-full text-[10px] font-bold ${
+                    viewingRecord.handover === "Driver"
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-slate-100 text-slate-700"
+                  }`}>
+                    Handover To: {viewingRecord.handover || "Hub"}
+                  </span>
+                </div>
+                {viewingRecord.handover === "Driver" ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
                     <div>
-                      <span className="text-[11px] text-slate-400 block">Partner ID</span>
-                      <span className="font-mono font-semibold text-slate-800">{viewingRecord.partner_id || "—"}</span>
-                    </div>
-                    <div>
-                      <span className="text-[11px] text-slate-400 block">Partner Phone</span>
-                      <span className="font-mono text-slate-800">{viewingRecord.partner_phone || "—"}</span>
+                      <span className="text-[11px] text-slate-400 block">Driver ID</span>
+                      <span className="font-mono font-semibold text-slate-800">{viewingRecord.driver_id || "—"}</span>
                     </div>
                     <div>
                       <span className="text-[11px] text-slate-400 block">Driver Name</span>
@@ -1121,8 +1114,12 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
                       <span className="font-mono text-slate-800">{viewingRecord.driver_phone || "—"}</span>
                     </div>
                   </div>
-                </div>
-              )}
+                ) : (
+                  <p className="text-xs text-slate-500 font-medium">
+                    Vehicle handed over to Hub / Yard — no driver details required.
+                  </p>
+                )}
+              </div>
 
               {/* Invoice & Approval Info */}
               <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
@@ -1556,123 +1553,110 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
                   </div>
                 </div>
 
-                {/* Handover & Partner / Driver Custody (Optional) */}
+                {/* Handover & Custody (Hub vs Driver) */}
                 <div className="mt-6 pt-5 border-t border-border/80">
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center gap-2">
                       <span className="font-sans text-xs font-bold text-slate-800">
                         Vehicle Handover &amp; Custody
                       </span>
-                      <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 border border-slate-200">
-                        Optional
-                      </span>
                     </div>
                     <span className="text-[11px] text-text-muted">
-                      Driver / Partner custody details upon release
+                      Select whether vehicle is handed over to Hub or Driver
                     </span>
                   </div>
 
                   <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                       <div>
                         <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
-                          Handover?
+                          Handover To <span className="text-red-500">*</span>
                         </label>
                         <select
-                          value={handover}
+                          value={handoverTo}
                           onChange={e => {
                             try {
-                              setHandover(e.target.value);
+                              setHandoverTo(e.target.value as "Hub" | "Driver");
                             } catch (err) {
-                              console.error("Error setting handover:", err);
+                              console.error("Error setting handoverTo:", err);
                             }
                           }}
                           className={`w-full h-10 rounded-xl border px-3 text-xs font-bold outline-none transition-all shadow-2xs cursor-pointer ${
-                            handover === "Yes"
+                            handoverTo === "Driver"
                               ? "border-emerald-300 bg-emerald-50 text-emerald-800 focus:ring-1 focus:ring-emerald-400"
                               : "border-slate-200 bg-white text-slate-700 focus:ring-1 focus:ring-primary/20"
                           }`}
                         >
-                          <option value="No">No</option>
-                          <option value="Yes">Yes</option>
+                          <option value="Hub">Hub / Yard</option>
+                          <option value="Driver">Driver</option>
                         </select>
                       </div>
 
-                      <div>
-                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
-                          Partner ID
-                        </label>
-                        <input
-                          type="text"
-                          value={partnerId}
-                          onChange={e => {
-                            try {
-                              setPartnerId(e.target.value);
-                            } catch (err) {
-                              console.error("Error setting partnerId:", err);
-                            }
-                          }}
-                          placeholder="e.g. OP102 / LR-P-12"
-                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs"
-                        />
-                      </div>
+                      {handoverTo === "Driver" ? (
+                        <>
+                          <div>
+                            <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
+                              Driver ID
+                            </label>
+                            <input
+                              type="text"
+                              value={driverId}
+                              onChange={e => {
+                                try {
+                                  setDriverId(e.target.value);
+                                } catch (err) {
+                                  console.error("Error setting driverId:", err);
+                                }
+                              }}
+                              placeholder="e.g. DRV1024"
+                              className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs"
+                            />
+                          </div>
 
-                      <div>
-                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
-                          Partner Phone Number
-                        </label>
-                        <input
-                          type="tel"
-                          value={partnerPhone}
-                          onChange={e => {
-                            try {
-                              setPartnerPhone(e.target.value);
-                            } catch (err) {
-                              console.error("Error setting partnerPhone:", err);
-                            }
-                          }}
-                          placeholder="e.g. 9876543210"
-                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs"
-                        />
-                      </div>
+                          <div>
+                            <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
+                              Driver Name
+                            </label>
+                            <input
+                              type="text"
+                              value={driverName}
+                              onChange={e => {
+                                try {
+                                  setDriverName(e.target.value);
+                                } catch (err) {
+                                  console.error("Error setting driverName:", err);
+                                }
+                              }}
+                              placeholder="e.g. Ramesh Kumar"
+                              className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs"
+                            />
+                          </div>
 
-                      <div>
-                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
-                          Driver Name
-                        </label>
-                        <input
-                          type="text"
-                          value={driverName}
-                          onChange={e => {
-                            try {
-                              setDriverName(e.target.value);
-                            } catch (err) {
-                              console.error("Error setting driverName:", err);
-                            }
-                          }}
-                          placeholder="e.g. Ramesh Kumar"
-                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
-                          Driver Phone Number
-                        </label>
-                        <input
-                          type="tel"
-                          value={driverPhone}
-                          onChange={e => {
-                            try {
-                              setDriverPhone(e.target.value);
-                            } catch (err) {
-                              console.error("Error setting driverPhone:", err);
-                            }
-                          }}
-                          placeholder="e.g. 9123456780"
-                          className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs"
-                        />
-                      </div>
+                          <div>
+                            <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
+                              Driver Phone Number
+                            </label>
+                            <input
+                              type="tel"
+                              value={driverPhone}
+                              onChange={e => {
+                                try {
+                                  setDriverPhone(e.target.value);
+                                } catch (err) {
+                                  console.error("Error setting driverPhone:", err);
+                                }
+                              }}
+                              placeholder="e.g. 9876543210"
+                              className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs"
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="col-span-1 sm:col-span-1 lg:col-span-3 flex items-center bg-white px-3.5 py-2 rounded-xl border border-slate-200 text-xs text-slate-600 font-medium shadow-2xs">
+                          <CheckCircle className="w-4 h-4 text-emerald-600 mr-2 shrink-0" />
+                          <span>Handed over to <strong>Hub / Yard</strong> — no driver details required.</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
