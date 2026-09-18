@@ -730,7 +730,7 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
         "Outward ID", "Inward ID", "Vehicle Number", "Workshop", "In Date/Time",
         "Out Date/Time", "Out KMs", "RFD Date", "Invoice No", "Invoice Date",
         "Invoice Amount (₹)", "Payment Status", "Final Status", "Remarks",
-        "Handover To", "Driver ID", "Driver Name", "Driver Phone"
+        "Handover To", "Driver Name", "Driver Phone"
       ];
       const rows = registryRecords.map(r => {
         try {
@@ -750,7 +750,6 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
             r?.final_status || "",
             (r?.remarks || "").replace(/[\r\n]+/g, " "),
             r?.handover || "Hub",
-            r?.driver_id || "",
             r?.driver_name || "",
             r?.driver_phone || ""
           ];
@@ -1100,11 +1099,7 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
                   </span>
                 </div>
                 {viewingRecord.handover === "Driver" ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
-                    <div>
-                      <span className="text-[11px] text-slate-400 block">Driver ID</span>
-                      <span className="font-mono font-semibold text-slate-800">{viewingRecord.driver_id || "—"}</span>
-                    </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
                     <div>
                       <span className="text-[11px] text-slate-400 block">Driver Name</span>
                       <span className="font-semibold text-slate-800">{viewingRecord.driver_name || "—"}</span>
@@ -1567,7 +1562,7 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
                   </div>
 
                   <div className="p-4 rounded-xl bg-slate-50/70 border border-slate-200">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                       <div>
                         <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
                           Handover To <span className="text-red-500">*</span>
@@ -1594,25 +1589,6 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
 
                       {handoverTo === "Driver" ? (
                         <>
-                          <div>
-                            <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
-                              Driver ID
-                            </label>
-                            <input
-                              type="text"
-                              value={driverId}
-                              onChange={e => {
-                                try {
-                                  setDriverId(e.target.value);
-                                } catch (err) {
-                                  console.error("Error setting driverId:", err);
-                                }
-                              }}
-                              placeholder="e.g. DRV1024"
-                              className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs"
-                            />
-                          </div>
-
                           <div>
                             <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
                               Driver Name
@@ -1652,7 +1628,7 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
                           </div>
                         </>
                       ) : (
-                        <div className="col-span-1 sm:col-span-1 lg:col-span-3 flex items-center bg-white px-3.5 py-2 rounded-xl border border-slate-200 text-xs text-slate-600 font-medium shadow-2xs">
+                        <div className="col-span-1 sm:col-span-2 flex items-center bg-white px-3.5 py-2 rounded-xl border border-slate-200 text-xs text-slate-600 font-medium shadow-2xs">
                           <CheckCircle className="w-4 h-4 text-emerald-600 mr-2 shrink-0" />
                           <span>Handed over to <strong>Hub / Yard</strong> — no driver details required.</span>
                         </div>
