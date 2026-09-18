@@ -8488,6 +8488,13 @@ class MaintenanceOutCreate(BaseModel):
     vehicle_out_photos: Optional[Union[str, List[str]]] = None
     final_status: Optional[str] = "Completed & RFD"
     remarks: Optional[str] = None
+    handover: Optional[str] = "No"
+    partner_id: Optional[str] = None
+    partner_name: Optional[str] = None
+    partner_phone: Optional[str] = None
+    driver_id: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_phone: Optional[str] = None
 
 @app.post("/api/maintenance-in")
 def create_maintenance_in(data: MaintenanceInCreate, authorization: Optional[str] = Header(None)):
@@ -8822,14 +8829,16 @@ def create_maintenance_out(data: MaintenanceOutCreate, authorization: Optional[s
                 invoice_amount, insurance_liability_discounts, letzryd_payable,
                 invoice_file, type_of_payment, payment_status, utr_no,
                 approved_by, approval_date, approval_file, vehicle_out_photos,
-                final_status, remarks
+                final_status, remarks,
+                handover, partner_id, partner_name, partner_phone, driver_id, driver_name, driver_phone
             ) VALUES (
                 %s, %s, %s, %s, %s,
                 %s, %s, %s, %s,
                 %s, %s, %s,
                 %s, %s, %s, %s,
                 %s, %s, %s, %s,
-                %s, %s
+                %s, %s,
+                %s, %s, %s, %s, %s, %s, %s
             ) RETURNING id, created_at;
         """, (
             data.inward_id, data.vehicle_number.strip().upper(), uid, u_email, data.rfd_date,
@@ -8837,7 +8846,9 @@ def create_maintenance_out(data: MaintenanceOutCreate, authorization: Optional[s
             data.invoice_amount, data.insurance_liability_discounts, payable,
             data.invoice_file, data.type_of_payment, data.payment_status, data.utr_no,
             data.approved_by, data.approval_date, data.approval_file, photos_val,
-            data.final_status, data.remarks
+            data.final_status, data.remarks,
+            data.handover or "No", data.partner_id, data.partner_name, data.partner_phone,
+            data.driver_id, data.driver_name, data.driver_phone
         ))
         out_row = cur.fetchone()
         out_id = out_row[0]
@@ -8900,6 +8911,8 @@ def list_maintenance_out(
                    o.letzryd_payable, o.invoice_file, o.type_of_payment, o.payment_status,
                    o.utr_no, o.approved_by, o.approval_date, o.approval_file,
                    o.vehicle_out_photos, o.final_status, o.remarks,
+                   o.handover, o.partner_id, o.partner_name, o.partner_phone,
+                   o.driver_id, o.driver_name, o.driver_phone,
                    i.workshop_name, i.vehicle_in_date_time, i.city_name, i.vehicle_k_m_s as vehicle_in_kms
             FROM july_maintenance_out o
             LEFT JOIN july_maintenance_in i ON i.id = o.inward_id
@@ -8975,7 +8988,14 @@ def update_maintenance_out(id: int, data: MaintenanceOutCreate, authorization: O
                 approval_file = %s,
                 vehicle_out_photos = %s,
                 final_status = %s,
-                remarks = %s
+                remarks = %s,
+                handover = %s,
+                partner_id = %s,
+                partner_name = %s,
+                partner_phone = %s,
+                driver_id = %s,
+                driver_name = %s,
+                driver_phone = %s
             WHERE id = %s RETURNING id;
         """, (
             data.vehicle_number.strip().upper(), data.rfd_date,
@@ -8983,7 +9003,10 @@ def update_maintenance_out(id: int, data: MaintenanceOutCreate, authorization: O
             data.invoice_no, data.invoice_date, data.invoice_amount,
             data.invoice_file, data.payment_status or "Pending",
             data.approved_by, data.approval_date, data.approval_file,
-            photos_val, data.final_status, data.remarks, id
+            photos_val, data.final_status, data.remarks,
+            data.handover or "No", data.partner_id, data.partner_name, data.partner_phone,
+            data.driver_id, data.driver_name, data.driver_phone,
+            id
         ))
         row = cur.fetchone()
         if not row:

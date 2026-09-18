@@ -585,6 +585,13 @@ export interface MaintenanceOutRecord {
   vehicle_out_photos?: string;
   final_status?: string;
   remarks?: string;
+  handover?: string;
+  partner_id?: string;
+  partner_name?: string;
+  partner_phone?: string;
+  driver_id?: string;
+  driver_name?: string;
+  driver_phone?: string;
   // Joined fields from inward
   workshop_name?: string;
   vehicle_in_date_time?: string;
