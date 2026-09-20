@@ -26,9 +26,9 @@ The automated rental engine is built to cover **the entire company fleet**, not 
 | :--- | :--- | :---: | :--- |
 | **`core_vehicle_onboarding`** | Total Registered Vehicles | **1,668** | Master vehicle inventory (1,647 operational + 21 unallocated yard stock). |
 | **`core_daily_vehicle_status`** | Operational Vehicles on Road | **1,647** | Single source of truth for daily vehicle custody and active status. |
-| **`daily_rent_log`** | Daily Vehicle Rental Records | **1,647** | **100% full coverage:** 81,915 daily logs calculated from May 28, 2026 to Sept 20, 2026. |
+| **`daily_rent_log`** | Daily Vehicle Rental Records | **1,647** | **100% full coverage:** 85,474 daily logs calculated from May 28, 2026 to Sept 20, 2026. |
 | **`core_partner_onboarding`** | Registered Drivers & Operators | **2,431** | Master partner registry across Bangalore, Hyderabad, and Mumbai. |
-| **`rental_custom_partner_plans`**| Contracted Partner Rate Cards | **234** | Active agreements supporting model-specific rates and date ranges. |
+| **`rental_custom_partner_plans`**| Contracted Partner Rate Cards | **236** | Active agreements supporting model-specific rates and date ranges. |
 | **`rental_model_baselines`** | Vehicle Model Rate Fallbacks | **31** | Covers every vehicle model operated in all three cities. |
 
 ### Clarifying the 934-Vehicle Audit vs. Full 1,647-Vehicle Fleet
@@ -37,7 +37,7 @@ The automated rental engine is built to cover **the entire company fleet**, not 
 
 ### Consolidation of Legacy Tables
 * The legacy table `partner_vehicle_rental_plans` was an unpopulated draft table with **0 rows**.
-* All partner agreements were consolidated into the unified, model-aware, date-effective table **`rental_custom_partner_plans`** (234 active agreement records).
+* All partner agreements were consolidated into the unified, model-aware, date-effective table **`rental_custom_partner_plans`** (236 active agreement records).
 * Old, discarded rental tables (`core_rent`, `rents`, `rent_ledger`, `bkp_*`, etc.) were backed up with complete DDL schemas and row data into a separate repository archive (`LetzRyd_Discarded_Rental_Tables`) and dropped from PostgreSQL to keep the production schema clean.
 
 ### Automatic Handling of New Vehicles
@@ -55,17 +55,25 @@ No manual spreadsheet setup or code changes are required when new cars enter the
 * **Base Daily Rent:** The contracted vehicle rental rate (e.g. ₹970, ₹929, ₹800).
 * **Daily Indemnity Fee:** A mandatory protection and insurance fee. The standard company-wide rate is **₹30.00/day**, unless specifically discounted or waived by agreement.
 * **Gross Daily Rent:** The total daily charge billed to the driver:
-  $$	ext{Gross Daily Rent} = 	ext{Base Daily Rent} + 	ext{Daily Indemnity Fee}$$
+  $$\text{Gross Daily Rent} = \text{Base Daily Rent} + \text{Daily Indemnity Fee}$$
   *(Example: ₹970 Base + ₹30 Fee = ₹1,000 Gross Daily Rent).*
 * **Weekly Rental Charge:**
-  $$	ext{Total Weekly Rent} = 	ext{Gross Daily Rent} 	imes 	ext{Billable On-Road Days}$$
+  $$\text{Total Weekly Rent} = \text{Gross Daily Rent} \times \text{Billable On-Road Days}$$
 
 ### 2. Date-Specific Custody vs. Weekly Slab Billability
 * **Date-Specific Billability (`day_trips`):** Vehicles are billed only for days they are marked active/on-road in `core_daily_vehicle_status`. If a vehicle is marked "Maintenance", "Breakdown", or "Drop-off", it is **not billed** for that date. If platform logs show completed rides on that exact date, the system overrides the attendance to **Active** and bills rent. Crucially, trips completed on Monday **never** make a Thursday maintenance day billable.
 * **Weekly Tiering (`week_trips`):** While custody is decided day-by-day, reducing slabs are earned on cumulative **weekly volume** (Monday 00:00:00 to Sunday 23:59:59).
 
-### 3. Whole-Week Dynamic Repricing Engine
+### 3. Whole-Week Dynamic Repricing Engine & Mathematical Example
 When the stored procedure `sp_calculate_daily_rent` runs daily, it automatically evaluates the **entire active ISO week** (`v_week_start` to `v_week_end`). As cumulative trips cross higher thresholds on later days of the week, earlier days in that open week are automatically repriced to the newly earned lower rate.
+
+#### Concrete Mathematical Repricing Example:
+* **Monday to Thursday Accumulation:** An operator on Rishad's TBS ladder (Plan 17) completes 15 trips per day $\times$ 4 days = **60 trips**.
+  - Plan 17 Slab bracket: 55–64 trips $\rightarrow$ Base Rate = **₹760.00/day**.
+  - Monday through Thursday are billed at ₹760.00 base rent + ₹20.00 indemnity = ₹780.00/day.
+* **Friday Threshold Breach:** On Friday, the fleet completes another 15 trips, bringing total cumulative trips to **75 trips** (15 trips $\times$ 5 days = 75 trips).
+  - Plan 17 Slab bracket: $\ge 75$ trips $\rightarrow$ Base Rate = **₹720.00/day** (top performance tier).
+* **Whole-Week Retroactive Repricing:** When `sp_calculate_daily_rent` runs nightly on Friday, it detects that weekly trips reached 75. It automatically reprices Monday, Tuesday, Wednesday, Thursday, and Friday from ₹760.00 down to **₹720.00/day**, ensuring whole-week mathematical consistency.
 
 ### 4. Open Draft Ledger vs. Immutable Settlement Lock
 * **Phase 1: Open Draft Recalculation:** During the current active week, `daily_rent_log` recalculates dynamically via `ON CONFLICT DO UPDATE` as daily trips accumulate.
@@ -113,11 +121,17 @@ Bangalore has 611 vehicles in the audit fleet. It features tiered reducing curve
 
 ---
 
-### 3. The Zero-Trip Rent Policy: Path A vs. Path B
-A major source of historical variance in Bangalore comes from how idle vehicles (0 completed trips) are billed:
-* **Path A (Raw Spreadsheet Formula):** The default formula evaluated `Trips <= 89` and awarded a discounted baseline rate of ₹929 (retail) or ₹900 (operator).
-* **Path B (Proposed Operational Policy):** Operations management held that drivers who keep a car idle for an entire week should not receive volume discounts, and manually hand-typed `1050` over 81 rows in Week 26. However, they missed 20 rows.
-* **Engine Implementation:** Automated Hisaab implements **Path B (₹1,050 full rent)** pending formal client operational sign-off, eliminating manual cell editing.
+### 3. The Zero-Trip Rent Policy: Path A vs. Path B Side-by-Side
+A major source of historical variance in Bangalore comes from how idle vehicles (0 completed trips) are billed. Both models are presented side-by-side for executive decision:
+
+| Evaluation Dimension | Path A: Approved Historical Billing | Path B: Proposed Operational Idling Policy |
+| :--- | :--- | :--- |
+| **Core Logic** | Unedited Excel formula: Trips $\le 89 \rightarrow$ ₹929 (Individual) / ₹900 (Operator). | Hand-overwrites applied to 81 rows in Week 26: 0 trips $\rightarrow$ **₹1,050 full rent**. |
+| **Commercial Rationale** | Baseline contractual tariff; driver is not penalized beyond standard rent. | Disincentivizes vehicle idling; driver keeping a commercial asset idle pays full opportunity rent. |
+| **Weekly Financial Delta** | ₹929/day $\times$ 7 days = ₹6,503 base rent. | ₹1,050/day $\times$ 7 days = ₹7,350 base rent (+₹847 to +₹1,050 per vehicle/week). |
+| **Fleet Impact (20 Missed Rows)** | 20 vehicles billed at ₹929 / ₹900. Total = **₹128,492**. | 20 vehicles billed at ₹1,050. Total = **₹148,652** (Net Delta: **+₹20,160.00/week**). |
+| **Audit Excel Export** | Reflected in Column `Excel_Hisaab_Rent` of `LetzRyd_Row_Level_Reconciliation_Week26.xlsx`. | Reflected in Column `DB_Calculated_Rent_Path_B` of `LetzRyd_Row_Level_Reconciliation_Week26.xlsx`. |
+| **System Status** | Supported via slab condition fallback. | **Engine default pending management sign-off**, eliminating all manual cell overrides. |
 
 ---
 
@@ -125,28 +139,37 @@ A major source of historical variance in Bangalore comes from how idle vehicles 
 * **The Rule:** If an individual driver enrolled on an Uber incentive slab completes **1 or more trips on Ola**, the Uber volume discount curve is cancelled.
 * **Result:** The driver is billed at the flat **`BLR_ALL_PLATFORM` rate of ₹1,050/day**.
 * **Rationale:** Discount slabs are funded by Uber platform targets. Splitting trips across platforms prevents the fleet from hitting platform target tiers.
-* **Case Study (Row 11):** Vehicle `KA05AP7491` (Driver: Muhammed Rahees M) completed 61 Ola trips and 1 Uber trip. Because Ola trips $\ge 1$, the engine charges flat ₹1,050/day base rent.
+* **Case Study (Row 11):** Vehicle `KA05AP7491` (Driver: Muhammed Rahees M, `LETZBLR6238809258`) completed 61 Ola trips and 1 Uber trip. Because Ola trips $\ge 1$, the engine charges flat ₹1,050/day base rent.
 
 ---
 
-### 5. Bangalore Operator Agreements & Plan Scoping
+### 5. Bangalore Operator Agreements & Canonical Partner IDs
 Contracted rate cards stored in `rental_custom_partner_plans` and partner-scoped slabs in `rental_rate_slabs`:
 
-| Partner Name | Partner ID | Vehicle Model | Custom Daily Rent | Daily Fee | Operational Agreement |
+| Partner Name | Canonical Partner ID | Vehicle Model | Custom Daily Rent | Daily Fee | Operational Agreement |
 | :--- | :--- | :--- | :---: | :---: | :--- |
-| **Rishad P V** | `LETZBLRIP9656907001` | Maruti WagonR | **EBS Ladder** | **₹20.00** | Contracted EBS: 0–89 @ ₹800, 90–109 @ ₹550, 110–129 @ ₹410, 130+ @ ₹270. Fee concession ₹20. |
+| **Rishad P V (TBS Fleet)** | `LETZBLRIP9656907001` | Maruti WagonR | **Plan 17 TBS Ladder** | **₹20.00** | **78 vehicles:** $\ge 75$ @ ₹720, 65–74 @ ₹740, 55–64 @ ₹760, <55 @ ₹800. Fee concession ₹20. |
+| **Rishad P V (EBS Fleet)** | `LETZBLRIP9656907001` | Maruti WagonR | **Plan 18 EBS Ladder** | **₹20.00** | **44 vehicles:** 0–89 @ ₹800, 90–109 @ ₹550, 110–129 @ ₹410, 130+ @ ₹270. Fee concession ₹20. |
 | **Mohammed Irshad / Rishan R** | `LETZBLRIP7356813050` | Maruti WagonR | **₹900.00** | **₹30.00** | Contracted fleet operator agreement. |
-| **Hamza Moidu** | `LETZBLRIP9633600609` | Maruti WagonR | **₹870.00** | **₹30.00** | Contracted 4-tier curve starting at ₹870 base. |
-| **Subhan Khan M N** | `LETZBLR8105051939` | Maruti WagonR | **₹850.00** | **₹30.00** | Contracted 4-tier curve starting at ₹850 base. |
-| **Mohamed Ramees A** | `LETZBLRIP9845345799` | Maruti WagonR | **₹900.00** | **₹30.00** | Contracted operator fleet agreement. |
+| **Hamza Moidu** | `LETZBLRIP7025077468` | Maruti WagonR | **Plan 14 TBS Ladder** | **₹30.00** | Contracted 4-tier curve starting at ₹870 base (75+ @ ₹770, 65-74 @ ₹790, 55-64 @ ₹840, <55 @ ₹870). |
+| **Subhan Khan M N** | `LETZBLRIP7026684292` | Maruti WagonR | **Plan 15 TBS Ladder** | **₹30.00** | Contracted 4-tier curve starting at ₹850 base (75+ @ ₹770, 65-74 @ ₹790, 55-64 @ ₹810, <55 @ ₹850). |
+| **Mohamed Ramees A** | `LETZBLRIP8075280208` | Maruti WagonR | **Plan 19 EBS Ladder** | **₹30.00** | Contracted EBS: 0-89 @ ₹900, 90-109 @ ₹615, 110-129 @ ₹465, 130+ @ ₹320. |
 
-* **Resolving Rishad's Plan Collision:** In legacy spreadsheets, generic TBS formulas were accidentally pasted on some of Rishad's rows. In the database, Rishad is explicitly mapped to Plan 18 (`BLR_OP_RISHAD_EBS`) via `core_partner_onboarding.driver_plan`, ensuring his contracted EBS curve applies without colliding with generic TBS slabs.
+#### Preserving Rishad's Historical TBS vs. EBS Split Without Collisions
+In Week 26 Hisaab, Rishad operated **122 total vehicles**:
+- **78 vehicles** were designated `Rishad TBS` in Column `BA` and evaluated using his TBS formula:
+  `=IF(AB>=75, 720, IF(AB>=65, 740, IF(AB>=55, 760, IF(AB<55, 800, ""))))` (Plan 17).  
+  *Forensic Benchmark:* Row 316 (`KA51AM1078`) completed 57 Uber trips $\rightarrow$ evaluated to **₹760.00 base rent**.
+- **44 vehicles** were designated `Not Found` in Column `BA` and evaluated using his EBS formula (Plan 18: 0–89 @ ₹800, 90–109 @ ₹550, 110–129 @ ₹410, 130+ @ ₹270).
+
+**How the Database Solves the Collision:**
+In PostgreSQL, Rishad's default partner plan in `core_partner_onboarding` is set to Plan 18 (`BLR_OP_RISHAD_EBS`). The 78 TBS vehicles are mapped at the vehicle level in `rental_custom_partner_plans` with `plan_id = 17`. In stored procedure `sp_calculate_daily_rent`, Priority 3 scopes slabs using `COALESCE(cp.plan_id, swb.enrolled_plan_id)`. This guarantees each vehicle resolves to its exact contracted curve without `trip_min` sorting collisions.
 
 ---
 
 ### 6. Bangalore Fee Concessions & Waivers
 Standard daily indemnity fee is ₹30.00/day. Approved concessions in `rental_fee_rules`:
-* **Nisamudeen K P (`LETZBLRIP9947932622`):** Concession fee of **₹15.00/day** (Rule #6).
+* **Nisamudeen K P (`LETZBLRIP9036461336` / `LETZBLRIP9947932622`):** Concession fee of **₹15.00/day** (Rule #6).
 * **Rishad P V (`LETZBLRIP9656907001`):** Concession fee of **₹20.00/day** (Rule #7).
 * **Shaik Kareem (`LETZHYDIP9701685282`):** Fee waiver to **₹0.00/day** (Rule #5).
 
@@ -193,52 +216,56 @@ Hyderabad (146 vehicles in audit) calculates rent based on specific vehicle mode
 ### 3. The "Expectation Case" Master Table (All 14 Partners)
 In the Hyderabad spreadsheet (`Plans` sheet, Columns G to I, Rows 4 to 19), operations maintained an **`Expectation Case Fixed Revenue Share`** side table. This table took precedence over generic trip slabs. All 14 partner agreements are stored in `rental_custom_partner_plans`:
 
-| # | Partner Name | Partner ID | Contracted Daily Rent | Vehicle Model Scope |
-| :-: | :--- | :--- | :---: | :--- |
-| 1 | Khaja Abdul Mujeeb | `LETZHYD8897187692` | **₹970.00** | Maruti WagonR |
-| 2 | C Yeswanth Kumar Raju | `LETZHYDIP9346939240` | **₹970.00** | Maruti WagonR |
-| 3 | Gundawar Ramesh | `LETZHYD9985560206` | **₹1,000.00** | Maruti WagonR |
-| 4 | Mohd Abdul Muneeb | `LETZHYDIP6301998819` | **₹920.00** | Maruti WagonR |
-| 5 | Goli Nitish Kumar | `LETZHYDIP9381891907` | **₹970.00** | Maruti WagonR |
-| 6 | Shaik Khalleel Basha | `LETZHYDIP9052136251` | **₹1,050.00** | Maruti WagonR |
-| 7 | Rayapalli Naga Yaswanth | `LETZHYDIP9391757100` | **₹1,050.00** | Maruti WagonR |
-| 8 | Doneti Tarun Kumar | `LETZHYDIP8143524398` | **₹1,400.00** | EC3 Electric |
-| 9 | **Mohd Abdul Qadir** | `LETZHYDIP7569776283` | **Multi-Model** | Dzire: ₹1,070 \| WagonR: ₹970 \| EC3: ₹1,400 |
-| 10 | **Mohammed Zubair** | `LETZHYD9849106470` | **Multi-Model** | Dzire: ₹1,070 \| WagonR: ₹970 |
-| 11 | **Shaik Kareem** | `LETZHYDIP9701685282` | **Multi-Model** | Dzire: ₹1,200 \| WagonR: ₹900 (Fee = ₹0 waiver) |
-| 12 | **Pasupureddy Karthik** | `LETZHYDIP9640404017` | **₹900.00** | Maruti WagonR (25+ vehicles) |
-| 13 | **Mudupu Sai Baba** | `LETZHYDIP9390599335` | **₹940.00** | Maruti WagonR (6+ vehicles) |
-| 14 | Syed Qutubuddin | `LETZHYDIP9866941379` | **₹1,200.00** | Dzire Tour S CNG |
+| # | Partner Name | Canonical Partner ID | Contracted Daily Rent | Vehicle Model Scope | Forensic Evidence / Historical Notes |
+| :-: | :--- | :--- | :---: | :--- | :--- |
+| 1 | Khaja Abdul Mujeeb | `LETZHYD8897187692` | **₹970.00** | Maruti WagonR | Fixed partner contract. |
+| 2 | C Yeswanth Kumar Raju | `LETZHYDIP9346939240` | **₹970.00** | Maruti WagonR | Fixed driver agreement. |
+| 3 | Gundawar Ramesh | `LETZHYD9985560206` | **₹1,000.00** | Maruti WagonR | Fixed driver agreement. |
+| 4 | Mohd Abdul Muneeb | `LETZHYDIP6301998819` | **₹920.00** | Maruti WagonR | Fixed driver agreement. |
+| 5 | Goli Nitish Kumar | `LETZHYDIP9381891907` | **₹970.00** | Maruti WagonR | Fixed driver agreement. |
+| 6 | Shaik Khalleel Basha | `LETZHYDIP9052136251` | **₹1,050.00** | Maruti WagonR | Fixed driver agreement. |
+| 7 | Rayapalli Naga Yaswanth | `LETZHYDIP9391757100` | **₹1,050.00** | Maruti WagonR | Fixed driver agreement. |
+| 8 | Doneti Tarun Kumar | `LETZHYDIP8143524398` | **₹1,400.00** | EC3 Electric | Fixed EV agreement. |
+| 9 | **Mohd Abdul Qadir** | `LETZHYDIP7569776283` | **Multi-Model** | Dzire: ₹1,070 \| WagonR: ₹970 \| EC3: ₹1,400 | Model-specific agreement cards. |
+| 10 | **Mohammed Zubair** | `LETZHYD9849106470` | **Multi-Model** | Dzire: ₹1,070 \| WagonR: ₹970 | Model-specific agreement cards. |
+| 11 | **Shaik Kareem** | `LETZHYDIP9701685282` | **Multi-Model** | Dzire: ₹1,200 \| WagonR: ₹900 (Fee = ₹0 waiver) | Executive fee waiver card. |
+| 12 | **Pasupureddy Karthik** | `LETZHYDIP9640404017` | **₹900.00** | Maruti WagonR (25+ vehicles) | Fleet operator agreement. |
+| 13 | **Mudupu Sai Baba** | `LETZHYDIP9390599335` | **₹940.00** | Maruti WagonR (6+ vehicles) | Fleet operator agreement. |
+| 14 | **Syed Qutubuddin** | `LETZHYDIP9866941379` | **₹1,200.00** | **ALL Models (Dzire Tour S & Citroen eC3)** | Rate applies across all models (evidenced by Citroen eC3 in W27 cells K132, K135, K138). |
 
 ---
 
 ### 4. Multi-Model Operator Nuance: Qadir & Zubair
 * **The Problem:** In the spreadsheet, `XLOOKUP` matched by Partner ID only. Mohd Abdul Qadir (`LETZHYDIP7569776283`) was listed at **₹1,070** (his Dzire rate). When he also took WagonRs, the Excel formula tried to bill ₹1,070 on the WagonRs too, forcing ops to manually type `970.0` every week.
-* **The Solution:** In `rental_custom_partner_plans`, agreements match by **both** `partner_id` AND `vehicle_model`. Qadir's WagonR rate of **₹970** comes from his custom partner card (Card #12), while WagonR model baseline is ₹1,050. The engine applies ₹1,070 to his Dzires and ₹970 to his WagonRs automatically.
+* **The Solution:** In `rental_custom_partner_plans`, agreements match by **both** `partner_id` AND `vehicle_model`. Qadir holds Card #219 (Dzire @ ₹1,070) and Card #235 (WagonR @ ₹970). The engine applies ₹1,070 to his Dzires and ₹970 to his WagonRs automatically.
 * **Audit Parity:** Hyderabad achieved **146 / 146 (100.00%) perfect match with zero mismatches**.
 
 ---
 
 ## 5. City 3: Mumbai (MUM) Deep-Dive
 
-Mumbai (177 vehicles in audit) operates on a standard 2-tier high-level retail structure and an underlying 6-tier production curve.
+Mumbai (177 vehicles in audit) features two distinct commercial structures: a high-level **Retail 2-Tier Curve** and an underlying **Production 6-Tier Slab**.
 
-### 1. Standard Retail Slabs
+### 1. Delineation of Mumbai Plans
 
-#### A. High-Level 2-Tier Curve
-* **Plan 1 (0 to 99 Trips):** **₹970.00 Base + ₹30.00 Fee = ₹1,000.00 Gross Daily Rent**
-* **Plan 2 (100+ Trips):** **₹850.00 Base + ₹30.00 Fee = ₹880.00 Gross Daily Rent**
+#### A. Mumbai Retail 2-Tier Plan (`MUM_RETAIL_2TIER`)
+Designed for standard commercial leases where drivers pay a flat base rate that steps down once a weekly target of 100 trips is achieved:
+* **0 to 99 Trips:** **₹970.00 Base + ₹30.00 Fee = ₹1,000.00 Gross Daily Rent**
+* **100+ Trips:** **₹850.00 Base + ₹30.00 Fee = ₹880.00 Gross Daily Rent** (-₹120/day volume discount)
 
-#### B. Detailed 6-Tier Production Curve (`MUM_UBER_REDUCING`)
+#### B. Mumbai Production 6-Tier Slab (`MUM_UBER_REDUCING` - Plan #10)
+Underlying incentive ladder calibrated for high-density metropolitan driving across six granular trip brackets:
 
-| Weekly Trip Range | Daily Base Rent | Daily Indemnity Fee | Gross Daily Rent |
-| :---: | :---: | :---: | :---: |
-| **0 to 64 Trips** | **₹970.00** | **₹30.00** | **₹1,000.00** |
-| **65 to 79 Trips** | **₹759.00** | **₹30.00** | **₹789.00** |
-| **80 to 109 Trips** | **₹659.00** | **₹30.00** | **₹689.00** |
-| **110 to 124 Trips** | **₹569.00** | **₹30.00** | **₹599.00** |
-| **125 to 139 Trips** | **₹439.00** | **₹30.00** | **₹469.00** |
-| **140+ Trips** | **₹339.00** | **₹30.00** | **₹369.00** |
+| Slab ID | Weekly Trip Range | Daily Base Rent | Daily Indemnity Fee | Gross Daily Rent | Discount vs. Base |
+| :---: | :---: | :---: | :---: | :---: | :---: |
+| **82** | **0 to 64 Trips** | **₹970.00** | **₹30.00** | **₹1,000.00** | Baseline Rate |
+| **83** | **65 to 79 Trips** | **₹759.00** | **₹30.00** | **₹789.00** | -₹211.00 / day |
+| **84** | **80 to 109 Trips** | **₹659.00** | **₹30.00** | **₹689.00** | -₹311.00 / day |
+| **85** | **110 to 124 Trips** | **₹569.00** | **₹30.00** | **₹599.00** | -₹401.00 / day |
+| **86** | **125 to 139 Trips** | **₹439.00** | **₹30.00** | **₹469.00** | -₹531.00 / day |
+| **87** | **140+ Trips** | **₹339.00** | **₹30.00** | **₹369.00** | -₹631.00 / day |
+
+*Key Distinction:* While a 100-trip driver on the 2-Tier plan pays ₹850.00 base, a 100-trip driver on the 6-Tier plan achieves the 80–109 bracket paying **₹659.00 base**. Both plans are parameterized independently in `core_rental_plans` and `rental_rate_slabs`.
 
 ---
 
@@ -248,7 +275,7 @@ Historical workbooks show rate transitions between June and September:
   - **June & July (W26 & W27):** Rate was **₹999 Base + ₹30 Fee = ₹1,029 Gross**.
   - **September (W37):** Contracted at **₹970 Base + ₹30 Fee = ₹1,000 Gross**.
 * **Dinesh Prasad Prajapati (`LETZMUMIP8169447128`, Vehicle `MH03ES4925`):**
-  - **June & July (W26 & W27):** Standard retail Plan 1 = **₹1,000 Gross**.
+  - **June & July (W26 & W27):** Standard retail Plan 10 = **₹1,000 Gross**.
   - **September (W37):** Custom deal of **₹999 Base + ₹30 Fee = ₹1,029 Gross**.
 
 * **Audit Transparency:** Rather than inventing an arbitrary mid-week transition date (such as July 1st, which bisects Week 27), this is documented as an **Unresolved Operational Transition Window between WK27 and WK37** pending a signed contract addendum from LetzRyd management.
@@ -282,6 +309,7 @@ Whenever automated Hisaab runs for a vehicle on any given date, it executes the 
                                       │
                                       ▼
     Step 3: Check Dynamic Trip Slabs (rental_rate_slabs)
+            ├── Scoped by COALESCE(cp.plan_id, swb.enrolled_plan_id)
             ├── 0 Completed Trips? ──> Apply ₹1,050 Idle Rate (Path B)
             ├── Ola Trips >= 1 on Uber Plan? ──> Apply ₹1,050 Flat Dual-App Rate
             ├── Standard Bracket Match? ──> Apply Slab Rate
@@ -336,6 +364,8 @@ All rental calculations are governed by 7 clean relational tables in PostgreSQL:
 | **Bangalore** | **611** | **587** | **24** | **96.07%** | 20 zero-trip misses, 3 operator skips, 1 override |
 | **TOTAL FLEET** | **934** | **910** | **24** | **97.43%** | **Production Ready** |
 
+*Row-Level Reconciliation Spreadsheet:* All 934 vehicles audited row-by-row are exported in **`C:\Users\anura\Downloads\LetzRyd_Row_Level_Reconciliation_Week26.xlsx`**, featuring Path A and Path B side-by-side columns.
+
 ---
 
 ### The 24 Bangalore Discrepancies Explained
@@ -344,8 +374,8 @@ All 24 remaining operational variances across the entire fleet are located in Ba
 
 #### 1. Missed 0-Trip Manual Overwrites in the Sheet (20 Vehicles)
 * **What Happened:** Under management's proposed policy, active vehicles with 0 trips must pay full rent (**₹1,050**). In the Week 26 sheet, operations hand-typed `1050` on 81 rows, but missed doing so on these 20 rows. Because the unedited formula remained active, it returned ₹929 for 14 individual drivers and ₹900 for 6 operators.
-* **What Automated Hisaab Does:** The engine applies standard ₹1,050 full rent.
-* **Impact:** Automating this rule reduced manual typing discrepancies from **101 potential errors down to 20**.
+* **What Automated Hisaab Does:** The engine applies standard ₹1,050 full rent (Path B), while preserving Path A for comparison.
+* **Financial Delta:** The net delta across all 20 vehicles is **₹20,160.00/week** (Path A = ₹128,492 vs. Path B = ₹148,652).
 * **Sample Vehicles:** `KA51AL1130` (Row 42), `KA51AL1486` (Row 85), `KA51AM1061` (Row 312).
 
 #### 2. Operator Contract vs. Generic Formula Pasting (3 Vehicles)
@@ -363,6 +393,6 @@ All 24 remaining operational variances across the entire fleet are located in Ba
 
 To finalize automated billing for 100% of vehicles, operations only needs to confirm three operational decisions:
 
-1. **Confirm Zero-Trip Rule:** Confirm that all 20 zero-trip vehicles should be billed at **₹1,050 full rent** (as automated Hisaab currently does under Path B), correcting the spreadsheet omission.
+1. **Confirm Zero-Trip Rule:** Confirm whether all 20 zero-trip vehicles should be billed at **₹1,050 full rent** (Path B) or remain at the historical formula rate of **₹929/₹900** (Path A), resolving the ₹20,160/week delta.
 2. **Confirm Operator Agreements:** Confirm that Rishad (₹800) and Mohammed Irshad (₹900) should be billed at their master contract rates rather than the pasted spreadsheet formulas.
 3. **Clarify Row 506 (Kaja Hussain):** Confirm whether charging ₹1,050 for 13 trips was an intentional one-off disciplinary penalty or should remain at the standard ₹929 slab rate.
