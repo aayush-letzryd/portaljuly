@@ -126,10 +126,11 @@ A major source of historical variance in Bangalore comes from how idle vehicles 
 
 | Evaluation Dimension | Path A: Approved Historical Billing | Path B: Proposed Operational Idling Policy |
 | :--- | :--- | :--- |
-| **Core Logic** | Unedited Excel formula: Trips $\le 89 \rightarrow$ ₹929 (Individual) / ₹900 (Operator). | Hand-overwrites applied to 81 rows in Week 26: 0 trips $\rightarrow$ **₹1,050 full rent**. |
+| **Core Logic** | Unedited Excel formula: Trips $\le 89 ightarrow$ ₹929 (Individual) / ₹900 (Operator). | Hand-overwrites applied to 81 rows in Week 26: 0 trips $ightarrow$ **₹1,050 full rent**. |
 | **Commercial Rationale** | Baseline contractual tariff; driver is not penalized beyond standard rent. | Disincentivizes vehicle idling; driver keeping a commercial asset idle pays full opportunity rent. |
-| **Weekly Financial Delta** | ₹929/day $\times$ 7 days = ₹6,503 base rent. | ₹1,050/day $\times$ 7 days = ₹7,350 base rent (+₹847 to +₹1,050 per vehicle/week). |
-| **Fleet Impact (20 Missed Rows)** | 20 vehicles billed at ₹929 / ₹900. Total = **₹128,492**. | 20 vehicles billed at ₹1,050. Total = **₹148,652** (Net Delta: **+₹20,160.00/week**). |
+| **Theoretical 7-Day Basis (140 Days)** | 14 Individuals @ ₹929 + 6 Operators @ ₹900 = ₹128,492 base rent. | 20 Vehicles @ ₹1,050 full rent = ₹147,000 base. Theoretical Delta = **₹18,158.00** ($[14 	imes 121 + 6 	imes 150] 	imes 7$). |
+| **Actual Attendance Reality (54 Days)** | 20 vehicles were on-road for **54 actual vehicle-days** (ranging from 1 to 7 days). Total Excel Rent = **₹51,641.00**. | 54 billable vehicle-days @ ₹1,050 base + fees = **₹58,320.00**. Actual Net Delta = **+₹6,679.00** (+₹6,969 base delta). |
+| **Origin of ₹20,160 Figure** | Derived from early theoretical flat estimate of 20 vehicles $	imes$ ₹1,008 average difference without attendance proration. | Both actual attendance (₹6,679 delta across 54 days) and 7-day theoretical ceiling (₹18,158) are documented side-by-side for executive sign-off. |
 | **Audit Excel Export** | Reflected in Column `Excel_Hisaab_Rent` of `LetzRyd_Row_Level_Reconciliation_Week26.xlsx`. | Reflected in Column `DB_Calculated_Rent_Path_B` of `LetzRyd_Row_Level_Reconciliation_Week26.xlsx`. |
 | **System Status** | Supported via slab condition fallback. | **Engine default pending management sign-off**, eliminating all manual cell overrides. |
 
@@ -375,7 +376,9 @@ All 24 remaining operational variances across the entire fleet are located in Ba
 #### 1. Missed 0-Trip Manual Overwrites in the Sheet (20 Vehicles)
 * **What Happened:** Under management's proposed policy, active vehicles with 0 trips must pay full rent (**₹1,050**). In the Week 26 sheet, operations hand-typed `1050` on 81 rows, but missed doing so on these 20 rows. Because the unedited formula remained active, it returned ₹929 for 14 individual drivers and ₹900 for 6 operators.
 * **What Automated Hisaab Does:** The engine applies standard ₹1,050 full rent (Path B), while preserving Path A for comparison.
-* **Financial Delta:** The net delta across all 20 vehicles is **₹20,160.00/week** (Path A = ₹128,492 vs. Path B = ₹148,652).
+* **Financial Delta:**
+  - *Actual Attendance (54 Vehicle-Days):* The 20 vehicles were on-road for 54 actual vehicle-days. Total Excel Rent = **₹51,641.00**, Path B Rent = **₹58,320.00** (Net Delta: **+₹6,679.00** net / +₹6,969 base delta).
+  - *Theoretical 7-Day Ceiling (140 Vehicle-Days):* If all 20 vehicles operated 7 full days, the delta would be $[14 	imes 121 + 6 	imes 150] 	imes 7 = \mathbf{₹18,158.00}$. The early unprorated estimate was ₹20,160 ($20 	imes ₹1,008$).
 * **Sample Vehicles:** `KA51AL1130` (Row 42), `KA51AL1486` (Row 85), `KA51AM1061` (Row 312).
 
 #### 2. Operator Contract vs. Generic Formula Pasting (3 Vehicles)
