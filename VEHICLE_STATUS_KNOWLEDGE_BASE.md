@@ -132,17 +132,14 @@ The entire operational history from **2026-08-11 to 2026-09-19** (40 days) was r
 
 ## 5. In-Database Automated Scheduling (`pg_cron`)
 
-The 15-minute refresh is automated **natively inside PostgreSQL** via `pg_cron`:
+Automated refreshes are executed **natively inside PostgreSQL** via `pg_cron` with an optimized dual-cadence rolling architecture to guarantee late-submitted holiday/weekend drop-offs are reconciled automatically:
 
-### Active Cron Job:
+### Active Cron Jobs:
 
-| Parameter | Value |
-| :--- | :--- |
-| **Job ID** | `1` |
-| **Job Name** | `refresh_daily_vehicle_status_15m` |
-| **Schedule** | `*/15 * * * *` (Every 15 minutes) |
-| **Command** | `CALL public.sp_generate_daily_vehicle_status(CURRENT_DATE);` |
-| **Active** | **`True`** |
+| Job ID | Job Name | Schedule | Command | Purpose & Execution Time |
+| :--- | :--- | :--- | :--- | :--- |
+| **`1`** | `refresh_daily_vehicle_status_15m` | `*/15 * * * *` (Every 15 min) | `CALL public.sp_refresh_vehicle_status_rolling(1);` | Rapid intraday catch-up (Yesterday + Today, ~1.5s). Captures same-day/previous-day entries immediately. |
+| **`11`** | `nightly_vehicle_status_rolling_7d` | `15 1 * * *` (Daily at 01:15 AM) | `CALL public.sp_refresh_vehicle_status_rolling(7);` | Deep rolling 7-day sweep (~7.0s). Sweeps holiday/weekend drop-offs before daily rent calculation (`02:00 AM`). |
 
 ### Management & Monitoring SQL Queries:
 ```sql
@@ -156,9 +153,13 @@ FROM cron.job_run_details
 ORDER BY start_time DESC 
 LIMIT 20;
 
--- 3. Manually trigger a refresh for today:
-CALL public.sp_generate_daily_vehicle_status(CURRENT_DATE);
+-- 3. Manually refresh past N days (e.g. past 7 days):
+CALL public.sp_refresh_vehicle_status_rolling(7);
 
--- 4. Manually backfill a historical date:
-CALL public.sp_generate_daily_vehicle_status('2026-09-15');
+-- 4. Manually backfill an arbitrary date range:
+CALL public.sp_refresh_vehicle_status_range('2026-09-01', '2026-09-20');
+
+-- 5. Manually trigger a single-day refresh:
+CALL public.sp_generate_daily_vehicle_status(CURRENT_DATE);
 ```
+
