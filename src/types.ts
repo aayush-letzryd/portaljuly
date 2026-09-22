@@ -389,9 +389,27 @@ export interface HubRecord {
   created_at: string;
 }
 
+export type RentalConfigType = 
+  | "PARTNER_DEAL" 
+  | "EXCEPTION_OVERRIDE" 
+  | "RATE_SLAB" 
+  | "MODEL_BASELINE" 
+  | "FEE_WAIVER" 
+  | "CORE_PLAN";
+
 export interface RentRecord {
   id: number;
-  level: string;
+  config_type?: RentalConfigType | string;
+  city?: string;
+  level?: string;
+  plan_id?: number;
+  plan_code?: string;
+  plan_name?: string;
+  plan_category?: string;
+  calculation_type?: string;
+  partner_id?: string;
+  partner_name?: string;
+  customer_type?: string;
   vehicle_manufacturer?: string;
   vehicle_model?: string;
   vehicle_number?: string;
@@ -399,12 +417,27 @@ export interface RentRecord {
   vehicle_age_bucket?: string;
   vendor_id?: string;
   driver_id?: string;
+  metric_type?: string;
+  condition_rule?: string;
+  trip_min?: number;
+  trip_max?: number | null;
   rent_amount: number;
+  daily_rent?: number;
+  daily_fee?: number;
+  is_fee_waiver?: boolean;
+  all_platform_flat_rent?: number;
+  valid_from?: string;
+  valid_to?: string;
+  reason_or_notes?: string;
+  evidence_source?: string;
+  approved_by?: string;
+  created_by?: string;
   discount_percent?: number;
   discount_amount?: number;
   monthly_plan_locked?: boolean;
   status?: string;
   created_at?: string;
+  updated_at?: string;
 }
 
 export interface AccidentRecord {

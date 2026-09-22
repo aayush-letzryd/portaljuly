@@ -7580,6 +7580,8 @@ def delete_hub_record(id: int, authorization: Optional[str] = Header(None)):
 def get_rents(
     search: Optional[str] = None,
     level: Optional[str] = None,
+    config_type: Optional[str] = None,
+    city: Optional[str] = None,
     status: Optional[str] = None,
     authorization: Optional[str] = Header(None)
 ):
@@ -7587,34 +7589,79 @@ def get_rents(
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        query = "SELECT * FROM july_rents WHERE 1=1"
+        query = """
+            SELECT 
+                id, config_type, city, plan_id, plan_code, plan_name, plan_category,
+                calculation_type, partner_id, partner_name, customer_type,
+                vehicle_manufacturer, vehicle_model, vehicle_number, vehicle_age,
+                metric_type, condition_rule, trip_min, trip_max,
+                daily_rent, daily_fee, is_fee_waiver, all_platform_flat_rent,
+                valid_from::text, valid_to::text, reason_or_notes, evidence_source,
+                approved_by, created_by, status, created_at::text, updated_at::text,
+                daily_rent AS rent_amount,
+                partner_id AS vendor_id,
+                partner_id AS driver_id,
+                LOWER(COALESCE(config_type, 'model')) AS level
+            FROM public.portal_rental_plans 
+            WHERE 1=1
+        """
         params = []
         if search:
-            query += " AND (vehicle_model ILIKE %s OR vehicle_number ILIKE %s OR vendor_id ILIKE %s OR driver_id ILIKE %s)"
+            query += """ AND (
+                vehicle_model ILIKE %s OR vehicle_number ILIKE %s OR partner_id ILIKE %s 
+                OR partner_name ILIKE %s OR plan_code ILIKE %s OR reason_or_notes ILIKE %s
+            )"""
             s = f"%{search}%"
-            params.extend([s, s, s, s])
-        if level:
-            query += " AND level = %s"
-            params.append(level)
-        if status:
+            params.extend([s, s, s, s, s, s])
+        if config_type and config_type != "all":
+            query += " AND config_type = %s"
+            params.append(config_type)
+        if city and city != "all":
+            query += " AND city = %s"
+            params.append(city)
+        if status and status != "all":
             query += " AND status = %s"
             params.append(status)
         query += " ORDER BY id DESC"
         cur.execute(query, params)
         cols = [d[0] for d in cur.description]
-        return [dict(zip(cols, row)) for row in cur.fetchall()]
+        records = [dict(zip(cols, row)) for row in cur.fetchall()]
+        return records
     finally:
         postgreSQL_pool.putconn(conn)
 
 class RentData(BaseModel):
-    level: str
+    config_type: Optional[str] = "PARTNER_DEAL"
+    city: Optional[str] = "Bangalore"
+    level: Optional[str] = None
+    plan_id: Optional[int] = None
+    plan_code: Optional[str] = None
+    plan_name: Optional[str] = None
+    plan_category: Optional[str] = "STANDARD"
+    calculation_type: Optional[str] = "SLAB_TIERED"
+    partner_id: Optional[str] = None
+    partner_name: Optional[str] = None
+    customer_type: Optional[str] = "ALL"
     vehicle_manufacturer: Optional[str] = None
     vehicle_model: Optional[str] = None
     vehicle_number: Optional[str] = None
     vehicle_age: Optional[str] = None
     vendor_id: Optional[str] = None
     driver_id: Optional[str] = None
-    rent_amount: float
+    metric_type: Optional[str] = "UBER_TRIPS"
+    condition_rule: Optional[str] = "NONE"
+    trip_min: Optional[int] = 0
+    trip_max: Optional[int] = None
+    rent_amount: Optional[float] = None
+    daily_rent: Optional[float] = None
+    daily_fee: Optional[float] = 30.00
+    is_fee_waiver: Optional[bool] = False
+    all_platform_flat_rent: Optional[float] = None
+    valid_from: Optional[str] = None
+    valid_to: Optional[str] = None
+    reason_or_notes: Optional[str] = None
+    evidence_source: Optional[str] = None
+    approved_by: Optional[str] = "Operations Head"
     status: Optional[str] = "Active"
 
 @app.post("/api/rents")
@@ -7623,26 +7670,49 @@ def create_rent(data: RentData, authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("""
-            INSERT INTO july_rents (level, vehicle_manufacturer, vehicle_model, vehicle_number, vehicle_age, vendor_id, driver_id, rent_amount)
-            VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING id;
-        """, (data.level, data.vehicle_manufacturer, data.vehicle_model, data.vehicle_number, data.vehicle_age, data.vendor_id, data.driver_id, data.rent_amount))
-        new_id = cur.fetchone()[0]
-
-        entity_type = data.level.capitalize()
-        entity_id = ""
-        if data.level == "driver": entity_id = data.driver_id or ""
-        elif data.level == "vendor": entity_id = data.vendor_id or ""
-        elif data.level == "vehicle": entity_id = data.vehicle_number or ""
-        elif data.level == "model": entity_id = data.vehicle_model or ""
+        rent_val = data.daily_rent if data.daily_rent is not None else (data.rent_amount or 0.0)
+        fee_val = 0.0 if data.is_fee_waiver else (data.daily_fee if data.daily_fee is not None else 30.00)
+        partner_val = data.partner_id or data.vendor_id or data.driver_id or None
+        v_model = data.vehicle_model or "ALL"
+        c_type = data.config_type or "PARTNER_DEAL"
+        c_city = data.city or "Bangalore"
 
         from datetime import date
         today_str = date.today().isoformat()
+        v_from = data.valid_from or today_str
+        v_to = data.valid_to or "9999-12-31"
+
+        cur.execute("""
+            INSERT INTO public.portal_rental_plans (
+                config_type, city, plan_id, plan_code, plan_name, plan_category, calculation_type,
+                partner_id, partner_name, customer_type, vehicle_manufacturer, vehicle_model,
+                vehicle_number, vehicle_age, metric_type, condition_rule, trip_min, trip_max,
+                daily_rent, daily_fee, is_fee_waiver, all_platform_flat_rent, valid_from, valid_to,
+                reason_or_notes, evidence_source, approved_by, created_by, status
+            ) VALUES (
+                %s, %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s, %s,
+                %s, %s, %s, %s, %s
+            ) RETURNING id;
+        """, (
+            c_type, c_city, data.plan_id, data.plan_code, data.plan_name, data.plan_category, data.calculation_type,
+            partner_val, data.partner_name, data.customer_type, data.vehicle_manufacturer, v_model,
+            data.vehicle_number, data.vehicle_age, data.metric_type, data.condition_rule, data.trip_min, data.trip_max,
+            rent_val, fee_val, data.is_fee_waiver, data.all_platform_flat_rent, v_from, v_to,
+            data.reason_or_notes, data.evidence_source, data.approved_by, user.get("name") or user.get("username"), data.status or "Active"
+        ))
+        new_id = cur.fetchone()[0]
+
+        # Audit ledger logging
+        entity_type = c_type.replace("_", " ").title()
+        entity_id = partner_val or data.vehicle_number or v_model or f"Plan-{new_id}"
 
         cur.execute("""
             INSERT INTO july_rent_ledger (entity_type, entity_id, change_type, old_amount, new_amount, modified_by, effective_date)
             VALUES (%s, %s, %s, %s, %s, %s, %s);
-        """, (entity_type, entity_id, "Created", 0, data.rent_amount, user.get("name") or user.get("username"), today_str))
+        """, (entity_type, entity_id, "Created", 0, rent_val, user.get("name") or user.get("username"), v_from))
 
         conn.commit()
         return {"success": True, "id": new_id}
@@ -7655,38 +7725,53 @@ def update_rent(id: int, data: RentData, authorization: Optional[str] = Header(N
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT rent_amount, level, driver_id, vendor_id, vehicle_number, vehicle_model FROM july_rents WHERE id = %s;", (id,))
+        cur.execute("SELECT daily_rent, config_type, partner_id, vehicle_number, vehicle_model FROM public.portal_rental_plans WHERE id = %s;", (id,))
         row = cur.fetchone()
-        if not row:
-            raise HTTPException(status_code=404, detail="Rent record not found")
-        old_rent_amount, old_level, old_driver_id, old_vendor_id, old_vehicle_number, old_vehicle_model = row
+        old_rent = row[0] if row else 0.0
 
-        cur.execute("""
-            UPDATE july_rents SET level=%s, vehicle_manufacturer=%s, vehicle_model=%s, vehicle_number=%s, vehicle_age=%s, vendor_id=%s, driver_id=%s, rent_amount=%s
-            WHERE id=%s RETURNING id;
-        """, (data.level, data.vehicle_manufacturer, data.vehicle_model, data.vehicle_number, data.vehicle_age, data.vendor_id, data.driver_id, data.rent_amount, id))
-        cur.fetchone()
-
-        entity_type = data.level.capitalize()
-        entity_id = ""
-        if data.level == "driver": entity_id = data.driver_id or ""
-        elif data.level == "vendor": entity_id = data.vendor_id or ""
-        elif data.level == "vehicle": entity_id = data.vehicle_number or ""
-        elif data.level == "model": entity_id = data.vehicle_model or ""
+        rent_val = data.daily_rent if data.daily_rent is not None else (data.rent_amount or 0.0)
+        fee_val = 0.0 if data.is_fee_waiver else (data.daily_fee if data.daily_fee is not None else 30.00)
+        partner_val = data.partner_id or data.vendor_id or data.driver_id or None
+        v_model = data.vehicle_model or "ALL"
+        c_type = data.config_type or (row[1] if row else "PARTNER_DEAL")
+        c_city = data.city or "Bangalore"
 
         from datetime import date
         today_str = date.today().isoformat()
+        v_from = data.valid_from or today_str
+        v_to = data.valid_to or "9999-12-31"
+
+        cur.execute("""
+            UPDATE public.portal_rental_plans SET
+                config_type=%s, city=%s, plan_id=%s, plan_code=%s, plan_name=%s, plan_category=%s, calculation_type=%s,
+                partner_id=%s, partner_name=%s, customer_type=%s, vehicle_manufacturer=%s, vehicle_model=%s,
+                vehicle_number=%s, vehicle_age=%s, metric_type=%s, condition_rule=%s, trip_min=%s, trip_max=%s,
+                daily_rent=%s, daily_fee=%s, is_fee_waiver=%s, all_platform_flat_rent=%s, valid_from=%s, valid_to=%s,
+                reason_or_notes=%s, evidence_source=%s, approved_by=%s, status=%s, updated_at=CURRENT_TIMESTAMP
+            WHERE id=%s RETURNING id;
+        """, (
+            c_type, c_city, data.plan_id, data.plan_code, data.plan_name, data.plan_category, data.calculation_type,
+            partner_val, data.partner_name, data.customer_type, data.vehicle_manufacturer, v_model,
+            data.vehicle_number, data.vehicle_age, data.metric_type, data.condition_rule, data.trip_min, data.trip_max,
+            rent_val, fee_val, data.is_fee_waiver, data.all_platform_flat_rent, v_from, v_to,
+            data.reason_or_notes, data.evidence_source, data.approved_by, data.status or "Active", id
+        ))
+        updated_row = cur.fetchone()
+        if not updated_row:
+            raise HTTPException(status_code=404, detail="Rent record not found")
+
+        entity_type = c_type.replace("_", " ").title()
+        entity_id = partner_val or data.vehicle_number or v_model or f"Plan-{id}"
 
         cur.execute("""
             INSERT INTO july_rent_ledger (entity_type, entity_id, change_type, old_amount, new_amount, modified_by, effective_date)
             VALUES (%s, %s, %s, %s, %s, %s, %s);
-        """, (entity_type, entity_id, "Updated", old_rent_amount, data.rent_amount, user.get("name") or user.get("username"), today_str))
+        """, (entity_type, entity_id, "Updated", old_rent, rent_val, user.get("name") or user.get("username"), today_str))
 
         conn.commit()
         return {"success": True, "id": id}
     finally:
         postgreSQL_pool.putconn(conn)
-
 
 @app.put("/api/rents/{id}/status")
 def update_rent_status(id: int, request: Request, authorization: Optional[str] = Header(None)):
@@ -7697,13 +7782,13 @@ def update_rent_status(id: int, request: Request, authorization: Optional[str] =
     data = asyncio.run(request.json())
     new_status = data.get("status")
     
-    if new_status not in ["Approved", "Rejected"]:
+    if new_status not in ["Approved", "Rejected", "Active", "Pending"]:
         raise HTTPException(status_code=400, detail="Invalid status")
         
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("UPDATE july_rents SET status = %s WHERE id = %s", (new_status, id))
+        cur.execute("UPDATE public.portal_rental_plans SET status = %s, updated_at = CURRENT_TIMESTAMP WHERE id = %s", (new_status, id))
         conn.commit()
         return {"status": "success", "message": f"Rent plan {new_status}"}
     except Exception as e:
@@ -7711,7 +7796,6 @@ def update_rent_status(id: int, request: Request, authorization: Optional[str] =
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         postgreSQL_pool.putconn(conn)
-
 
 @app.put("/api/rents/{id}/assign")
 def assign_rent(id: int, request: Request, authorization: Optional[str] = Header(None)):
@@ -7726,10 +7810,10 @@ def assign_rent(id: int, request: Request, authorization: Optional[str] = Header
     try:
         cur = conn.cursor()
         cur.execute("""
-            UPDATE july_rents 
-            SET assigned_to = %s, assigned_by = %s, assigned_time = NOW() 
+            UPDATE public.portal_rental_plans 
+            SET approved_by = %s, updated_at = CURRENT_TIMESTAMP 
             WHERE id = %s
-        """, (assigned_to, user.get("name", ""), id))
+        """, (assigned_to, id))
         conn.commit()
         return {"status": "success", "message": f"Assigned to {assigned_to}"}
     except Exception as e:
@@ -7744,21 +7828,17 @@ def delete_rent(id: int, authorization: Optional[str] = Header(None)):
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT rent_amount, level, driver_id, vendor_id, vehicle_number, vehicle_model FROM july_rents WHERE id = %s;", (id,))
+        cur.execute("SELECT daily_rent, config_type, partner_id, vehicle_number, vehicle_model FROM public.portal_rental_plans WHERE id = %s;", (id,))
         row = cur.fetchone()
         if not row:
             raise HTTPException(status_code=404, detail="Rent record not found")
-        old_rent_amount, old_level, old_driver_id, old_vendor_id, old_vehicle_number, old_vehicle_model = row
+        old_rent, c_type, partner_val, v_no, v_model = row
 
-        cur.execute("DELETE FROM july_rents WHERE id = %s RETURNING id;", (id,))
+        cur.execute("DELETE FROM public.portal_rental_plans WHERE id = %s RETURNING id;", (id,))
         cur.fetchone()
 
-        entity_type = old_level.capitalize() if old_level else "Model"
-        entity_id = ""
-        if old_level == "driver": entity_id = old_driver_id or ""
-        elif old_level == "vendor": entity_id = old_vendor_id or ""
-        elif old_level == "vehicle": entity_id = old_vehicle_number or ""
-        elif old_level == "model": entity_id = old_vehicle_model or ""
+        entity_type = (c_type or "Config").replace("_", " ").title()
+        entity_id = partner_val or v_no or v_model or f"Plan-{id}"
 
         from datetime import date
         today_str = date.today().isoformat()
@@ -7766,7 +7846,7 @@ def delete_rent(id: int, authorization: Optional[str] = Header(None)):
         cur.execute("""
             INSERT INTO july_rent_ledger (entity_type, entity_id, change_type, old_amount, new_amount, modified_by, effective_date)
             VALUES (%s, %s, %s, %s, %s, %s, %s);
-        """, (entity_type, entity_id, "Deleted", old_rent_amount, 0, user.get("name") or user.get("username"), today_str))
+        """, (entity_type, entity_id, "Deleted", old_rent, 0, user.get("name") or user.get("username"), today_str))
 
         conn.commit()
         return {"success": True}
