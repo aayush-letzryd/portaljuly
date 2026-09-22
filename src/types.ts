@@ -110,16 +110,21 @@ export interface AdjustmentRecord {
   partner_name: string;
   partner_code: string;
   driver_id?: string;
-  partner_number: string;
+  partner_number?: string;
   vehicle_number?: string;
   city_name: string;
-  partner_type: "Individual" | "Fleet" | "Rental";
+  partner_type?: string;
   adjustment_level?: string;
   adjustment_nature?: string;
   time_duration?: string;
-  adjustment_type: "Credit" | "Debit" | "Waiver";
-  adjustment_date: string;
-  enter_amount: string;
+  adjustment_type: string;
+  adjustment_sub_type?: string;
+  adjustment_sub_type_other?: string;
+  adjustment_date?: string;
+  adjustment_date_mandatory?: string;
+  adjustment_date_optional?: string;
+  hisaab_date?: string;
+  enter_amount?: string;
   remittance_towards?: string;
   adjustment_related_to?: string;
   remarks?: string;
@@ -129,6 +134,10 @@ export interface AdjustmentRecord {
   final_level_approval_by?: string;
   status: "Completed" | "Hold" | "Declined";
   photo?: string;
+  photo_1?: string;
+  photo_2?: string;
+  photo_3?: string;
+  photo_4?: string;
   created_at: string;
   // NEW LETZRYD DOCUMENT FIELDS
   hisaab_number?: string;

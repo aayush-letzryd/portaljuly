@@ -734,7 +734,16 @@ def startup_event():
             "cost_level VARCHAR(50)",
             "escalate_to VARCHAR(100)",
             "submitter_comments TEXT",
-            "sent_for_approval VARCHAR(10)"
+            "sent_for_approval VARCHAR(10)",
+            "hisaab_date VARCHAR(50)",
+            "adjustment_sub_type VARCHAR(255)",
+            "adjustment_sub_type_other TEXT",
+            "adjustment_date_mandatory VARCHAR(50)",
+            "adjustment_date_optional VARCHAR(50)",
+            "photo_1 TEXT",
+            "photo_2 TEXT",
+            "photo_3 TEXT",
+            "photo_4 TEXT"
         ]:
             cur.execute(f"ALTER TABLE july_partner_adjustment ADD COLUMN IF NOT EXISTS {col};")
 
@@ -1816,11 +1825,19 @@ class AdjustmentData(BaseModel):
     cost_level: Optional[str] = None
     escalate_to: Optional[Union[str, int]] = None
     submitter_comments: Optional[str] = None
-    sent_for_approval: Optional[str] = None
     approval_status: Optional[str] = "Draft"
     current_approver_id: Optional[int] = None
     approval_remarks: Optional[str] = None
     created_by: Optional[int] = None
+    hisaab_date: Optional[str] = None
+    adjustment_sub_type: Optional[str] = None
+    adjustment_sub_type_other: Optional[str] = None
+    adjustment_date_mandatory: Optional[str] = None
+    adjustment_date_optional: Optional[str] = None
+    photo_1: Optional[Any] = None
+    photo_2: Optional[Any] = None
+    photo_3: Optional[Any] = None
+    photo_4: Optional[Any] = None
 
 class AllocationData(BaseModel):
     allocation_date: str
@@ -5278,6 +5295,8 @@ def create_adjustment(data: AdjustmentData, authorization: Optional[str] = Heade
                 finance_team_status, finance_team_remarks, final_level_approval_by, status, photo,
                 hisaab_number, contested_line_items, severity_level, cost_level, escalate_to,
                 submitter_comments, sent_for_approval,
+                hisaab_date, adjustment_sub_type, adjustment_sub_type_other, adjustment_date_mandatory, adjustment_date_optional,
+                photo_1, photo_2, photo_3, photo_4,
                 approval_status, created_by, created_at, updated_at, updated_by
             ) VALUES (
                 %s,%s,%s,%s,%s,%s,

@@ -42,19 +42,27 @@ export default function AdjustmentForm({
 
   // LetzRyd Document State Fields
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [cityName, setCityName] = useState("Hyderabad");
   const [partnerName, setPartnerName] = useState("");
   const [partnerCode, setPartnerCode] = useState("");
   const [driverId, setDriverId] = useState("");
+  const [partnerNumber, setPartnerNumber] = useState("");
+  const [vehicleNumber, setVehicleNumber] = useState("");
   
   const getTodayIST = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
-  // New Fields
   const [hisaabNumber, setHisaabNumber] = useState("");
-  const [adjustmentLevel, setAdjustmentLevel] = useState<"Operator" | "Driver">("Operator");
-  const [adjustmentType, setAdjustmentType] = useState<"Credit" | "Debit" | "Waiver">("Credit");
-  const [adjustmentDate, setAdjustmentDate] = useState(getTodayIST()); // Hardcoded today in IST
+  const [hisaabDate, setHisaabDate] = useState(getTodayIST());
+  const [adjustmentLevel, setAdjustmentLevel] = useState<"Operator" | "Drive to Own" | "Individual Driver" | "LetzOwn">("Operator");
+  const [adjustmentType, setAdjustmentType] = useState<"Rental Waiver" | "Penalty" | "Maintenance">("Rental Waiver");
+  const [adjustmentSubType, setAdjustmentSubType] = useState("");
+  const [adjustmentSubTypeOther, setAdjustmentSubTypeOther] = useState("");
+  const [adjustmentNature, setAdjustmentNature] = useState("Monetary");
+  const [adjustmentDateMandatory, setAdjustmentDateMandatory] = useState(getTodayIST());
+  const [adjustmentDateOptional, setAdjustmentDateOptional] = useState("");
   const [enterAmount, setEnterAmount] = useState("");
-  const [contestedLineItems, setContestedLineItems] = useState<string[]>([]);
+  const [remittanceTowards, setRemittanceTowards] = useState("");
+  const [adjustmentRelatedTo, setAdjustmentRelatedTo] = useState("");
   
   // Approvals & Proof
   const [severityLevel, setSeverityLevel] = useState("Low");
@@ -66,6 +74,31 @@ export default function AdjustmentForm({
   const [approversList, setApproversList] = useState<any[]>([]);
   const [approverSearchQuery, setApproverSearchQuery] = useState("");
   const [isApproverDropdownOpen, setIsApproverDropdownOpen] = useState(false);
+
+  // Dynamic Sub Point Options based on Feedback
+  const SUB_TYPE_OPTIONS: Record<string, string[]> = {
+    "Rental Waiver": [
+      "App Issue",
+      "Negative Balance",
+      "Incentive Adjustment",
+      "Dead Mile Waiver",
+      "Temporary Leave",
+      "Trip Mismatch",
+      "Other"
+    ],
+    "Penalty": [
+      "Penalty"
+    ],
+    "Maintenance": [
+      "Accident Penalty",
+      "Breakdown",
+      "Vehicle Service",
+      "Running Repair",
+      "Vehicle Washing",
+      "Traffic Fine",
+      "Other"
+    ]
+  };
 
   React.useEffect(() => {
     const token = localStorage.getItem("lr_token");
@@ -108,9 +141,14 @@ export default function AdjustmentForm({
     completed_count: 0
   });
 
-  // Proof Image State
+  // Proof Image State (Up to 4 photos as per feedback)
+  const [photo1, setPhoto1] = useState<string | null>(null);
+  const [photo2, setPhoto2] = useState<string | null>(null);
+  const [photo3, setPhoto3] = useState<string | null>(null);
+  const [photo4, setPhoto4] = useState<string | null>(null);
   const [photo, setPhoto] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
+  const [activePhotoSlot, setActivePhotoSlot] = useState<1 | 2 | 3 | 4>(1);
 
   // Registry Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
@@ -165,17 +203,16 @@ export default function AdjustmentForm({
     fetchRecords();
   }, []);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleSlotImageUpload = (slot: 1 | 2 | 3 | 4, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      compressImage(file).then(setPhoto).catch((err) => alert('Photo upload failed: ' + (err?.message || 'Please check your connection and try again.')));
+      compressImage(file).then((compressed) => {
+        if (slot === 1) { setPhoto1(compressed); setPhoto(compressed); }
+        else if (slot === 2) setPhoto2(compressed);
+        else if (slot === 3) setPhoto3(compressed);
+        else if (slot === 4) setPhoto4(compressed);
+      }).catch((err) => alert('Photo upload failed: ' + (err?.message || 'Please check your connection and try again.')));
     }
-  };
-
-  const handleContestedToggle = (item: string) => {
-    setContestedLineItems(prev => 
-      prev.includes(item) ? prev.filter(i => i !== item) : [...prev, item]
-    );
   };
 
   const loadRecordForEdit = async (id: number) => {
@@ -188,25 +225,25 @@ export default function AdjustmentForm({
       const data = await res.json();
       
       setEditingId(data.id);
+      setCityName(data.city_name || "Hyderabad");
       setPartnerName(data.partner_name || "");
       setPartnerCode(data.partner_code || "");
       setDriverId(data.driver_id || "");
+      setPartnerNumber(data.partner_number || "");
+      setVehicleNumber(data.vehicle_number || "");
       
       setHisaabNumber(data.hisaab_number || "");
-      setAdjustmentLevel((data.adjustment_level === "Driver" || data.adjustment_level === "Operator") ? data.adjustment_level : "Operator");
-      setAdjustmentType(data.adjustment_type || "Credit");
-      setAdjustmentDate(data.adjustment_date || getTodayIST());
+      setHisaabDate(data.hisaab_date || getTodayIST());
+      setAdjustmentLevel(data.adjustment_level || "Operator");
+      setAdjustmentType(data.adjustment_type || "Rental Waiver");
+      setAdjustmentSubType(data.adjustment_sub_type || "");
+      setAdjustmentSubTypeOther(data.adjustment_sub_type_other || "");
+      setAdjustmentNature(data.adjustment_nature || "Monetary");
+      setAdjustmentDateMandatory(data.adjustment_date_mandatory || data.adjustment_date || getTodayIST());
+      setAdjustmentDateOptional(data.adjustment_date_optional || "");
       setEnterAmount(data.enter_amount || "");
-      
-      if (data.contested_line_items) {
-        try {
-          setContestedLineItems(JSON.parse(data.contested_line_items));
-        } catch {
-          setContestedLineItems(data.contested_line_items.split(','));
-        }
-      } else {
-        setContestedLineItems([]);
-      }
+      setRemittanceTowards(data.remittance_towards || "");
+      setAdjustmentRelatedTo(data.adjustment_related_to || "");
 
       setSeverityLevel(data.severity_level || "Low");
       setCostLevel(data.cost_level || "Minor (<₹1k)");
@@ -217,7 +254,11 @@ export default function AdjustmentForm({
 
       setFinanceTeamStatus(data.finance_team_status || "Pending");
       setStatus(data.status || "Hold");
-      setPhoto(data.photo || null);
+      setPhoto1(data.photo_1 || data.photo || null);
+      setPhoto2(data.photo_2 || null);
+      setPhoto3(data.photo_3 || null);
+      setPhoto4(data.photo_4 || null);
+      setPhoto(data.photo_1 || data.photo || null);
       
       setFormMode("edit");
       setActiveTab("form");
@@ -230,16 +271,25 @@ export default function AdjustmentForm({
   const resetForm = () => {
     setEditingId(null);
     setFormMode("new");
+    setCityName("Hyderabad");
     setPartnerName("");
     setPartnerCode("");
     setDriverId("");
+    setPartnerNumber("");
+    setVehicleNumber("");
     
     setHisaabNumber("");
+    setHisaabDate(getTodayIST());
     setAdjustmentLevel("Operator");
-    setAdjustmentType("Credit");
-    setAdjustmentDate(getTodayIST());
+    setAdjustmentType("Rental Waiver");
+    setAdjustmentSubType("");
+    setAdjustmentSubTypeOther("");
+    setAdjustmentNature("Monetary");
+    setAdjustmentDateMandatory(getTodayIST());
+    setAdjustmentDateOptional("");
     setEnterAmount("");
-    setContestedLineItems([]);
+    setRemittanceTowards("");
+    setAdjustmentRelatedTo("");
     
     setSeverityLevel("Low");
     setCostLevel("Minor (<₹1k)");
@@ -250,43 +300,56 @@ export default function AdjustmentForm({
 
     setFinanceTeamStatus("Pending");
     setStatus("Hold");
+    setPhoto1(null);
+    setPhoto2(null);
+    setPhoto3(null);
+    setPhoto4(null);
     setPhoto(null);
   };
 
   const handleSaveAndSubmit = async (sendForApproval: boolean) => {
-    if (!enterAmount || parseFloat(enterAmount) <= 0) {
-      return alert("Please enter a valid Amount");
+    // Conditional Amount Validation: ONLY required when "Maintenance" is selected
+    if (adjustmentType === "Maintenance") {
+      if (!enterAmount || parseFloat(enterAmount) <= 0) {
+        return alert("Please enter a valid Amount for Maintenance adjustment");
+      }
     }
 
     if (!partnerName.trim()) {
-      return alert("Please enter Partner Name");
+      return alert("Please enter Partner / Driver Name");
+    }
+
+    if (!adjustmentDateMandatory) {
+      return alert("Please select Mandatory Adjustment Date");
     }
 
     const payload = {
       partner_name: partnerName.trim(),
       partner_code: partnerCode.trim(),
       driver_id: driverId.trim() || null,
-      
-      // Legacy overrides to satisfy backend Pydantic schema
-      partner_number: null,
-      vehicle_number: null,
-      city_name: (user as any).city || "Bangalore",
-      partner_type: null,
-      adjustment_nature: "Monetary",
+      partner_number: partnerNumber.trim() || null,
+      vehicle_number: vehicleNumber.trim() || null,
+      city_name: cityName,
+      partner_type: adjustmentLevel,
+      adjustment_nature: adjustmentNature,
       time_duration: null,
-      remittance_towards: null,
-      adjustment_related_to: null,
+      remittance_towards: remittanceTowards.trim() || null,
+      adjustment_related_to: adjustmentRelatedTo.trim() || null,
       first_level_approval_by: user.name,
       finance_team_remarks: null,
       final_level_approval_by: null,
 
       adjustment_level: adjustmentLevel,
-      adjustment_type: adjustmentType,
-      adjustment_date: adjustmentDate,
-      enter_amount: enterAmount,
-      
       hisaab_number: hisaabNumber.trim(),
-      contested_line_items: JSON.stringify(contestedLineItems),
+      hisaab_date: hisaabDate,
+      adjustment_type: adjustmentType,
+      adjustment_sub_type: adjustmentSubType,
+      adjustment_sub_type_other: adjustmentSubTypeOther.trim() || null,
+      adjustment_date: adjustmentDateMandatory,
+      adjustment_date_mandatory: adjustmentDateMandatory,
+      adjustment_date_optional: adjustmentDateOptional || null,
+      enter_amount: adjustmentType === "Maintenance" ? enterAmount : (enterAmount || "0"),
+      
       severity_level: severityLevel,
       cost_level: costLevel,
       escalate_to: String(escalateTo || ""),
@@ -296,7 +359,11 @@ export default function AdjustmentForm({
 
       finance_team_status: financeTeamStatus,
       status: status,
-      photo: photo || null
+      photo: photo1 || photo || null,
+      photo_1: photo1 || photo || null,
+      photo_2: photo2 || null,
+      photo_3: photo3 || null,
+      photo_4: photo4 || null
     };
 
     try {
@@ -332,7 +399,7 @@ export default function AdjustmentForm({
         }
         alert("🚀 Hisaab Adjustment Submitted & Sent for Approval Successfully!");
       } else {
-        alert(editingId ? "💾 Hisaab Adjustment Updated as Draft!" : "💾 Hisaab Adjustment Saved as Draft!");
+        alert("💾 Hisaab Adjustment Draft Saved Successfully!");
       }
 
       resetForm();
@@ -340,7 +407,7 @@ export default function AdjustmentForm({
       fetchRecords();
       setActiveTab("registry");
     } catch (err: any) {
-      alert(err.message);
+      alert("❌ Error: " + err.message);
     }
   };
 
@@ -349,16 +416,16 @@ export default function AdjustmentForm({
     handleSaveAndSubmit(true);
   };
 
-  const handleDelete = async (id: number, name: string) => {
-    if (!window.confirm(`Are you sure you want to delete the adjustment request for ${name}?`)) return;
+  const handleDelete = async (id: number, partner: string) => {
+    if (!confirm(`Are you sure you want to delete adjustment request for "${partner}"?`)) return;
     try {
       const token = localStorage.getItem("lr_token");
       const res = await fetch(`/api/adjustment/${id}`, {
         method: "DELETE",
         headers: { "Authorization": `Bearer ${token}` }
       });
-      if (!res.ok) throw new Error("Delete failed");
-      alert("Adjustment deleted successfully");
+      if (!res.ok) throw new Error("Failed to delete record");
+      alert("Deleted successfully");
       fetchStats();
       fetchRecords();
     } catch (err: any) {
@@ -367,120 +434,99 @@ export default function AdjustmentForm({
   };
 
   const handleSendForApproval = async (id: number) => {
-    if (!window.confirm(`Send Adjustment #${id} for approval?`)) return;
     try {
       const token = localStorage.getItem("lr_token");
-      const res = await fetch(`/api/adjustment/send-for-approval/${id}`, {
+      const sendRes = await fetch(`/api/adjustment/send-for-approval/${id}`, {
         method: "POST",
         headers: { "Authorization": `Bearer ${token}` }
       });
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.detail || "Failed to send for approval");
+      if (!sendRes.ok) {
+        const sendErr = await sendRes.json();
+        throw new Error(sendErr.detail || "Failed to send for approval");
       }
-      alert("Sent for approval successfully!");
+      alert("🚀 Sent for approval successfully!");
+      fetchStats();
       fetchRecords();
     } catch (err: any) {
-      alert(err.message);
+      alert("❌ Error: " + err.message);
     }
   };
 
   // Filter and Search logic
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
-      if (filterCity !== "all" && r.city_name !== filterCity) return false;
-      if (filterAdjType !== "all" && r.adjustment_type !== filterAdjType) return false;
-      if (filterStatus !== "all" && r.status !== filterStatus) return false;
+      const matchesSearch = 
+        !searchQuery ||
+        r.partner_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.partner_code?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.hisaab_number?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        r.driver_id?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        String(r.id).includes(searchQuery);
 
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        return (
-          (r.partner_name || "").toLowerCase().includes(q) ||
-          (r.partner_code || "").toLowerCase().includes(q) ||
-          (r.driver_id || "").toLowerCase().includes(q) ||
-          (r.hisaab_number || "").toLowerCase().includes(q) ||
-          String(r.id).includes(q)
-        );
-      }
-      return true;
+      const matchesCity = filterCity === "all" || r.city_name === filterCity;
+      const matchesType = filterAdjType === "all" || r.adjustment_type === filterAdjType;
+      const matchesStatus = filterStatus === "all" || r.status === filterStatus;
+
+      return matchesSearch && matchesCity && matchesType && matchesStatus;
     });
   }, [records, searchQuery, filterCity, filterAdjType, filterStatus]);
 
-  // Searchable Dropdown Logic
-  const handleRetrieveSearchSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setRetrieveSearchInput(val);
-    const match = records.find(r => `[#${r.id}] ${r.partner_name} - ${r.hisaab_number || r.partner_code}` === val);
-    if (match) {
-      loadRecordForEdit(match.id);
-    }
-  };
-
   // CSV Export
   const handleExportCSV = () => {
-    if (filteredRecords.length === 0) return alert("No records to export");
-    const headers = [
-      "ID", "Partner Name", "Partner Code", "Driver ID", "Hisaab Number", 
-      "Adj Level", "Adjustment Type", "Date", 
-      "Amount", "Contested Items", "Severity", "Cost Level", "Escalated To", "Submitter Comments", 
-      "Sent For Approval", "Finance Status", "Status", "Created At"
-    ];
-
-    const rows = filteredRecords.map((r) => [
+    if (records.length === 0) return alert("No data available to export");
+    const headers = ["ID", "City", "Partner Name", "Partner Code", "Driver ID", "Vehicle No", "Hisaab No", "Hisaab Date", "Adj Level", "Adj Type", "Sub Type", "Amount", "Mandatory Date", "Optional Date", "Approval Status", "Status"];
+    const rows = records.map(r => [
       r.id,
-      `"${r.partner_name.replace(/"/g, '""')}"`,
-      `"${r.partner_code.replace(/"/g, '""')}"`,
+      r.city_name,
+      `"${r.partner_name || ""}"`,
+      r.partner_code || "",
       r.driver_id || "",
+      r.vehicle_number || "",
       r.hisaab_number || "",
-      r.adjustment_level || "",
+      r.hisaab_date || "",
+      r.adjustment_level,
       r.adjustment_type,
-      r.adjustment_date,
+      r.adjustment_sub_type || "",
       r.enter_amount,
-      `"${(r.contested_line_items || "").replace(/"/g, '""')}"`,
-      r.severity_level || "",
-      r.cost_level || "",
-      r.escalate_to || "",
-      `"${(r.submitter_comments || r.remarks || "").replace(/"/g, '""')}"`,
-      r.sent_for_approval || "",
-      r.finance_team_status,
-      r.status,
-      r.created_at
+      r.adjustment_date_mandatory || r.adjustment_date || "",
+      r.adjustment_date_optional || "",
+      r.approval_status || "Draft",
+      r.status
     ]);
 
-    const csvContent = "data:text/csv;charset=utf-8," 
-      + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
-    
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map(e => e.join(","))].join("\n");
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `letzryd_hisaab_adjustments_${new Date().toISOString().split("T")[0]}.csv`);
+    link.setAttribute("download", `Hisaab_Adjustments_${new Date().toISOString().slice(0, 10)}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-bg text-text">
+    <div className="min-h-screen bg-bg flex flex-col font-sans antialiased text-text selection:bg-primary selection:text-white">
       
-      {/* HEADER SECTION */}
-      <header className="sticky top-0 z-50 border-b border-border bg-white shadow-xs">
+      {/* APP BAR HEADER */}
+      <header className="sticky top-0 z-40 border-b border-border bg-white/90 backdrop-blur-md shadow-2xs">
         <div className="mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3">
+          
+          {/* Logo & Navigation */}
+          <div className="flex items-center gap-4">
             <button 
-              type="button"
               onClick={onBackToSelector}
-              className="flex h-8 w-8 items-center justify-center rounded-lg text-text-muted hover:bg-slate-100 hover:text-primary transition-all cursor-pointer"
-              title="Back to Form Selector"
+              className="flex h-9 w-9 items-center justify-center rounded-xl border border-border bg-white text-text-muted hover:bg-bg hover:text-primary transition-all shadow-2xs cursor-pointer"
+              title="Return to Application Selector"
             >
-              <ChevronLeft className="h-5 w-5" />
+              <ArrowLeft className="h-4 w-4" />
             </button>
+
             <img 
-              src="/letzryd_icon.png" 
-              alt="LetzRyd logo" 
-              className="h-9 w-auto object-contain cursor-pointer"
-              onClick={onBackToSelector}
+              src="https://letzryd.com/replica-assets/letzryd-long-png-logo-Aq2o3DNOw1i2kBMB-7ab04eaa76.png" 
+              alt="LetzRyd Logo" 
+              className="h-8 w-auto object-contain" 
             />
-            <span className="hidden h-5 border-l border-border sm:inline-block" />
+
             <span className="hidden font-sans text-xs font-semibold text-text-muted sm:inline-block">
               Fleet Portal
             </span>
@@ -548,7 +594,7 @@ export default function AdjustmentForm({
             <div className="rounded-2xl border border-border bg-white shadow-xl overflow-hidden mb-10 transition-all">
               <div className="bg-primary text-white px-8 py-6 relative">
                 <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-primary-hover via-primary to-primary opacity-60" />
-                <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative overflow-hidden w-full">
+                <div className="relative flex flex-col sm:flex-row sm:items-center justify-between gap-4 overflow-hidden w-full">
                   <div className="absolute top-0 right-0 w-64 h-64 bg-white opacity-5 rounded-full -mr-20 -mt-20 pointer-events-none"></div>
                   <div className="relative z-10">
                     <div className="flex items-center gap-3 mb-2">
@@ -606,21 +652,40 @@ export default function AdjustmentForm({
                     <div className="border-b border-border pb-3">
                       <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
                         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">1</span>
-                        Target Details
+                        Target & Entity Details
                       </h3>
                     </div>
 
                     <div className="space-y-4">
-                      <div>
-                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Adjustment Level <span className="text-red-500">*</span></label>
-                        <select 
-                          value={adjustmentLevel}
-                          onChange={(e) => setAdjustmentLevel(e.target.value as any)}
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer"
-                        >
-                          <option value="Operator">Operator</option>
-                          <option value="Driver">Driver</option>
-                        </select>
+                      {/* FEEDBACK POINT 1: Adjustment Level * (Remove Driver. Add Drive to Own, Individual Driver, LetzOwn. Keep Operator) */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Adjustment Level <span className="text-red-500">*</span></label>
+                          <select 
+                            value={adjustmentLevel}
+                            onChange={(e) => setAdjustmentLevel(e.target.value as any)}
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer"
+                          >
+                            <option value="Operator">Operator</option>
+                            <option value="Drive to Own">Drive to Own</option>
+                            <option value="Individual Driver">Individual Driver</option>
+                            <option value="LetzOwn">LetzOwn</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">City Name <span className="text-red-500">*</span></label>
+                          <select 
+                            value={cityName}
+                            onChange={(e) => setCityName(e.target.value)}
+                            required
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer"
+                          >
+                            {CITIES.map((c) => (
+                              <option key={c.value} value={c.value}>{c.text}</option>
+                            ))}
+                          </select>
+                        </div>
                       </div>
 
                       <div>
@@ -635,45 +700,67 @@ export default function AdjustmentForm({
                         />
                       </div>
                       
-                      {adjustmentLevel === "Operator" && (
+                      <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Partner Code <span className="text-red-500">*</span></label>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Partner Code / ID</label>
                           <input 
                             type="text" 
-                            placeholder="Unique LetzRyd ID..."
+                            placeholder="Unique Partner ID..."
                             value={partnerCode}
                             onChange={(e) => setPartnerCode(e.target.value)}
-                            required
                             className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs"
                           />
                         </div>
-                      )}
 
-                      {adjustmentLevel === "Driver" && (
                         <div>
-                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Driver ID <span className="text-red-500">*</span></label>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Partner Contact Number</label>
+                          <input 
+                            type="tel" 
+                            placeholder="Mobile phone..."
+                            value={partnerNumber}
+                            onChange={(e) => setPartnerNumber(e.target.value)}
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Vehicle Number</label>
                           <input 
                             type="text" 
-                            placeholder="Enter Driver ID..."
-                            value={driverId}
-                            onChange={(e) => setDriverId(e.target.value)}
-                            required
-                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs"
+                            placeholder="e.g. TS09 EA 1111..."
+                            value={vehicleNumber}
+                            onChange={(e) => setVehicleNumber(e.target.value)}
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs uppercase"
                           />
                         </div>
-                      )}
+
+                        {/* FEEDBACK POINT 2: Hisaab Number * - Need the date to be automated, with a dropdown option for selecting the required date */}
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Hisaab Number <span className="text-red-500">*</span></label>
+                          <input 
+                            type="text" 
+                            placeholder="Ref Hisaab Bill No..."
+                            value={hisaabNumber}
+                            onChange={(e) => setHisaabNumber(e.target.value)}
+                            required
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs font-mono"
+                          />
+                        </div>
+                      </div>
 
                       <div>
-                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Hisaab Number <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Hisaab Date (Automated / Select Date) <span className="text-red-500">*</span></label>
                         <input 
-                          type="text" 
-                          placeholder="Reference Hisaab Bill No..."
-                          value={hisaabNumber}
-                          onChange={(e) => setHisaabNumber(e.target.value)}
+                          type="date" 
+                          value={hisaabDate}
+                          onChange={(e) => setHisaabDate(e.target.value)}
                           required
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs font-mono"
+                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm outline-none focus:border-primary transition-all shadow-2xs cursor-pointer font-medium"
                         />
                       </div>
+
                     </div>
                   </div>
 
@@ -687,16 +774,21 @@ export default function AdjustmentForm({
                     </div>
 
                     <div className="space-y-4">
+                      {/* FEEDBACK POINT 3: Adjustment Details - Adjustment Type * (Remove Credit/Debit/Waiver. Add Rental Waiver, Penalty, Maintenance) */}
                       <div>
                         <label className="block font-sans text-xs font-bold text-text-muted mb-2">Adjustment Type <span className="text-red-500">*</span></label>
-                        <div className="flex gap-4">
-                          {["Credit", "Debit", "Waiver"].map((type) => (
-                            <label key={type} className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-border px-3 py-2 text-xs font-bold hover:bg-bg cursor-pointer transition-all shadow-2xs">
+                        <div className="grid grid-cols-3 gap-2">
+                          {(["Rental Waiver", "Penalty", "Maintenance"] as const).map((type) => (
+                            <label key={type} className={`flex items-center justify-center gap-1.5 rounded-xl border px-3 py-2.5 text-xs font-bold hover:bg-bg cursor-pointer transition-all shadow-2xs ${adjustmentType === type ? 'border-primary bg-primary/10 text-primary' : 'border-border bg-white text-text-muted'}`}>
                               <input 
                                 type="radio" 
                                 name="adjustmentType" 
                                 checked={adjustmentType === type}
-                                onChange={() => setAdjustmentType(type as any)}
+                                onChange={() => {
+                                  setAdjustmentType(type);
+                                  setAdjustmentSubType("");
+                                  setAdjustmentSubTypeOther("");
+                                }}
                                 className="text-primary focus:ring-primary cursor-pointer"
                               />
                               {type}
@@ -705,49 +797,82 @@ export default function AdjustmentForm({
                         </div>
                       </div>
 
-                      <div className="flex gap-4">
-                        <div className="flex-1">
-                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Enter Amount (₹) <span className="text-red-500">*</span></label>
+                      {/* FEEDBACK POINT 4: Sub Point – Adjustment Details – Adjustment Type * */}
+                      <div>
+                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">
+                          Sub Point – {adjustmentType} Details <span className="text-red-500">*</span>
+                        </label>
+                        <select 
+                          value={adjustmentSubType}
+                          onChange={(e) => setAdjustmentSubType(e.target.value)}
+                          required
+                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer font-medium"
+                        >
+                          <option value="">-- Select {adjustmentType} Sub-Category --</option>
+                          {(SUB_TYPE_OPTIONS[adjustmentType] || []).map((sub) => (
+                            <option key={sub} value={sub}>{sub}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Other Details Input if 'Other' selected */}
+                      {adjustmentSubType === "Other" && (
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Enter Details for Other <span className="text-red-500">*</span></label>
+                          <input 
+                            type="text" 
+                            placeholder="Specify other reason/details..."
+                            value={adjustmentSubTypeOther}
+                            onChange={(e) => setAdjustmentSubTypeOther(e.target.value)}
+                            required
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs"
+                          />
+                        </div>
+                      )}
+
+                      {/* FEEDBACK POINT 5: Conditional Amount Field (Displayed ONLY when "Maintenance" is selected. Hidden for Rental Waiver & Penalty) */}
+                      {adjustmentType === "Maintenance" && (
+                        <div className="bg-amber-50/70 p-4 rounded-xl border border-amber-200">
+                          <label className="block font-sans text-xs font-bold text-amber-900 mb-2">Enter Amount (₹) <span className="text-red-500">*</span></label>
                           <div className="relative">
-                            <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-text-muted" />
+                            <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-amber-600" />
                             <input 
                               type="number" 
                               placeholder="0.00"
                               value={enterAmount}
                               onChange={(e) => setEnterAmount(e.target.value)}
                               required
-                              className="w-full pl-9 rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs"
+                              className="w-full pl-9 rounded-xl border border-amber-300 bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs font-bold text-slate-900"
                             />
                           </div>
                         </div>
-                        <div className="flex-1">
-                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Date of Application</label>
+                      )}
+
+                      {/* FEEDBACK POINT 6: Date of Application -> Two date fields: Adjustment Date - Mandatory & Adjustment Date - Optional */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Adjustment Date – Mandatory <span className="text-red-500">*</span></label>
                           <input 
                             type="date" 
-                            value={adjustmentDate}
-                            disabled
-                            className="w-full rounded-xl border border-border bg-slate-50 px-4 py-2.5 font-sans text-sm outline-none transition-all shadow-2xs cursor-not-allowed opacity-70"
+                            value={adjustmentDateMandatory}
+                            onChange={(e) => setAdjustmentDateMandatory(e.target.value)}
+                            required
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm outline-none focus:border-primary transition-all shadow-2xs cursor-pointer"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Adjustment Date – Optional</label>
+                          <input 
+                            type="date" 
+                            value={adjustmentDateOptional}
+                            onChange={(e) => setAdjustmentDateOptional(e.target.value)}
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm outline-none focus:border-primary transition-all shadow-2xs cursor-pointer"
                           />
                         </div>
                       </div>
 
-                      <div>
-                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Contested Hisaab Line Items <span className="text-red-500">*</span></label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {CONTESTED_OPTIONS.map(option => (
-                            <label key={option} className="flex items-center gap-2 text-sm text-text cursor-pointer hover:bg-slate-50 p-1.5 rounded border border-transparent hover:border-border">
-                              <input 
-                                type="checkbox"
-                                checked={contestedLineItems.includes(option)}
-                                onChange={() => handleContestedToggle(option)}
-                                className="rounded text-primary focus:ring-primary"
-                              />
-                              {option}
-                            </label>
-                          ))}
-                        </div>
-                        {contestedLineItems.length === 0 && <p className="text-[10px] text-red-500 mt-1">Please select at least one contested item.</p>}
-                      </div>
+                      {/* FEEDBACK POINT 7: Contested Hisaab Line Items field has been REMOVED completely */}
 
                     </div>
                   </div>
@@ -757,36 +882,56 @@ export default function AdjustmentForm({
                     <div className="border-b border-border pb-3">
                       <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
                         <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">3</span>
-                        Approvals & Escalations
+                        Reasoning, Remittance & Approval Workflow
                       </h3>
                     </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                       <div>
-                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Severity Level</label>
-                        <select 
-                          value={severityLevel}
-                          onChange={(e) => setSeverityLevel(e.target.value)}
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer"
-                        >
-                          <option value="Low">Low</option>
-                          <option value="Medium">Medium</option>
-                          <option value="High">High</option>
-                          <option value="Critical">Critical</option>
-                        </select>
+                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Adjustment Reason / Related To</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. App Discrepancy, Maintenance Repair..."
+                          value={adjustmentRelatedTo}
+                          onChange={(e) => setAdjustmentRelatedTo(e.target.value)}
+                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs"
+                        />
                       </div>
 
                       <div>
-                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Cost Level</label>
-                        <select 
-                          value={costLevel}
-                          onChange={(e) => setCostLevel(e.target.value)}
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer"
-                        >
-                          <option value="Minor (<₹1k)">Minor (&lt;₹1,000)</option>
-                          <option value="Moderate (₹1k-₹5k)">Moderate (₹1,000 - ₹5,000)</option>
-                          <option value="Major (>₹5k)">Major (&gt;₹5,000)</option>
-                        </select>
+                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Remittance / Account Reference</label>
+                        <input 
+                          type="text" 
+                          placeholder="e.g. Ledger Acc #9081..."
+                          value={remittanceTowards}
+                          onChange={(e) => setRemittanceTowards(e.target.value)}
+                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Severity & Cost Level</label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <select 
+                            value={severityLevel}
+                            onChange={(e) => setSeverityLevel(e.target.value)}
+                            className="w-full rounded-xl border border-border bg-white px-3 py-2.5 font-sans text-xs focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer"
+                          >
+                            <option value="Low">Low</option>
+                            <option value="Medium">Medium</option>
+                            <option value="High">High</option>
+                            <option value="Critical">Critical</option>
+                          </select>
+                          <select 
+                            value={costLevel}
+                            onChange={(e) => setCostLevel(e.target.value)}
+                            className="w-full rounded-xl border border-border bg-white px-3 py-2.5 font-sans text-xs focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer"
+                          >
+                            <option value="Minor (<₹1k)">&lt;₹1,000</option>
+                            <option value="Moderate (₹1k-₹5k)">₹1k - ₹5k</option>
+                            <option value="Major (>₹5k)">&gt;₹5,000</option>
+                          </select>
+                        </div>
                       </div>
 
                       <div className="md:col-span-3">
@@ -807,62 +952,75 @@ export default function AdjustmentForm({
                   </div>
                 </div>
 
-                {/* ATTACHMENT SECTION */}
+                {/* FEEDBACK POINT 8: Attachments & Proof (Optional) - Upload maximum of 4 photos */}
                 <div className="border-t border-border pt-10">
                   <div className="border-b border-border pb-3 mb-6">
                     <h3 className="font-sans text-sm font-bold text-primary">
-                      4. Attachments & Proof (Optional)
+                      4. Attachments & Proof (Optional - Up to 4 Photos)
                     </h3>
-                    <p className="font-sans text-xs text-text-muted mt-1">Upload any receipts, bills, or proof related to this adjustment.</p>
+                    <p className="font-sans text-xs text-text-muted mt-1">Upload or capture up to 4 receipts, bills, or proof photos related to this adjustment.</p>
                   </div>
 
-                  <div className="flex flex-col md:flex-row gap-6 items-start">
-                    {/* Capture Card */}
-                    <div className="w-full md:w-80 rounded-2xl border border-dashed border-border bg-bg/30 p-6 text-center hover:bg-bg/50 transition-all shadow-2xs">
-                      {photo ? (
-                        <div className="relative inline-block">
-                          <img 
-                            src={photo} 
-                            alt="Attachment Proof" 
-                            className="h-32 w-auto object-cover rounded-xl border border-border shadow-xs"
-                          />
-                          <button 
-                            type="button"
-                            onClick={() => setPhoto(null)}
-                            className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white border border-white hover:bg-red-700 shadow-xs cursor-pointer"
-                          >
-                            <X className="h-3 w-3" />
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="space-y-4">
-                          <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                            <Upload className="h-5 w-5" />
-                          </div>
-                          <p className="font-sans text-xs font-bold text-text-muted">No photo uploaded</p>
-                          <div className="flex gap-2 justify-center">
-                            <button
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    {([
+                      { slot: 1, val: photo1, setVal: setPhoto1 },
+                      { slot: 2, val: photo2, setVal: setPhoto2 },
+                      { slot: 3, val: photo3, setVal: setPhoto3 },
+                      { slot: 4, val: photo4, setVal: setPhoto4 }
+                    ] as const).map(({ slot, val, setVal }) => (
+                      <div key={slot} className="w-full rounded-2xl border border-dashed border-border bg-bg/30 p-4 text-center hover:bg-bg/50 transition-all shadow-2xs flex flex-col items-center justify-between min-h-[160px]">
+                        <span className="text-[10px] font-bold text-slate-500 uppercase mb-2">Photo {slot}</span>
+                        {val ? (
+                          <div className="relative inline-block w-full">
+                            <img 
+                              src={val} 
+                              alt={`Proof ${slot}`} 
+                              className="h-28 w-full object-cover rounded-xl border border-border shadow-xs"
+                            />
+                            <button 
                               type="button"
-                              onClick={() => setCameraActive(true)}
-                              className="flex items-center gap-1 rounded-lg bg-primary px-3 py-1.5 font-sans text-xs font-bold text-white hover:bg-primary-hover shadow-xs cursor-pointer"
+                              onClick={() => {
+                                setVal(null);
+                                if (slot === 1) setPhoto(null);
+                              }}
+                              className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white border border-white hover:bg-red-700 shadow-xs cursor-pointer"
                             >
-                              <Camera className="h-3 w-3" />
-                              Capture
+                              <X className="h-3 w-3" />
                             </button>
-                            <label className="flex items-center gap-1 rounded-lg border border-border bg-white px-3 py-1.5 font-sans text-xs font-bold text-text-muted hover:bg-bg cursor-pointer transition-colors shadow-2xs">
-                              <Upload className="h-3 w-3" />
-                              Upload
-                              <input 
-                                type="file" 
-                                accept="image/*" 
-                                onChange={handleImageUpload} 
-                                className="hidden" 
-                              />
-                            </label>
                           </div>
-                        </div>
-                      )}
-                    </div>
+                        ) : (
+                          <div className="space-y-3 w-full my-auto">
+                            <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                              <Upload className="h-4 w-4" />
+                            </div>
+                            <p className="font-sans text-[11px] font-bold text-text-muted">No photo uploaded</p>
+                            <div className="flex gap-2 justify-center">
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setActivePhotoSlot(slot);
+                                  setCameraActive(true);
+                                }}
+                                className="flex items-center gap-1 rounded-lg bg-primary px-2.5 py-1 font-sans text-[11px] font-bold text-white hover:bg-primary-hover shadow-xs cursor-pointer"
+                              >
+                                <Camera className="h-3 w-3" />
+                                Camera
+                              </button>
+                              <label className="flex items-center gap-1 rounded-lg border border-border bg-white px-2.5 py-1 font-sans text-[11px] font-bold text-text-muted hover:bg-bg cursor-pointer transition-colors shadow-2xs">
+                                <Upload className="h-3 w-3" />
+                                File
+                                <input 
+                                  type="file" 
+                                  accept="image/*" 
+                                  onChange={(e) => handleSlotImageUpload(slot, e)} 
+                                  className="hidden" 
+                                />
+                              </label>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
                 </div>
 
@@ -1188,7 +1346,10 @@ export default function AdjustmentForm({
       {cameraActive && (
         <CameraCapture 
           onCapture={(base64) => {
-            setPhoto(base64);
+            if (activePhotoSlot === 1) { setPhoto1(base64); setPhoto(base64); }
+            else if (activePhotoSlot === 2) setPhoto2(base64);
+            else if (activePhotoSlot === 3) setPhoto3(base64);
+            else if (activePhotoSlot === 4) setPhoto4(base64);
             setCameraActive(false);
           }}
           onClose={() => setCameraActive(false)}
