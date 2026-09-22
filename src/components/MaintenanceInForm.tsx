@@ -192,14 +192,54 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
   const [vehicleKms, setVehicleKms] = useState("");
   const [repairType, setRepairType] = useState("");
   const [workshopName, setWorkshopName] = useState("");
+  const [customWorkshop, setCustomWorkshop] = useState("");
   const [estimatedDeliveryDate, setEstimatedDeliveryDate] = useState("");
   const [estimatedAmount, setEstimatedAmount] = useState("");
   const [insuranceClaimed, setInsuranceClaimed] = useState("No");
   const [insuranceBrokerage, setInsuranceBrokerage] = useState("");
+  const [customBrokerage, setCustomBrokerage] = useState("");
+  const [insuranceCompany, setInsuranceCompany] = useState("");
+  const [customInsuranceCompany, setCustomInsuranceCompany] = useState("");
   const [claimNumber, setClaimNumber] = useState("");
   const [documents, setDocuments] = useState<string[]>([]);
   const [damagePhotos, setDamagePhotos] = useState<string[]>([]);
   const [remarks, setRemarks] = useState("");
+
+  const DEFAULT_WORKSHOPS = [
+    "Bosch Car Service",
+    "GoMechanic Miyapur",
+    "GoMechanic Gachibowli",
+    "TVS Auto Service",
+    "Mahindra First Choice",
+    "Maruti Suzuki Authorized Service",
+    "Hyundai Authorized Workshop",
+    "Tata Motors Authorized Service",
+    "LetzRyd In-House Workshop"
+  ];
+  const [workshopOptions, setWorkshopOptions] = useState<string[]>(DEFAULT_WORKSHOPS);
+
+  useEffect(() => {
+    const fetchWorkshops = async () => {
+      try {
+        const token = localStorage.getItem("lr_token");
+        const res = await fetch("/api/workshop", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            const names = data.map((w: any) => w.vendor_name).filter(Boolean);
+            if (names.length > 0) {
+              setWorkshopOptions(prev => Array.from(new Set([...names, ...prev])));
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch workshops list:", err);
+      }
+    };
+    fetchWorkshops();
+  }, []);
 
   // UI state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -301,6 +341,7 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
       setEstimatedAmount(r.estimated_amount || "");
       setInsuranceClaimed(r.insurance_claimed || "No");
       setInsuranceBrokerage(r.insurance_brokerage || "");
+      setInsuranceCompany(r.insurance_company || "");
       setClaimNumber(r.claim_number || "");
       setDocuments(safeParseDocuments(r.approval_file));
 
@@ -336,6 +377,10 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
       setEstimatedAmount("");
       setInsuranceClaimed("No");
       setInsuranceBrokerage("");
+      setCustomBrokerage("");
+      setInsuranceCompany("");
+      setCustomInsuranceCompany("");
+      setCustomWorkshop("");
       setClaimNumber("");
       setDocuments([]);
       setDamagePhotos([]);
@@ -669,6 +714,12 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
         console.error("Failed to read token from localStorage in handleSubmit", tErr);
       }
 
+      const finalWorkshop = workshopName === "Other" ? customWorkshop.trim() : workshopName.trim();
+      if (!finalWorkshop) return setSubmitError("Workshop Name is required");
+
+      const finalBrokerage = insuranceBrokerage === "Other" ? customBrokerage.trim() : insuranceBrokerage.trim();
+      const finalInsuranceCompany = insuranceCompany === "Other" ? customInsuranceCompany.trim() : insuranceCompany.trim();
+
       const payload = {
         city_name: cityName.trim(),
         vehicle_number: vehicleNumber.trim().toUpperCase(),
@@ -676,11 +727,12 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
         vehicle_in_date_time: vehicleInDateTime.trim(),
         vehicle_k_m_s: vehicleKms.trim(),
         repair_type: repairType.trim() || null,
-        workshop_name: workshopName.trim(),
+        workshop_name: finalWorkshop,
         estimated_delivery_date: estimatedDeliveryDate.trim() || null,
         estimated_amount: estimatedAmount.trim() || null,
         insurance_claimed: insuranceClaimed.trim() || "No",
-        insurance_brokerage: insuranceBrokerage.trim() || null,
+        insurance_brokerage: finalBrokerage || null,
+        insurance_company: finalInsuranceCompany || null,
         claim_number: claimNumber.trim() || null,
         approved_by: null,
         approval_date: null,
@@ -1143,6 +1195,12 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
                       <span className="font-semibold text-slate-800">{viewingRecord.insurance_brokerage}</span>
                     </div>
                   )}
+                  {viewingRecord.insurance_company && (
+                    <div>
+                      <span className="text-[11px] text-slate-400 block">Insurance Company</span>
+                      <span className="font-semibold text-slate-800">{viewingRecord.insurance_company}</span>
+                    </div>
+                  )}
                   {viewingRecord.claim_number && (
                     <div>
                       <span className="text-[11px] text-slate-400 block">Claim Number</span>
@@ -1481,8 +1539,7 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
                     <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
                       Repair Classification / Type
                     </label>
-                    <input
-                      type="text"
+                    <select
                       value={repairType}
                       onChange={e => {
                         try {
@@ -1491,9 +1548,17 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
                           console.error("Error setting repair type", err);
                         }
                       }}
-                      placeholder="e.g. Accidental, Battery Failure, Periodic Service"
-                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs"
-                    />
+                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs cursor-pointer"
+                    >
+                      <option value="">Select Repair Type</option>
+                      <option value="PMS">1. PMS</option>
+                      <option value="Accident Paid">2. Accident Paid</option>
+                      <option value="Accident Insurance">3. Accident Insurance</option>
+                      <option value="RR">4. RR</option>
+                      <option value="FS1">5. FS1</option>
+                      <option value="FS2">6. FS2</option>
+                      <option value="FS3">7. FS3</option>
+                    </select>
                   </div>
                 </div>
 
@@ -1549,20 +1614,40 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
                     <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
                       Workshop Name <span className="text-red-500">*</span>
                     </label>
-                    <input
-                      type="text"
-                      value={workshopName}
+                    <select
+                      value={workshopOptions.includes(workshopName) ? workshopName : (workshopName ? "Other" : "")}
                       onChange={e => {
-                        try {
-                          setWorkshopName(e.target.value);
-                        } catch (err) {
-                          console.error("Error setting workshop name", err);
+                        const val = e.target.value;
+                        if (val === "Other") {
+                          setWorkshopName("Other");
+                          setCustomWorkshop(workshopName && !workshopOptions.includes(workshopName) ? workshopName : "");
+                        } else {
+                          setWorkshopName(val);
+                          setCustomWorkshop("");
                         }
                       }}
-                      placeholder="e.g. Bosch Car Service, GoMechanic Miyapur"
-                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs"
+                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs cursor-pointer"
                       required
-                    />
+                    >
+                      <option value="">Select Workshop</option>
+                      {workshopOptions.map((w) => (
+                        <option key={w} value={w}>{w}</option>
+                      ))}
+                      <option value="Other">Other (Specify Workshop Name)</option>
+                    </select>
+                    {(workshopName === "Other" || (!workshopOptions.includes(workshopName) && workshopName)) && (
+                      <input
+                        type="text"
+                        value={workshopName === "Other" ? customWorkshop : workshopName}
+                        onChange={e => {
+                          setCustomWorkshop(e.target.value);
+                          setWorkshopName("Other");
+                        }}
+                        placeholder="Enter Workshop Name *"
+                        className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs mt-2"
+                        required
+                      />
+                    )}
                   </div>
 
                   <div>
@@ -1639,19 +1724,88 @@ export default function MaintenanceInForm({ user, onBackToSelector, onLogout }: 
                     <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
                       Insurance Brokerage
                     </label>
-                    <input
-                      type="text"
-                      value={insuranceBrokerage}
+                    <select
+                      value={["Direct / Internal", "Coverfox", "PolicyBazaar", "RenewBuy", "Mahindra Insurance Brokers", "Turtlemint"].includes(insuranceBrokerage) ? insuranceBrokerage : (insuranceBrokerage ? "Other" : "")}
                       onChange={e => {
-                        try {
-                          setInsuranceBrokerage(e.target.value);
-                        } catch (err) {
-                          console.error("Error setting insurance brokerage", err);
+                        const val = e.target.value;
+                        if (val === "Other") {
+                          setInsuranceBrokerage("Other");
+                          setCustomBrokerage(insuranceBrokerage && !["Direct / Internal", "Coverfox", "PolicyBazaar", "RenewBuy", "Mahindra Insurance Brokers", "Turtlemint"].includes(insuranceBrokerage) ? insuranceBrokerage : "");
+                        } else {
+                          setInsuranceBrokerage(val);
+                          setCustomBrokerage("");
                         }
                       }}
-                      placeholder="e.g. ICICI Lombard, Digit Insurance"
-                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs"
-                    />
+                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs cursor-pointer"
+                    >
+                      <option value="">Select Insurance Brokerage</option>
+                      <option value="Direct / Internal">Direct / Internal</option>
+                      <option value="Coverfox">Coverfox</option>
+                      <option value="PolicyBazaar">PolicyBazaar</option>
+                      <option value="RenewBuy">RenewBuy</option>
+                      <option value="Mahindra Insurance Brokers">Mahindra Insurance Brokers</option>
+                      <option value="Turtlemint">Turtlemint</option>
+                      <option value="Other">Other (Specify Brokerage)</option>
+                    </select>
+                    {(insuranceBrokerage === "Other" || (!["Direct / Internal", "Coverfox", "PolicyBazaar", "RenewBuy", "Mahindra Insurance Brokers", "Turtlemint"].includes(insuranceBrokerage) && insuranceBrokerage)) && (
+                      <input
+                        type="text"
+                        value={insuranceBrokerage === "Other" ? customBrokerage : insuranceBrokerage}
+                        onChange={e => {
+                          setCustomBrokerage(e.target.value);
+                          setInsuranceBrokerage("Other");
+                        }}
+                        placeholder="Enter Insurance Brokerage"
+                        className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs mt-2"
+                      />
+                    )}
+                  </div>
+
+                  <div>
+                    <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
+                      Insurance Company
+                    </label>
+                    <select
+                      value={["ICICI Lombard", "HDFC ERGO", "Go Digit", "Bajaj Allianz", "Tata AIG", "Reliance General", "New India Assurance", "Star Health", "United India Insurance", "Oriental Insurance", "National Insurance", "SBI General Insurance"].includes(insuranceCompany) ? insuranceCompany : (insuranceCompany ? "Other" : "")}
+                      onChange={e => {
+                        const val = e.target.value;
+                        if (val === "Other") {
+                          setInsuranceCompany("Other");
+                          setCustomInsuranceCompany(insuranceCompany && !["ICICI Lombard", "HDFC ERGO", "Go Digit", "Bajaj Allianz", "Tata AIG", "Reliance General", "New India Assurance", "Star Health", "United India Insurance", "Oriental Insurance", "National Insurance", "SBI General Insurance"].includes(insuranceCompany) ? insuranceCompany : "");
+                        } else {
+                          setInsuranceCompany(val);
+                          setCustomInsuranceCompany("");
+                        }
+                      }}
+                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs cursor-pointer"
+                    >
+                      <option value="">Select Insurance Company</option>
+                      <option value="ICICI Lombard">ICICI Lombard</option>
+                      <option value="HDFC ERGO">HDFC ERGO</option>
+                      <option value="Go Digit">Go Digit</option>
+                      <option value="Bajaj Allianz">Bajaj Allianz</option>
+                      <option value="Tata AIG">Tata AIG</option>
+                      <option value="Reliance General">Reliance General</option>
+                      <option value="New India Assurance">New India Assurance</option>
+                      <option value="Star Health">Star Health</option>
+                      <option value="United India Insurance">United India Insurance</option>
+                      <option value="Oriental Insurance">Oriental Insurance</option>
+                      <option value="National Insurance">National Insurance</option>
+                      <option value="SBI General Insurance">SBI General Insurance</option>
+                      <option value="Other">Other (Specify Company)</option>
+                    </select>
+                    {(insuranceCompany === "Other" || (!["ICICI Lombard", "HDFC ERGO", "Go Digit", "Bajaj Allianz", "Tata AIG", "Reliance General", "New India Assurance", "Star Health", "United India Insurance", "Oriental Insurance", "National Insurance", "SBI General Insurance"].includes(insuranceCompany) && insuranceCompany)) && (
+                      <input
+                        type="text"
+                        value={insuranceCompany === "Other" ? customInsuranceCompany : insuranceCompany}
+                        onChange={e => {
+                          setCustomInsuranceCompany(e.target.value);
+                          setInsuranceCompany("Other");
+                        }}
+                        placeholder="Enter Insurance Company Name"
+                        className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs mt-2"
+                      />
+                    )}
                   </div>
 
                   <div>

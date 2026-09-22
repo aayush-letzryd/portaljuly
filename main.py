@@ -1305,7 +1305,11 @@ def startup_event():
         for col in [
             "created_by INTEGER",
             "updated_at TIMESTAMP",
-            "updated_by INTEGER"
+            "updated_by INTEGER",
+            "driver_phone VARCHAR(50)",
+            "dl_front_photo TEXT",
+            "dl_back_photo TEXT",
+            "police_ack_copy TEXT"
         ]:
             cur.execute(f"ALTER TABLE july_accidents_registry ADD COLUMN IF NOT EXISTS {col};")
 
@@ -1444,6 +1448,9 @@ def startup_event():
             CREATE INDEX IF NOT EXISTS idx_maint_in_veh_closed ON july_maintenance_in (vehicle_number, is_closed);
         """)
 
+        for col in ["insurance_company VARCHAR(255)"]:
+            cur.execute(f"ALTER TABLE july_maintenance_in ADD COLUMN IF NOT EXISTS {col};")
+
         # ── july_maintenance_out ────────────────────────────────
         cur.execute("""
             CREATE TABLE IF NOT EXISTS july_maintenance_out (
@@ -1475,6 +1482,9 @@ def startup_event():
             CREATE INDEX IF NOT EXISTS idx_maint_out_veh ON july_maintenance_out (vehicle_number);
             CREATE INDEX IF NOT EXISTS idx_maint_out_inward_id ON july_maintenance_out (inward_id);
         """)
+
+        for col in ["hub_name VARCHAR(255)"]:
+            cur.execute(f"ALTER TABLE july_maintenance_out ADD COLUMN IF NOT EXISTS {col};")
 
         # ── july_rent_ledger ──────────────────────────────────
         cur.execute("""
@@ -2072,6 +2082,7 @@ class AccidentData(BaseModel):
     vehicle_status: str
     driver_id: str
     driver_name: str
+    driver_phone: Optional[str] = None
     no_of_persons: str
     third_party_involvement: str
     fir_filed: str
@@ -2087,6 +2098,9 @@ class AccidentData(BaseModel):
     back_vehicle_photo: Optional[Any] = None
     right_vehicle_photo: Optional[Any] = None
     left_vehicle_photo: Optional[Any] = None
+    dl_front_photo: Optional[Any] = None
+    dl_back_photo: Optional[Any] = None
+    police_ack_copy: Optional[Any] = None
     fir_document_copy: Optional[Any] = None
 
 class InspectionData(BaseModel):
@@ -7863,22 +7877,23 @@ def create_accident(data: AccidentData, authorization: Optional[str] = Header(No
         cur.execute("""
             INSERT INTO july_accidents_registry (
                 vehicle_number, vendor_id, vendor_name, city_name, date_of_accident, time_of_accident, place_of_accident, vehicle_status,
-                driver_id, driver_name, no_of_persons, third_party_involvement, fir_filed,
+                driver_id, driver_name, driver_phone, no_of_persons, third_party_involvement, fir_filed,
                 accident_reason, accident_inspection, insurance_status, repair_cost, toeing_cost, challan_amount, fine_amount, comments,
-                front_vehicle_photo, back_vehicle_photo, right_vehicle_photo, left_vehicle_photo, fir_document_copy,
+                front_vehicle_photo, back_vehicle_photo, right_vehicle_photo, left_vehicle_photo, dl_front_photo, dl_back_photo, police_ack_copy, fir_document_copy,
                 created_by, created_at, updated_at, updated_by
             ) VALUES (
                 %s,%s,%s,%s,%s,%s,%s,%s,
-                %s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,
                 %s,%s,%s,%s,%s,%s,%s,%s,
-                %s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,%s,
                 %s, NOW(), NOW(), %s
             ) RETURNING id;
         """, (
             data.vehicle_number, data.vendor_id, data.vendor_name, data.city_name, data.date_of_accident, data.time_of_accident, data.place_of_accident, data.vehicle_status,
-            data.driver_id, data.driver_name, data.no_of_persons, data.third_party_involvement, data.fir_filed,
+            data.driver_id, data.driver_name, data.driver_phone, data.no_of_persons, data.third_party_involvement, data.fir_filed,
             data.accident_reason, data.accident_inspection, data.insurance_status, data.repair_cost, data.toeing_cost, data.challan_amount, data.fine_amount, data.comments,
-            extract_image(data.front_vehicle_photo), extract_image(data.back_vehicle_photo), extract_image(data.right_vehicle_photo), extract_image(data.left_vehicle_photo), extract_image(data.fir_document_copy),
+            extract_image(data.front_vehicle_photo), extract_image(data.back_vehicle_photo), extract_image(data.right_vehicle_photo), extract_image(data.left_vehicle_photo),
+            extract_image(data.dl_front_photo), extract_image(data.dl_back_photo), extract_image(data.police_ack_copy), extract_image(data.fir_document_copy),
             uid, uid
         ))
         new_id = cur.fetchone()[0]
@@ -7900,16 +7915,17 @@ def update_accident(id: int, data: AccidentData, authorization: Optional[str] = 
         cur.execute("""
             UPDATE july_accidents_registry SET 
                 vehicle_number=%s, vendor_id=%s, vendor_name=%s, city_name=%s, date_of_accident=%s, time_of_accident=%s, place_of_accident=%s, vehicle_status=%s,
-                driver_id=%s, driver_name=%s, no_of_persons=%s, third_party_involvement=%s, fir_filed=%s,
+                driver_id=%s, driver_name=%s, driver_phone=%s, no_of_persons=%s, third_party_involvement=%s, fir_filed=%s,
                 accident_reason=%s, accident_inspection=%s, insurance_status=%s, repair_cost=%s, toeing_cost=%s, challan_amount=%s, fine_amount=%s, comments=%s,
-                front_vehicle_photo=%s, back_vehicle_photo=%s, right_vehicle_photo=%s, left_vehicle_photo=%s, fir_document_copy=%s,
+                front_vehicle_photo=%s, back_vehicle_photo=%s, right_vehicle_photo=%s, left_vehicle_photo=%s, dl_front_photo=%s, dl_back_photo=%s, police_ack_copy=%s, fir_document_copy=%s,
                 updated_at=NOW(), updated_by=%s
             WHERE id = %s RETURNING id;
         """, (
             data.vehicle_number, data.vendor_id, data.vendor_name, data.city_name, data.date_of_accident, data.time_of_accident, data.place_of_accident, data.vehicle_status,
-            data.driver_id, data.driver_name, data.no_of_persons, data.third_party_involvement, data.fir_filed,
+            data.driver_id, data.driver_name, data.driver_phone, data.no_of_persons, data.third_party_involvement, data.fir_filed,
             data.accident_reason, data.accident_inspection, data.insurance_status, data.repair_cost, data.toeing_cost, data.challan_amount, data.fine_amount, data.comments,
-            extract_image(data.front_vehicle_photo), extract_image(data.back_vehicle_photo), extract_image(data.right_vehicle_photo), extract_image(data.left_vehicle_photo), extract_image(data.fir_document_copy),
+            extract_image(data.front_vehicle_photo), extract_image(data.back_vehicle_photo), extract_image(data.right_vehicle_photo), extract_image(data.left_vehicle_photo),
+            extract_image(data.dl_front_photo), extract_image(data.dl_back_photo), extract_image(data.police_ack_copy), extract_image(data.fir_document_copy),
             uid,
             id
         ))
@@ -8460,6 +8476,7 @@ class MaintenanceInCreate(BaseModel):
     estimated_amount: Optional[str] = None
     insurance_claimed: Optional[str] = "No"
     insurance_brokerage: Optional[str] = None
+    insurance_company: Optional[str] = None
     claim_number: Optional[str] = None
     approved_by: Optional[str] = None
     approval_date: Optional[str] = None
@@ -8495,6 +8512,7 @@ class MaintenanceOutCreate(BaseModel):
     driver_id: Optional[str] = None
     driver_name: Optional[str] = None
     driver_phone: Optional[str] = None
+    hub_name: Optional[str] = None
 
 @app.post("/api/maintenance-in")
 def create_maintenance_in(data: MaintenanceInCreate, authorization: Optional[str] = Header(None)):
@@ -8532,20 +8550,20 @@ def create_maintenance_in(data: MaintenanceInCreate, authorization: Optional[str
                 created_by, user_email, city_name, vehicle_number, vehicle_location,
                 vehicle_in_date_time, vehicle_k_m_s, repair_type, workshop_name,
                 estimated_delivery_date, estimated_amount, insurance_claimed,
-                insurance_brokerage, claim_number, approved_by, approval_date,
+                insurance_brokerage, insurance_company, claim_number, approved_by, approval_date,
                 approval_file, vehicle_damage_photos, remarks, is_closed
             ) VALUES (
                 %s, %s, %s, %s, %s,
                 %s, %s, %s, %s,
                 %s, %s, %s,
-                %s, %s, %s, %s,
+                %s, %s, %s, %s, %s,
                 %s, %s, %s, FALSE
             ) RETURNING id, created_at;
         """, (
             uid, u_email, data.city_name.strip(), vnum, data.vehicle_location,
             data.vehicle_in_date_time, data.vehicle_k_m_s, data.repair_type, data.workshop_name.strip(),
             data.estimated_delivery_date, data.estimated_amount, data.insurance_claimed,
-            data.insurance_brokerage, data.claim_number, data.approved_by, data.approval_date,
+            data.insurance_brokerage, data.insurance_company, data.claim_number, data.approved_by, data.approval_date,
             data.approval_file, photos_val, data.remarks
         ))
         row = cur.fetchone()
@@ -8700,6 +8718,7 @@ def update_maintenance_in(id: int, data: MaintenanceInCreate, authorization: Opt
                 estimated_amount = %s,
                 insurance_claimed = %s,
                 insurance_brokerage = %s,
+                insurance_company = %s,
                 claim_number = %s,
                 approved_by = %s,
                 approval_date = %s,
@@ -8711,7 +8730,7 @@ def update_maintenance_in(id: int, data: MaintenanceInCreate, authorization: Opt
             data.city_name.strip(), data.vehicle_number.strip().upper(), data.vehicle_location,
             data.vehicle_in_date_time, data.vehicle_k_m_s, data.repair_type, data.workshop_name.strip(),
             data.estimated_delivery_date, data.estimated_amount, data.insurance_claimed,
-            data.insurance_brokerage, data.claim_number, data.approved_by, data.approval_date,
+            data.insurance_brokerage, data.insurance_company, data.claim_number, data.approved_by, data.approval_date,
             data.approval_file, photos_val, data.remarks, id
         ))
         row = cur.fetchone()
@@ -8830,7 +8849,7 @@ def create_maintenance_out(data: MaintenanceOutCreate, authorization: Optional[s
                 invoice_file, type_of_payment, payment_status, utr_no,
                 approved_by, approval_date, approval_file, vehicle_out_photos,
                 final_status, remarks,
-                handover, partner_id, partner_name, partner_phone, driver_id, driver_name, driver_phone
+                handover, partner_id, partner_name, partner_phone, driver_id, driver_name, driver_phone, hub_name
             ) VALUES (
                 %s, %s, %s, %s, %s,
                 %s, %s, %s, %s,
@@ -8838,7 +8857,7 @@ def create_maintenance_out(data: MaintenanceOutCreate, authorization: Optional[s
                 %s, %s, %s, %s,
                 %s, %s, %s, %s,
                 %s, %s,
-                %s, %s, %s, %s, %s, %s, %s
+                %s, %s, %s, %s, %s, %s, %s, %s
             ) RETURNING id, created_at;
         """, (
             data.inward_id, data.vehicle_number.strip().upper(), uid, u_email, data.rfd_date,
@@ -8848,7 +8867,7 @@ def create_maintenance_out(data: MaintenanceOutCreate, authorization: Optional[s
             data.approved_by, data.approval_date, data.approval_file, photos_val,
             data.final_status, data.remarks,
             data.handover or "Hub", data.partner_id, data.partner_name, data.partner_phone,
-            data.driver_id, data.driver_name, data.driver_phone
+            data.driver_id, data.driver_name, data.driver_phone, data.hub_name
         ))
         out_row = cur.fetchone()
         out_id = out_row[0]

@@ -19,8 +19,9 @@ export default defineConfig(() => {
       watch: process.env.DISABLE_HMR === 'true' ? null : {},
       proxy: {
         '/api': {
-          target: 'http://127.0.0.1:8001',
-          changeOrigin: true
+          target: 'https://portaljuly-925756819101.asia-south1.run.app',
+          changeOrigin: true,
+          secure: false
         }
       }
     },

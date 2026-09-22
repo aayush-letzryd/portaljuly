@@ -243,6 +243,44 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
   const [driverId, setDriverId] = useState<string>("");
   const [driverName, setDriverName] = useState<string>("");
   const [driverPhone, setDriverPhone] = useState<string>("");
+  const [hubName, setHubName] = useState<string>("");
+  const [customHub, setCustomHub] = useState<string>("");
+
+  const DEFAULT_HUBS = [
+    "Miyapur Hub",
+    "Gachibowli Yard",
+    "Kukatpally Hub",
+    "Madhapur Hub",
+    "Begumpet Hub",
+    "Koramangala Hub",
+    "Whitefield Hub",
+    "Bandra Hub",
+    "Andheri Hub"
+  ];
+  const [hubOptions, setHubOptions] = useState<string[]>(DEFAULT_HUBS);
+
+  useEffect(() => {
+    const fetchHubs = async () => {
+      try {
+        const token = getAuthToken();
+        const res = await fetch("/api/hub", {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            const names = data.map((h: any) => h.hub_name).filter(Boolean);
+            if (names.length > 0) {
+              setHubOptions(prev => Array.from(new Set([...names, ...prev])));
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch hubs list:", err);
+      }
+    };
+    fetchHubs();
+  }, []);
 
   // UI States
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -536,6 +574,7 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
       setDriverId(r.driver_id || "");
       setDriverName(r.driver_name || "");
       setDriverPhone(r.driver_phone || "");
+      setHubName(r.hub_name || "");
 
       const parsedPhotos = parsePhotosSafely(r.vehicle_out_photos);
       setOutwardPhotos(parsedPhotos);
@@ -578,6 +617,8 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
       setDriverId("");
       setDriverName("");
       setDriverPhone("");
+      setHubName("");
+      setCustomHub("");
       setVehicleOutDateTime(getNowDateTimeString());
       setRfdDate(getTodayDateString());
     } catch (err) {
@@ -646,6 +687,16 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
       setIsSubmitting(true);
       const token = getAuthToken();
 
+      const finalHub = handoverTo === "Hub" ? (hubName === "Other" ? customHub.trim() : hubName.trim()) : null;
+      if (handoverTo === "Hub" && !finalHub) {
+        setSubmitError("Hub Name is required when handing over to Hub.");
+        return;
+      }
+      if (handoverTo === "Driver" && !driverId.trim()) {
+        setSubmitError("Driver ID is required when handing over to Driver.");
+        return;
+      }
+
       const payload = {
         inward_id: inwardRecord ? inwardRecord.id : null,
         vehicle_number: vehicleNumber.trim().toUpperCase(),
@@ -671,6 +722,7 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
         driver_id: handoverTo === "Driver" ? (driverId.trim() || null) : null,
         driver_name: handoverTo === "Driver" ? (driverName.trim() || null) : null,
         driver_phone: handoverTo === "Driver" ? (driverPhone.trim() || null) : null,
+        hub_name: finalHub,
         partner_id: null,
         partner_phone: null,
       };
@@ -1591,6 +1643,26 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
                         <>
                           <div>
                             <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
+                              Driver ID <span className="text-red-500">*</span>
+                            </label>
+                            <input
+                              type="text"
+                              value={driverId}
+                              onChange={e => {
+                                try {
+                                  setDriverId(e.target.value);
+                                } catch (err) {
+                                  console.error("Error setting driverId:", err);
+                                }
+                              }}
+                              placeholder="Enter Driver ID *"
+                              className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs"
+                              required
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
                               Driver Name
                             </label>
                             <input
@@ -1628,9 +1700,44 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
                           </div>
                         </>
                       ) : (
-                        <div className="col-span-1 sm:col-span-2 flex items-center bg-white px-3.5 py-2 rounded-xl border border-slate-200 text-xs text-slate-600 font-medium shadow-2xs">
-                          <CheckCircle className="w-4 h-4 text-emerald-600 mr-2 shrink-0" />
-                          <span>Handed over to <strong>Hub / Yard</strong> — no driver details required.</span>
+                        <div className="col-span-1 sm:col-span-2">
+                          <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
+                            Select/Enter Hub Name <span className="text-red-500">*</span>
+                          </label>
+                          <select
+                            value={hubOptions.includes(hubName) ? hubName : (hubName ? "Other" : "")}
+                            onChange={e => {
+                              const val = e.target.value;
+                              if (val === "Other") {
+                                setHubName("Other");
+                                setCustomHub(hubName && !hubOptions.includes(hubName) ? hubName : "");
+                              } else {
+                                setHubName(val);
+                                setCustomHub("");
+                              }
+                            }}
+                            className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs cursor-pointer"
+                            required
+                          >
+                            <option value="">Select Hub Name</option>
+                            {hubOptions.map((h) => (
+                              <option key={h} value={h}>{h}</option>
+                            ))}
+                            <option value="Other">Other (Specify Hub Name)</option>
+                          </select>
+                          {(hubName === "Other" || (!hubOptions.includes(hubName) && hubName)) && (
+                            <input
+                              type="text"
+                              value={hubName === "Other" ? customHub : hubName}
+                              onChange={e => {
+                                setCustomHub(e.target.value);
+                                setHubName("Other");
+                              }}
+                              placeholder="Enter Hub Name *"
+                              className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs mt-2"
+                              required
+                            />
+                          )}
                         </div>
                       )}
                     </div>

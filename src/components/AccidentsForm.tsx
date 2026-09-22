@@ -55,6 +55,7 @@ export default function AccidentsForm({
   // Panel 2: Driver & Passenger
   const [driverId, setDriverId] = useState("");
   const [driverName, setDriverName] = useState("");
+  const [driverPhone, setDriverPhone] = useState("");
   const [noOfPersons, setNoOfPersons] = useState("1");
   const [thirdPartyInvolvement, setThirdPartyInvolvement] = useState<"Yes" | "No">("No");
   const [firFiled, setFirFiled] = useState<"Yes" | "No">("No");
@@ -69,15 +70,18 @@ export default function AccidentsForm({
   const [fineAmount, setFineAmount] = useState("");
   const [comments, setComments] = useState("");
 
-  // Panel 4: Photographic Evidence (Base64)
+  // Panel 4: Photographic Evidence & Accident Documents (Base64)
   const [frontPhoto, setFrontPhoto] = useState<string | null>(null);
   const [backPhoto, setBackPhoto] = useState<string | null>(null);
   const [rightPhoto, setRightPhoto] = useState<string | null>(null);
   const [leftPhoto, setLeftPhoto] = useState<string | null>(null);
+  const [dlFrontPhoto, setDlFrontPhoto] = useState<string | null>(null);
+  const [dlBackPhoto, setDlBackPhoto] = useState<string | null>(null);
+  const [policeAckCopy, setPoliceAckCopy] = useState<string | null>(null);
   const [firDoc, setFirDoc] = useState<string | null>(null);
 
   // Camera capture modal state
-  const [cameraActiveField, setCameraActiveField] = useState<"front" | "back" | "right" | "left" | "fir" | null>(null);
+  const [cameraActiveField, setCameraActiveField] = useState<"front" | "back" | "right" | "left" | "dl_front" | "dl_back" | "police_ack" | "fir" | null>(null);
 
   // Stats / Registry Metrics
   const [stats, setStats] = useState({
@@ -137,13 +141,16 @@ export default function AccidentsForm({
     fetchRecords();
   }, []);
 
-  const handleImageUpload = (field: "front" | "back" | "right" | "left" | "fir", file: File) => {
+  const handleImageUpload = (field: "front" | "back" | "right" | "left" | "dl_front" | "dl_back" | "police_ack" | "fir", file: File) => {
     compressImage(file, 1920, 1920, 0.85, "accidents").then((url) => {
       if (typeof url === "string") {
         if (field === "front") setFrontPhoto(url);
         if (field === "back") setBackPhoto(url);
         if (field === "right") setRightPhoto(url);
         if (field === "left") setLeftPhoto(url);
+        if (field === "dl_front") setDlFrontPhoto(url);
+        if (field === "dl_back") setDlBackPhoto(url);
+        if (field === "police_ack") setPoliceAckCopy(url);
         if (field === "fir") setFirDoc(url);
       }
     })
@@ -171,6 +178,7 @@ export default function AccidentsForm({
 
       setDriverId(data.driver_id || "");
       setDriverName(data.driver_name || "");
+      setDriverPhone(data.driver_phone || "");
       setNoOfPersons(data.no_of_persons || "1");
       setThirdPartyInvolvement(data.third_party_involvement || "No");
       setFirFiled(data.fir_filed || "No");
@@ -188,6 +196,9 @@ export default function AccidentsForm({
       setBackPhoto(data.back_vehicle_photo || null);
       setRightPhoto(data.right_vehicle_photo || null);
       setLeftPhoto(data.left_vehicle_photo || null);
+      setDlFrontPhoto(data.dl_front_photo || null);
+      setDlBackPhoto(data.dl_back_photo || null);
+      setPoliceAckCopy(data.police_ack_copy || null);
       setFirDoc(data.fir_document_copy || null);
       
       setActiveTab("form");
@@ -210,6 +221,7 @@ export default function AccidentsForm({
 
     setDriverId("");
     setDriverName("");
+    setDriverPhone("");
     setNoOfPersons("1");
     setThirdPartyInvolvement("No");
     setFirFiled("No");
@@ -227,6 +239,9 @@ export default function AccidentsForm({
     setBackPhoto(null);
     setRightPhoto(null);
     setLeftPhoto(null);
+    setDlFrontPhoto(null);
+    setDlBackPhoto(null);
+    setPoliceAckCopy(null);
     setFirDoc(null);
   };
 
@@ -236,6 +251,7 @@ export default function AccidentsForm({
     if (!vendorName.trim()) return alert("Vendor Name is required");
     if (!driverName.trim()) return alert("Driver Name is required");
     if (!driverId.trim()) return alert("Driver ID is required");
+    if (!driverPhone.trim()) return alert("Driver Contact Number is required");
     if (!accidentReason.trim()) return alert("Accident Reason is required");
     if (!accidentInspection.trim()) return alert("Accident Inspection is required");
 
@@ -257,6 +273,7 @@ export default function AccidentsForm({
       vehicle_status: vehicleStatus,
       driver_id: driverId.trim(),
       driver_name: driverName.trim(),
+      driver_phone: driverPhone.trim(),
       no_of_persons: noOfPersons,
       third_party_involvement: thirdPartyInvolvement,
       fir_filed: firFiled,
@@ -272,6 +289,9 @@ export default function AccidentsForm({
       back_vehicle_photo: backPhoto || null,
       right_vehicle_photo: rightPhoto || null,
       left_vehicle_photo: leftPhoto || null,
+      dl_front_photo: dlFrontPhoto || null,
+      dl_back_photo: dlBackPhoto || null,
+      police_ack_copy: policeAckCopy || null,
       fir_document_copy: firFiled === "Yes" ? (firDoc || null) : null
     };
 
@@ -681,6 +701,18 @@ export default function AccidentsForm({
                       </div>
 
                       <div>
+                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Driver Contact Number <span className="text-red-500">*</span></label>
+                        <input 
+                          type="tel" 
+                          placeholder="Enter 10-digit mobile number..."
+                          value={driverPhone}
+                          onChange={(e) => setDriverPhone(e.target.value)}
+                          required
+                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs"
+                        />
+                      </div>
+
+                      <div>
                         <label className="block font-sans text-xs font-bold text-text-muted mb-2">No. of Persons in Vehicle <span className="text-red-500">*</span></label>
                         <input 
                           type="number" 
@@ -840,96 +872,164 @@ export default function AccidentsForm({
                 </div>
 
                 {/* ATTACHMENT SECTION */}
-                <div className="border-t border-border pt-10">
-                  <div className="border-b border-border pb-3 mb-6">
-                    <h3 className="font-sans text-sm font-bold text-primary">
-                      4. Photographic Evidence & Proof <span className="text-red-500">*</span>
-                    </h3>
-                    <p className="font-sans text-xs text-text-muted mt-1">Upload scene photos of all 4 vehicle sides. If FIR is filed, a copy is also mandatory.</p>
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-6">
-                    
-                    {/* Front Photo */}
-                    <div className="rounded-xl border border-dashed border-border bg-bg/30 p-4 text-center flex flex-col items-center justify-center">
-                      <span className="text-[10px] font-bold text-text-muted mb-2">Front Photo</span>
-                      {frontPhoto ? (
-                        <div className="relative">
-                          <img src={frontPhoto} className="h-24 w-24 object-cover rounded-lg border border-border shadow-xs" />
-                          <button type="button" onClick={() => setFrontPhoto(null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer"><X className="h-3 w-3" /></button>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <button type="button" onClick={() => setCameraActiveField("front")} className="flex items-center gap-1 bg-primary text-white px-2 py-1 rounded text-xs hover:bg-primary-hover shadow-xs cursor-pointer"><Camera className="h-3 w-3" /> Camera</button>
-                          <label className="flex items-center gap-1 bg-white border border-border text-text px-2 py-1 rounded text-xs hover:bg-slate-50 shadow-xs cursor-pointer justify-center"><Upload className="h-3 w-3" /> Upload <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload("front", e.target.files[0])} /></label>
-                        </div>
-                      )}
+                <div className="border-t border-border pt-10 space-y-8">
+                  
+                  {/* Vehicle Damage Photos */}
+                  <div>
+                    <div className="border-b border-border pb-3 mb-4">
+                      <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">4</span>
+                        Vehicle Damage Photographs <span className="text-red-500">*</span>
+                      </h3>
+                      <p className="font-sans text-xs text-text-muted mt-1">Upload scene photos of all 4 vehicle sides (Front, Back, Right, Left).</p>
                     </div>
 
-                    {/* Back Photo */}
-                    <div className="rounded-xl border border-dashed border-border bg-bg/30 p-4 text-center flex flex-col items-center justify-center">
-                      <span className="text-[10px] font-bold text-text-muted mb-2">Back Photo</span>
-                      {backPhoto ? (
-                        <div className="relative">
-                          <img src={backPhoto} className="h-24 w-24 object-cover rounded-lg border border-border shadow-xs" />
-                          <button type="button" onClick={() => setBackPhoto(null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer"><X className="h-3 w-3" /></button>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <button type="button" onClick={() => setCameraActiveField("back")} className="flex items-center gap-1 bg-primary text-white px-2 py-1 rounded text-xs hover:bg-primary-hover shadow-xs cursor-pointer"><Camera className="h-3 w-3" /> Camera</button>
-                          <label className="flex items-center gap-1 bg-white border border-border text-text px-2 py-1 rounded text-xs hover:bg-slate-50 shadow-xs cursor-pointer justify-center"><Upload className="h-3 w-3" /> Upload <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload("back", e.target.files[0])} /></label>
-                        </div>
-                      )}
-                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                      
+                      {/* Front Photo */}
+                      <div className="rounded-xl border border-dashed border-border bg-bg/30 p-4 text-center flex flex-col items-center justify-center">
+                        <span className="text-[11px] font-bold text-text-muted mb-2">Front Photo <span className="text-red-500">*</span></span>
+                        {frontPhoto ? (
+                          <div className="relative">
+                            <img src={frontPhoto} className="h-24 w-24 object-cover rounded-lg border border-border shadow-xs" />
+                            <button type="button" onClick={() => setFrontPhoto(null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer"><X className="h-3 w-3" /></button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <button type="button" onClick={() => setCameraActiveField("front")} className="flex items-center gap-1 bg-primary text-white px-2.5 py-1 rounded-lg text-xs hover:bg-primary-hover shadow-xs cursor-pointer"><Camera className="h-3.5 w-3.5" /> Camera</button>
+                            <label className="flex items-center gap-1 bg-white border border-border text-text px-2.5 py-1 rounded-lg text-xs hover:bg-slate-50 shadow-xs cursor-pointer justify-center"><Upload className="h-3.5 w-3.5" /> Upload <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload("front", e.target.files[0])} /></label>
+                          </div>
+                        )}
+                      </div>
 
-                    {/* Right Photo */}
-                    <div className="rounded-xl border border-dashed border-border bg-bg/30 p-4 text-center flex flex-col items-center justify-center">
-                      <span className="text-[10px] font-bold text-text-muted mb-2">Right Photo</span>
-                      {rightPhoto ? (
-                        <div className="relative">
-                          <img src={rightPhoto} className="h-24 w-24 object-cover rounded-lg border border-border shadow-xs" />
-                          <button type="button" onClick={() => setRightPhoto(null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer"><X className="h-3 w-3" /></button>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <button type="button" onClick={() => setCameraActiveField("right")} className="flex items-center gap-1 bg-primary text-white px-2 py-1 rounded text-xs hover:bg-primary-hover shadow-xs cursor-pointer"><Camera className="h-3 w-3" /> Camera</button>
-                          <label className="flex items-center gap-1 bg-white border border-border text-text px-2 py-1 rounded text-xs hover:bg-slate-50 shadow-xs cursor-pointer justify-center"><Upload className="h-3 w-3" /> Upload <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload("right", e.target.files[0])} /></label>
-                        </div>
-                      )}
-                    </div>
+                      {/* Back Photo */}
+                      <div className="rounded-xl border border-dashed border-border bg-bg/30 p-4 text-center flex flex-col items-center justify-center">
+                        <span className="text-[11px] font-bold text-text-muted mb-2">Back Photo <span className="text-red-500">*</span></span>
+                        {backPhoto ? (
+                          <div className="relative">
+                            <img src={backPhoto} className="h-24 w-24 object-cover rounded-lg border border-border shadow-xs" />
+                            <button type="button" onClick={() => setBackPhoto(null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer"><X className="h-3 w-3" /></button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <button type="button" onClick={() => setCameraActiveField("back")} className="flex items-center gap-1 bg-primary text-white px-2.5 py-1 rounded-lg text-xs hover:bg-primary-hover shadow-xs cursor-pointer"><Camera className="h-3.5 w-3.5" /> Camera</button>
+                            <label className="flex items-center gap-1 bg-white border border-border text-text px-2.5 py-1 rounded-lg text-xs hover:bg-slate-50 shadow-xs cursor-pointer justify-center"><Upload className="h-3.5 w-3.5" /> Upload <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload("back", e.target.files[0])} /></label>
+                          </div>
+                        )}
+                      </div>
 
-                    {/* Left Photo */}
-                    <div className="rounded-xl border border-dashed border-border bg-bg/30 p-4 text-center flex flex-col items-center justify-center">
-                      <span className="text-[10px] font-bold text-text-muted mb-2">Left Photo</span>
-                      {leftPhoto ? (
-                        <div className="relative">
-                          <img src={leftPhoto} className="h-24 w-24 object-cover rounded-lg border border-border shadow-xs" />
-                          <button type="button" onClick={() => setLeftPhoto(null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer"><X className="h-3 w-3" /></button>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <button type="button" onClick={() => setCameraActiveField("left")} className="flex items-center gap-1 bg-primary text-white px-2 py-1 rounded text-xs hover:bg-primary-hover shadow-xs cursor-pointer"><Camera className="h-3 w-3" /> Camera</button>
-                          <label className="flex items-center gap-1 bg-white border border-border text-text px-2 py-1 rounded text-xs hover:bg-slate-50 shadow-xs cursor-pointer justify-center"><Upload className="h-3 w-3" /> Upload <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload("left", e.target.files[0])} /></label>
-                        </div>
-                      )}
-                    </div>
+                      {/* Right Photo */}
+                      <div className="rounded-xl border border-dashed border-border bg-bg/30 p-4 text-center flex flex-col items-center justify-center">
+                        <span className="text-[11px] font-bold text-text-muted mb-2">Right Photo <span className="text-red-500">*</span></span>
+                        {rightPhoto ? (
+                          <div className="relative">
+                            <img src={rightPhoto} className="h-24 w-24 object-cover rounded-lg border border-border shadow-xs" />
+                            <button type="button" onClick={() => setRightPhoto(null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer"><X className="h-3 w-3" /></button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <button type="button" onClick={() => setCameraActiveField("right")} className="flex items-center gap-1 bg-primary text-white px-2.5 py-1 rounded-lg text-xs hover:bg-primary-hover shadow-xs cursor-pointer"><Camera className="h-3.5 w-3.5" /> Camera</button>
+                            <label className="flex items-center gap-1 bg-white border border-border text-text px-2.5 py-1 rounded-lg text-xs hover:bg-slate-50 shadow-xs cursor-pointer justify-center"><Upload className="h-3.5 w-3.5" /> Upload <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload("right", e.target.files[0])} /></label>
+                          </div>
+                        )}
+                      </div>
 
-                    {/* FIR Doc Copy */}
-                    <div className={`rounded-xl border border-dashed border-border bg-bg/30 p-4 text-center flex flex-col items-center justify-center ${firFiled === "No" ? "opacity-40 cursor-not-allowed pointer-events-none" : ""}`}>
-                      <span className="text-[10px] font-bold text-text-muted mb-2">FIR Document Copy</span>
-                      {firDoc ? (
-                        <div className="relative">
-                          <img src={firDoc} className="h-24 w-24 object-cover rounded-lg border border-border shadow-xs" />
-                          <button type="button" onClick={() => setFirDoc(null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer"><X className="h-3 w-3" /></button>
-                        </div>
-                      ) : (
-                        <div className="space-y-2">
-                          <button type="button" disabled={firFiled === "No"} onClick={() => setCameraActiveField("fir")} className="flex items-center gap-1 bg-primary text-white px-2 py-1 rounded text-xs hover:bg-primary-hover shadow-xs cursor-pointer justify-center disabled:bg-slate-300 disabled:pointer-events-none"><Camera className="h-3 w-3" /> Camera</button>
-                          <label className="flex items-center gap-1 bg-white border border-border text-text px-2 py-1 rounded text-xs hover:bg-slate-50 shadow-xs cursor-pointer justify-center"><Upload className="h-3 w-3" /> Upload <input type="file" accept="image/*" disabled={firFiled === "No"} className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload("fir", e.target.files[0])} /></label>
-                        </div>
-                      )}
+                      {/* Left Photo */}
+                      <div className="rounded-xl border border-dashed border-border bg-bg/30 p-4 text-center flex flex-col items-center justify-center">
+                        <span className="text-[11px] font-bold text-text-muted mb-2">Left Photo <span className="text-red-500">*</span></span>
+                        {leftPhoto ? (
+                          <div className="relative">
+                            <img src={leftPhoto} className="h-24 w-24 object-cover rounded-lg border border-border shadow-xs" />
+                            <button type="button" onClick={() => setLeftPhoto(null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer"><X className="h-3 w-3" /></button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <button type="button" onClick={() => setCameraActiveField("left")} className="flex items-center gap-1 bg-primary text-white px-2.5 py-1 rounded-lg text-xs hover:bg-primary-hover shadow-xs cursor-pointer"><Camera className="h-3.5 w-3.5" /> Camera</button>
+                            <label className="flex items-center gap-1 bg-white border border-border text-text px-2.5 py-1 rounded-lg text-xs hover:bg-slate-50 shadow-xs cursor-pointer justify-center"><Upload className="h-3.5 w-3.5" /> Upload <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload("left", e.target.files[0])} /></label>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
+
+                  {/* Accident Documents */}
+                  <div>
+                    <div className="border-b border-border pb-3 mb-4">
+                      <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">5</span>
+                        Accident Documents
+                      </h3>
+                      <p className="font-sans text-xs text-text-muted mt-1">Upload Driver License copies and police/FIR documentation.</p>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                      
+                      {/* DL Front Photo */}
+                      <div className="rounded-xl border border-dashed border-border bg-bg/30 p-4 text-center flex flex-col items-center justify-center">
+                        <span className="text-[11px] font-bold text-text-muted mb-2">Driving License (DL) – Front Photo</span>
+                        {dlFrontPhoto ? (
+                          <div className="relative">
+                            <img src={dlFrontPhoto} className="h-24 w-24 object-cover rounded-lg border border-border shadow-xs" />
+                            <button type="button" onClick={() => setDlFrontPhoto(null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer"><X className="h-3 w-3" /></button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <button type="button" onClick={() => setCameraActiveField("dl_front")} className="flex items-center gap-1 bg-primary text-white px-2.5 py-1 rounded-lg text-xs hover:bg-primary-hover shadow-xs cursor-pointer"><Camera className="h-3.5 w-3.5" /> Camera</button>
+                            <label className="flex items-center gap-1 bg-white border border-border text-text px-2.5 py-1 rounded-lg text-xs hover:bg-slate-50 shadow-xs cursor-pointer justify-center"><Upload className="h-3.5 w-3.5" /> Upload <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload("dl_front", e.target.files[0])} /></label>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* DL Back Photo */}
+                      <div className="rounded-xl border border-dashed border-border bg-bg/30 p-4 text-center flex flex-col items-center justify-center">
+                        <span className="text-[11px] font-bold text-text-muted mb-2">Driving License (DL) – Back Photo</span>
+                        {dlBackPhoto ? (
+                          <div className="relative">
+                            <img src={dlBackPhoto} className="h-24 w-24 object-cover rounded-lg border border-border shadow-xs" />
+                            <button type="button" onClick={() => setDlBackPhoto(null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer"><X className="h-3 w-3" /></button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <button type="button" onClick={() => setCameraActiveField("dl_back")} className="flex items-center gap-1 bg-primary text-white px-2.5 py-1 rounded-lg text-xs hover:bg-primary-hover shadow-xs cursor-pointer"><Camera className="h-3.5 w-3.5" /> Camera</button>
+                            <label className="flex items-center gap-1 bg-white border border-border text-text px-2.5 py-1 rounded-lg text-xs hover:bg-slate-50 shadow-xs cursor-pointer justify-center"><Upload className="h-3.5 w-3.5" /> Upload <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload("dl_back", e.target.files[0])} /></label>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Police Ack Copy */}
+                      <div className="rounded-xl border border-dashed border-border bg-bg/30 p-4 text-center flex flex-col items-center justify-center">
+                        <span className="text-[11px] font-bold text-text-muted mb-2">Police Ack Copy (Optional)</span>
+                        {policeAckCopy ? (
+                          <div className="relative">
+                            <img src={policeAckCopy} className="h-24 w-24 object-cover rounded-lg border border-border shadow-xs" />
+                            <button type="button" onClick={() => setPoliceAckCopy(null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer"><X className="h-3 w-3" /></button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <button type="button" onClick={() => setCameraActiveField("police_ack")} className="flex items-center gap-1 bg-primary text-white px-2.5 py-1 rounded-lg text-xs hover:bg-primary-hover shadow-xs cursor-pointer"><Camera className="h-3.5 w-3.5" /> Camera</button>
+                            <label className="flex items-center gap-1 bg-white border border-border text-text px-2.5 py-1 rounded-lg text-xs hover:bg-slate-50 shadow-xs cursor-pointer justify-center"><Upload className="h-3.5 w-3.5" /> Upload <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload("police_ack", e.target.files[0])} /></label>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* FIR Doc Copy */}
+                      <div className={`rounded-xl border border-dashed border-border bg-bg/30 p-4 text-center flex flex-col items-center justify-center ${firFiled === "No" ? "opacity-40 cursor-not-allowed pointer-events-none" : ""}`}>
+                        <span className="text-[11px] font-bold text-text-muted mb-2">FIR Document Copy (Optional)</span>
+                        {firDoc ? (
+                          <div className="relative">
+                            <img src={firDoc} className="h-24 w-24 object-cover rounded-lg border border-border shadow-xs" />
+                            <button type="button" onClick={() => setFirDoc(null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer"><X className="h-3 w-3" /></button>
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            <button type="button" disabled={firFiled === "No"} onClick={() => setCameraActiveField("fir")} className="flex items-center gap-1 bg-primary text-white px-2.5 py-1 rounded-lg text-xs hover:bg-primary-hover shadow-xs cursor-pointer justify-center disabled:bg-slate-300 disabled:pointer-events-none"><Camera className="h-3.5 w-3.5" /> Camera</button>
+                            <label className="flex items-center gap-1 bg-white border border-border text-text px-2.5 py-1 rounded-lg text-xs hover:bg-slate-50 shadow-xs cursor-pointer justify-center"><Upload className="h-3.5 w-3.5" /> Upload <input type="file" accept="image/*" disabled={firFiled === "No"} className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload("fir", e.target.files[0])} /></label>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                 </div>
 
                 {/* FORM ACTIONS */}
@@ -1176,6 +1276,9 @@ export default function AccidentsForm({
             if (cameraActiveField === "back") setBackPhoto(img);
             if (cameraActiveField === "right") setRightPhoto(img);
             if (cameraActiveField === "left") setLeftPhoto(img);
+            if (cameraActiveField === "dl_front") setDlFrontPhoto(img);
+            if (cameraActiveField === "dl_back") setDlBackPhoto(img);
+            if (cameraActiveField === "police_ack") setPoliceAckCopy(img);
             if (cameraActiveField === "fir") setFirDoc(img);
             setCameraActiveField(null);
           }}

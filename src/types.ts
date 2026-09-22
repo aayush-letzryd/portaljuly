@@ -419,6 +419,7 @@ export interface AccidentRecord {
   vehicle_status: "Drivable" | "Needs Towing" | "Impounded by Police";
   driver_id: string;
   driver_name: string;
+  driver_phone?: string;
   no_of_persons: string;
   third_party_involvement: "Yes" | "No";
   fir_filed: "Yes" | "No";
@@ -434,6 +435,9 @@ export interface AccidentRecord {
   back_vehicle_photo?: string;
   right_vehicle_photo?: string;
   left_vehicle_photo?: string;
+  dl_front_photo?: string;
+  dl_back_photo?: string;
+  police_ack_copy?: string;
   fir_document_copy?: string;
   created_at?: string;
 }
@@ -549,6 +553,7 @@ export interface MaintenanceInRecord {
   estimated_amount?: string;
   insurance_claimed?: string;
   insurance_brokerage?: string;
+  insurance_company?: string;
   claim_number?: string;
   approved_by?: string;
   approval_date?: string;
@@ -592,6 +597,7 @@ export interface MaintenanceOutRecord {
   driver_id?: string;
   driver_name?: string;
   driver_phone?: string;
+  hub_name?: string;
   // Joined fields from inward
   workshop_name?: string;
   vehicle_in_date_time?: string;
