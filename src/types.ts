@@ -151,6 +151,48 @@ export interface AdjustmentRecord {
   current_approver_id?: number;
 }
 
+export interface InspectionRecord {
+  id: number;
+  vehicle_number: string;
+  inspection_date: string;
+  odometer_reading: string;
+  driver_id?: string;
+  driver_name?: string;
+  driver_phone?: string;
+  city_name?: string;
+  hub_name?: string;
+  inspection_stage?: string;
+  jack?: string;
+  jack_rod?: string;
+  spanner?: string;
+  parking_triangle?: string;
+  fire_extinguishers?: string;
+  seat_cover?: string;
+  floor_carpet?: string;
+  music_system?: string;
+  key_quantity?: number | string;
+  fastag_balance?: string;
+  fastag_proof?: string;
+  odometer_photo?: string;
+  stepney_photo?: string;
+  photo_front?: string;
+  photo_back?: string;
+  photo_lh?: string;
+  photo_rh?: string;
+  photo_engine_chassis?: string;
+  photo_battery?: string;
+  photo_engine_compartment?: string;
+  photo_fast_tag?: string;
+  photo_music_system?: string;
+  photo_tyre_rh_fr?: string;
+  photo_tyre_lh_fr?: string;
+  photo_tyre_rh_re?: string;
+  photo_tyre_lh_re?: string;
+  photo_tyre_spare?: string;
+  remarks?: string;
+  created_at?: string;
+}
+
 export interface AllocationRecord {
   id: number;
   allocation_date: string;

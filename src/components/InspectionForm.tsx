@@ -41,8 +41,21 @@ export default function InspectionForm({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [vehicleNumber, setVehicleNumber] = useState("");
   const [inspectionDate, setInspectionDate] = useState(new Date().toISOString().split("T")[0]);
+  const [inspectionStage, setInspectionStage] = useState("Pre-Allocation (PDI)");
+  const [cityName, setCityName] = useState(user.city || "Hyderabad");
+  const [hubName, setHubName] = useState("Miyapur Hub");
+  const [driverId, setDriverId] = useState("");
+  const [driverName, setDriverName] = useState("");
+  const [driverPhone, setDriverPhone] = useState("");
   const [odometerReading, setOdometerReading] = useState("");
-  
+  const [fastagBalance, setFastagBalance] = useState("");
+
+  // Vehicle & Driver Lookup State
+  const [vehicleSuggestions, setVehicleSuggestions] = useState<any[]>([]);
+  const [showVehicleDropdown, setShowVehicleDropdown] = useState(false);
+  const [driverLookupStatus, setDriverLookupStatus] = useState("");
+  const [isDriverLookupLoading, setIsDriverLookupLoading] = useState(false);
+
   // Checklist State
   const [jack, setJack] = useState("Available");
   const [jackRod, setJackRod] = useState("Available");
@@ -52,19 +65,22 @@ export default function InspectionForm({
   const [seatCover, setSeatCover] = useState("Available");
   const [floorCarpet, setFloorCarpet] = useState("Available");
   const [stepney, setStepney] = useState("Available");
-  const [hubName, setHubName] = useState("Miyapur Hub");
+  const [musicSystem, setMusicSystem] = useState("Available");
+  const [keyQuantity, setKeyQuantity] = useState<number | "">("");
 
-  // 15 PDI Photos
+  // 17 Photographic Checkpoint Photos
   const [photoFront, setPhotoFront] = useState<string | null>(null);
   const [photoBack, setPhotoBack] = useState<string | null>(null);
   const [photoLh, setPhotoLh] = useState<string | null>(null);
   const [photoRh, setPhotoRh] = useState<string | null>(null);
+  const [odometerPhoto, setOdometerPhoto] = useState<string | null>(null);
   const [photoEngineChassis, setPhotoEngineChassis] = useState<string | null>(null);
   const [photoBattery, setPhotoBattery] = useState<string | null>(null);
   const [photoEngineCompartment, setPhotoEngineCompartment] = useState<string | null>(null);
   const [photoFastTag, setPhotoFastTag] = useState<string | null>(null);
+  const [fastagProof, setFastagProof] = useState<string | null>(null);
   const [photoMusicSystem, setPhotoMusicSystem] = useState<string | null>(null);
-  const [keyQuantity, setKeyQuantity] = useState<number | "">("");
+  const [stepneyPhoto, setStepneyPhoto] = useState<string | null>(null);
   const [photoTyreRhFr, setPhotoTyreRhFr] = useState<string | null>(null);
   const [photoTyreLhFr, setPhotoTyreLhFr] = useState<string | null>(null);
   const [photoTyreRhRe, setPhotoTyreRhRe] = useState<string | null>(null);
@@ -78,6 +94,8 @@ export default function InspectionForm({
 
   // Registry Search & Filters State
   const [searchQuery, setSearchQuery] = useState("");
+  const [filterCity, setFilterCity] = useState("all");
+  const [filterStage, setFilterStage] = useState("all");
   const [retrieveIdInput, setRetrieveIdInput] = useState("");
 
   const [records, setRecords] = useState<any[]>([]);
@@ -124,6 +142,49 @@ export default function InspectionForm({
     fetchRecords();
   }, []);
 
+  const handleVehicleInputChange = async (val: string) => {
+    setVehicleNumber(val);
+    if (val.trim().length >= 1) {
+      try {
+        const token = localStorage.getItem("lr_token");
+        const res = await fetch(`/api/allocation/lookup-vehicle?query=${encodeURIComponent(val.trim())}`, {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+        if (res.ok) { setVehicleSuggestions(await res.json()); setShowVehicleDropdown(true); }
+      } catch { /* ignore */ }
+    } else {
+      setShowVehicleDropdown(false);
+    }
+  };
+
+  const handleFetchDriver = async (num?: string) => {
+    const term = num || vehicleNumber || driverPhone || driverId;
+    if (!term?.trim()) return;
+    setIsDriverLookupLoading(true);
+    setDriverLookupStatus("");
+    try {
+      const token = localStorage.getItem("lr_token");
+      const resActive = await fetch(`/api/allocation/active?query=${encodeURIComponent(term.trim())}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (resActive.ok) {
+        const act = await resActive.json();
+        if (act && act.found) {
+          if (act.vehicle_number) setVehicleNumber(act.vehicle_number);
+          if (act.driver_name) setDriverName(act.driver_name);
+          if (act.driver_id) setDriverId(act.driver_id);
+          if (act.driver_phone) setDriverPhone(act.driver_phone);
+          if (act.city_name || act.city) setCityName(act.city_name || act.city);
+          setDriverLookupStatus(`✓ Linked Driver: ${act.driver_name} (${act.driver_id || 'Active'})`);
+        }
+      }
+    } catch {
+      setDriverLookupStatus("Driver lookup failed.");
+    } finally {
+      setIsDriverLookupLoading(false);
+    }
+  };
+
   const handleImageUpload = (field: string, file: File) => {
     compressImage(file, 1920, 1920, 0.85, "inspections").then((url) => {
       if (typeof url === "string") {
@@ -138,11 +199,14 @@ export default function InspectionForm({
     else if (field === "back") setPhotoBack(val);
     else if (field === "lh") setPhotoLh(val);
     else if (field === "rh") setPhotoRh(val);
+    else if (field === "odometer") setOdometerPhoto(val);
     else if (field === "engine_chassis") setPhotoEngineChassis(val);
     else if (field === "battery") setPhotoBattery(val);
     else if (field === "engine_compartment") setPhotoEngineCompartment(val);
     else if (field === "fast_tag") setPhotoFastTag(val);
+    else if (field === "fastag_proof") setFastagProof(val);
     else if (field === "music_system") setPhotoMusicSystem(val);
+    else if (field === "stepney") setStepneyPhoto(val);
     else if (field === "tyre_rh_fr") setPhotoTyreRhFr(val);
     else if (field === "tyre_lh_fr") setPhotoTyreLhFr(val);
     else if (field === "tyre_rh_re") setPhotoTyreRhRe(val);
@@ -162,7 +226,15 @@ export default function InspectionForm({
       setEditingId(data.id);
       setVehicleNumber(data.vehicle_number || "");
       setInspectionDate(data.inspection_date || "");
+      setInspectionStage(data.inspection_stage || "Pre-Allocation (PDI)");
+      setCityName(data.city_name || user.city || "Hyderabad");
+      setHubName(data.hub_name || "Miyapur Hub");
+      setDriverId(data.driver_id || "");
+      setDriverName(data.driver_name || "");
+      setDriverPhone(data.driver_phone || "");
       setOdometerReading(data.odometer_reading || "");
+      setFastagBalance(data.fastag_balance || "");
+
       setJack(data.jack || "Available");
       setJackRod(data.jack_rod || "Available");
       setSpanner(data.spanner || "Available");
@@ -170,17 +242,22 @@ export default function InspectionForm({
       setFireExtinguishers(data.fire_extinguishers || "Available");
       setSeatCover(data.seat_cover || "Available");
       setFloorCarpet(data.floor_carpet || "Available");
+      setStepney(data.stepney || "Available");
+      setMusicSystem(data.music_system || "Available");
+      setKeyQuantity(data.key_quantity || "");
       
       setPhotoFront(data.photo_front || null);
       setPhotoBack(data.photo_back || null);
       setPhotoLh(data.photo_lh || null);
       setPhotoRh(data.photo_rh || null);
+      setOdometerPhoto(data.odometer_photo || null);
       setPhotoEngineChassis(data.photo_engine_chassis || null);
       setPhotoBattery(data.photo_battery || null);
       setPhotoEngineCompartment(data.photo_engine_compartment || null);
       setPhotoFastTag(data.photo_fast_tag || null);
+      setFastagProof(data.fastag_proof || null);
       setPhotoMusicSystem(data.photo_music_system || null);
-      setKeyQuantity(data.key_quantity || "");
+      setStepneyPhoto(data.stepney_photo || null);
       setPhotoTyreRhFr(data.photo_tyre_rh_fr || null);
       setPhotoTyreLhFr(data.photo_tyre_lh_fr || null);
       setPhotoTyreRhRe(data.photo_tyre_rh_re || null);
@@ -200,7 +277,16 @@ export default function InspectionForm({
     setEditingId(null);
     setVehicleNumber("");
     setInspectionDate(new Date().toISOString().split("T")[0]);
+    setInspectionStage("Pre-Allocation (PDI)");
+    setCityName(user.city || "Hyderabad");
+    setHubName("Miyapur Hub");
+    setDriverId("");
+    setDriverName("");
+    setDriverPhone("");
     setOdometerReading("");
+    setFastagBalance("");
+    setDriverLookupStatus("");
+
     setJack("Available");
     setJackRod("Available");
     setSpanner("Available");
@@ -208,17 +294,22 @@ export default function InspectionForm({
     setFireExtinguishers("Available");
     setSeatCover("Available");
     setFloorCarpet("Available");
+    setStepney("Available");
+    setMusicSystem("Available");
+    setKeyQuantity("");
     
     setPhotoFront(null);
     setPhotoBack(null);
     setPhotoLh(null);
     setPhotoRh(null);
+    setOdometerPhoto(null);
     setPhotoEngineChassis(null);
     setPhotoBattery(null);
     setPhotoEngineCompartment(null);
     setPhotoFastTag(null);
+    setFastagProof(null);
     setPhotoMusicSystem(null);
-    setKeyQuantity("");
+    setStepneyPhoto(null);
     setPhotoTyreRhFr(null);
     setPhotoTyreLhFr(null);
     setPhotoTyreRhRe(null);
@@ -236,7 +327,15 @@ export default function InspectionForm({
     const payload = {
       vehicle_number: vehicleNumber.trim().toUpperCase(),
       inspection_date: inspectionDate,
+      inspection_stage: inspectionStage,
+      city_name: cityName,
+      hub_name: hubName,
+      driver_id: driverId.trim() || null,
+      driver_name: driverName.trim() || null,
+      driver_phone: driverPhone.trim() || null,
       odometer_reading: odometerReading.trim(),
+      fastag_balance: fastagBalance.trim() || null,
+
       jack,
       jack_rod: jackRod,
       spanner,
@@ -244,7 +343,13 @@ export default function InspectionForm({
       fire_extinguishers: fireExtinguishers,
       seat_cover: seatCover,
       floor_carpet: floorCarpet,
+      stepney,
+      music_system: musicSystem,
+      key_quantity: typeof keyQuantity === "number" ? keyQuantity : undefined,
       
+      odometer_photo: odometerPhoto,
+      fastag_proof: fastagProof,
+      stepney_photo: stepneyPhoto,
       photo_front: photoFront,
       photo_back: photoBack,
       photo_lh: photoLh,
@@ -254,7 +359,6 @@ export default function InspectionForm({
       photo_engine_compartment: photoEngineCompartment,
       photo_fast_tag: photoFastTag,
       photo_music_system: photoMusicSystem,
-      key_quantity: typeof keyQuantity === "number" ? keyQuantity : undefined,
       photo_tyre_rh_fr: photoTyreRhFr,
       photo_tyre_lh_fr: photoTyreLhFr,
       photo_tyre_rh_re: photoTyreRhRe,
@@ -321,6 +425,11 @@ export default function InspectionForm({
         const data = await res.json();
         if (data) {
           setOdometerReading(data.odometer_reading || "");
+          setDriverId(data.driver_id || "");
+          setDriverName(data.driver_name || "");
+          setDriverPhone(data.driver_phone || "");
+          setCityName(data.city_name || user.city || "Hyderabad");
+          setHubName(data.hub_name || "Miyapur Hub");
           setJack(data.jack || "Available");
           setJackRod(data.jack_rod || "Available");
           setSpanner(data.spanner || "Available");
@@ -328,17 +437,21 @@ export default function InspectionForm({
           setFireExtinguishers(data.fire_extinguishers || "Available");
           setSeatCover(data.seat_cover || "Available");
           setFloorCarpet(data.floor_carpet || "Available");
+          setStepney(data.stepney || "Available");
+          setMusicSystem(data.music_system || "Available");
           
           setPhotoFront(data.photo_front || null);
           setPhotoBack(data.photo_back || null);
           setPhotoLh(data.photo_lh || null);
           setPhotoRh(data.photo_rh || null);
+          setOdometerPhoto(data.odometer_photo || null);
           setPhotoEngineChassis(data.photo_engine_chassis || null);
           setPhotoBattery(data.photo_battery || null);
           setPhotoEngineCompartment(data.photo_engine_compartment || null);
           setPhotoFastTag(data.photo_fast_tag || null);
+          setFastagProof(data.fastag_proof || null);
           setPhotoMusicSystem(data.photo_music_system || null);
-          setPhotoKeys(data.photo_keys || null);
+          setStepneyPhoto(data.stepney_photo || null);
           setPhotoTyreRhFr(data.photo_tyre_rh_fr || null);
           setPhotoTyreLhFr(data.photo_tyre_lh_fr || null);
           setPhotoTyreRhRe(data.photo_tyre_rh_re || null);
@@ -359,31 +472,41 @@ export default function InspectionForm({
 
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
-      if (searchQuery.trim()) {
-        const q = searchQuery.toLowerCase();
-        return (
-          (r.vehicle_number || "").toLowerCase().includes(q) ||
-          (r.remarks || "").toLowerCase().includes(q) ||
-          String(r.id).includes(q)
-        );
-      }
-      return true;
+      const matchesSearch = 
+        !searchQuery ||
+        (r.vehicle_number || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (r.driver_name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (r.driver_id || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (r.remarks || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        String(r.id).includes(searchQuery);
+
+      const matchesCity = filterCity === "all" || r.city_name === filterCity;
+      const matchesStage = filterStage === "all" || r.inspection_stage === filterStage;
+
+      return matchesSearch && matchesCity && matchesStage;
     });
-  }, [records, searchQuery]);
+  }, [records, searchQuery, filterCity, filterStage]);
 
   const handleExportCSV = () => {
     if (filteredRecords.length === 0) return alert("No records to export");
     const headers = [
-      "ID", "Vehicle Number", "Inspection Date", "Odometer Reading", 
-      "Jack", "Jack Rod", "Spanner", "Parking Triangle", 
-      "Fire Extinguishers", "Seat Cover", "Floor Carpet", "Remarks", "Created At"
+      "ID", "Inspection Stage", "Vehicle Number", "Inspection Date", "City", "Hub Name",
+      "Driver ID", "Driver Name", "Driver Phone", "Odometer Reading", "FastTag Balance",
+      "Jack", "Jack Rod", "Spanner", "Parking Triangle", "Fire Extinguishers", "Seat Cover", "Floor Carpet", "Music System", "Key Quantity", "Remarks", "Created At"
     ];
 
     const rows = filteredRecords.map((r) => [
       r.id,
+      r.inspection_stage || "PDI",
       r.vehicle_number,
       r.inspection_date,
+      r.city_name || "",
+      r.hub_name || "",
+      r.driver_id || "",
+      `"${(r.driver_name || "").replace(/"/g, '""')}"`,
+      r.driver_phone || "",
       r.odometer_reading,
+      r.fastag_balance || "",
       r.jack,
       r.jack_rod,
       r.spanner,
@@ -391,6 +514,8 @@ export default function InspectionForm({
       r.fire_extinguishers,
       r.seat_cover,
       r.floor_carpet,
+      r.music_system || "Available",
+      r.key_quantity || "",
       `"${(r.remarks || "").replace(/"/g, '""')}"`,
       r.created_at || ""
     ]);
@@ -429,17 +554,17 @@ export default function InspectionForm({
 
   const renderPhotoCard = (label: string, fieldName: string, stateVal: string | null) => {
     return (
-      <div className="rounded-xl border border-dashed border-border bg-bg/30 p-4 text-center flex flex-col items-center justify-center">
+      <div className="rounded-xl border border-dashed border-border bg-bg/30 p-4 text-center flex flex-col items-center justify-between min-h-[140px]">
         <span className="text-[10px] font-bold text-text-muted mb-2">{label}</span>
         {stateVal ? (
-          <div className="relative">
-            <img src={stateVal} className="h-24 w-24 object-cover rounded-lg border border-border shadow-xs" />
+          <div className="relative w-full">
+            <img src={stateVal} className="h-24 w-full object-cover rounded-lg border border-border shadow-xs" />
             <button type="button" onClick={() => setPhotoByField(fieldName, null)} className="absolute -top-2 -right-2 bg-red-600 text-white rounded-full p-0.5 shadow-md hover:bg-red-700 cursor-pointer"><X className="h-3 w-3" /></button>
           </div>
         ) : (
-          <div className="space-y-2">
-            <button type="button" onClick={() => setCameraActiveField(fieldName)} className="flex items-center gap-1 bg-primary text-white px-2 py-1 rounded text-xs hover:bg-primary-hover shadow-xs cursor-pointer justify-center w-full"><Camera className="h-3 w-3" /> Camera</button>
-            <label className="flex items-center gap-1 bg-white border border-border text-text px-2 py-1 rounded text-xs hover:bg-slate-50 shadow-xs cursor-pointer justify-center"><Upload className="h-3 w-3" /> Upload <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(fieldName, e.target.files[0])} /></label>
+          <div className="space-y-2 w-full my-auto">
+            <button type="button" onClick={() => setCameraActiveField(fieldName)} className="flex items-center gap-1 bg-primary text-white px-2 py-1 rounded text-xs hover:bg-primary-hover shadow-xs cursor-pointer justify-center w-full font-bold"><Camera className="h-3 w-3" /> Camera</button>
+            <label className="flex items-center gap-1 bg-white border border-border text-text-muted px-2 py-1 rounded text-xs hover:bg-slate-50 shadow-2xs cursor-pointer justify-center font-bold"><Upload className="h-3 w-3" /> Upload <input type="file" accept="image/*" className="hidden" onChange={(e) => e.target.files?.[0] && handleImageUpload(fieldName, e.target.files[0])} /></label>
           </div>
         )}
       </div>
@@ -598,55 +723,183 @@ export default function InspectionForm({
                   {/* LEFT COLUMN: VEHICLE & INFO */}
                   <div className="space-y-6">
                     <div className="border-b border-border pb-3">
-                      <h3 className="font-sans text-sm font-bold text-primary">
-                        Vehicle & Inspection Details
+                      <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">1</span>
+                        Vehicle & Inspection Context
                       </h3>
                     </div>
 
                     <div className="space-y-4">
-                      <div>
+                      {/* Vehicle Number Input with Autocomplete & Lookup */}
+                      <div className="relative">
                         <div className="flex justify-between items-center mb-2">
                           <label className="block font-sans text-xs font-bold text-text-muted">Vehicle Number <span className="text-red-500">*</span></label>
-                          <button
-                            type="button"
-                            onClick={() => loadLastInspection(vehicleNumber)}
-                            disabled={!vehicleNumber.trim()}
-                            className="text-[10px] font-bold text-primary hover:underline cursor-pointer disabled:text-text-muted disabled:pointer-events-none"
-                          >
-                            Load Last Inspection Data
-                          </button>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleFetchDriver(vehicleNumber)}
+                              className="text-[10px] font-bold text-emerald-600 hover:underline cursor-pointer"
+                            >
+                              🔍 Fetch Driver
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => loadLastInspection(vehicleNumber)}
+                              disabled={!vehicleNumber.trim()}
+                              className="text-[10px] font-bold text-primary hover:underline cursor-pointer disabled:text-text-muted disabled:pointer-events-none"
+                            >
+                              Load Last Data
+                            </button>
+                          </div>
                         </div>
                         <input 
                           type="text" 
                           placeholder="e.g. TS09 EA 1111..."
                           value={vehicleNumber}
-                          onChange={(e) => setVehicleNumber(e.target.value)}
-                          onBlur={() => loadLastInspection(vehicleNumber)}
+                          onChange={(e) => handleVehicleInputChange(e.target.value)}
+                          onBlur={() => setTimeout(() => setShowVehicleDropdown(false), 200)}
                           required
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs"
+                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs uppercase font-bold"
                         />
+                        {showVehicleDropdown && vehicleSuggestions.length > 0 && (
+                          <div className="absolute left-0 right-0 top-full mt-1 z-30 max-h-48 overflow-y-auto rounded-xl border border-border bg-white shadow-lg">
+                            {vehicleSuggestions.map((v: any) => (
+                              <div
+                                key={v.id || v.vehicle_number}
+                                onMouseDown={() => {
+                                  setVehicleNumber(v.vehicle_number);
+                                  setShowVehicleDropdown(false);
+                                  handleFetchDriver(v.vehicle_number);
+                                }}
+                                className="px-4 py-2.5 hover:bg-slate-50 cursor-pointer text-xs flex justify-between items-center"
+                              >
+                                <span className="font-bold text-slate-800">{v.vehicle_number}</span>
+                                <span className="text-[10px] text-slate-500">{v.model || v.city_name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {driverLookupStatus && (
+                          <p className="text-[11px] font-bold text-emerald-600 mt-1">{driverLookupStatus}</p>
+                        )}
                       </div>
 
-                      <div>
-                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Inspection Date <span className="text-red-500">*</span></label>
-                        <input 
-                          type="date" 
-                          value={inspectionDate}
-                          onChange={(e) => setInspectionDate(e.target.value)}
-                          required
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer"
-                        />
+                      {/* Inspection Stage & Date */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Inspection Stage <span className="text-red-500">*</span></label>
+                          <select 
+                            value={inspectionStage}
+                            onChange={(e) => setInspectionStage(e.target.value)}
+                            required
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer font-semibold"
+                          >
+                            <option value="Pre-Allocation (PDI)">Pre-Allocation (PDI)</option>
+                            <option value="Post-DropOff (Return)">Post-DropOff (Return)</option>
+                            <option value="Routine Audit / Maintenance">Routine Audit / Maintenance</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Inspection Date <span className="text-red-500">*</span></label>
+                          <input 
+                            type="date" 
+                            value={inspectionDate}
+                            onChange={(e) => setInspectionDate(e.target.value)}
+                            required
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer"
+                          />
+                        </div>
                       </div>
 
+                      {/* City & Hub Location */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Operating City <span className="text-red-500">*</span></label>
+                          <select 
+                            value={cityName}
+                            onChange={(e) => setCityName(e.target.value)}
+                            required
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer"
+                          >
+                            {CITIES.map((c) => (
+                              <option key={c.value} value={c.value}>{c.text}</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Hub Location</label>
+                          <input 
+                            type="text" 
+                            placeholder="e.g. Miyapur Hub..."
+                            value={hubName}
+                            onChange={(e) => setHubName(e.target.value)}
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Driver Info */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Driver ID</label>
+                          <input 
+                            type="text" 
+                            placeholder="Driver ID (Optional)..."
+                            value={driverId}
+                            onChange={(e) => setDriverId(e.target.value)}
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Driver Name</label>
+                          <input 
+                            type="text" 
+                            placeholder="Driver Full Name..."
+                            value={driverName}
+                            onChange={(e) => setDriverName(e.target.value)}
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Driver Phone & Odometer */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Driver Phone</label>
+                          <input 
+                            type="tel" 
+                            placeholder="Mobile number..."
+                            value={driverPhone}
+                            onChange={(e) => setDriverPhone(e.target.value)}
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Odometer Reading (Kms) <span className="text-red-500">*</span></label>
+                          <input 
+                            type="number" 
+                            placeholder="Current mileage..."
+                            value={odometerReading}
+                            onChange={(e) => setOdometerReading(e.target.value)}
+                            required
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs font-mono font-bold"
+                          />
+                        </div>
+                      </div>
+
+                      {/* FastTag Balance */}
                       <div>
-                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Odometer Reading (Kms) <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">FastTag Balance Amount (₹)</label>
                         <input 
                           type="number" 
-                          placeholder="Current mileage..."
-                          value={odometerReading}
-                          onChange={(e) => setOdometerReading(e.target.value)}
-                          required
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs"
+                          placeholder="e.g. 500.00"
+                          value={fastagBalance}
+                          onChange={(e) => setFastagBalance(e.target.value)}
+                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs font-mono"
                         />
                       </div>
 
@@ -656,7 +909,7 @@ export default function InspectionForm({
                           placeholder="Add comments about vehicle damage, cleanliness, or pending items..."
                           value={remarks}
                           onChange={(e) => setRemarks(e.target.value)}
-                          rows={4}
+                          rows={3}
                           className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs resize-none"
                         />
                       </div>
@@ -666,12 +919,13 @@ export default function InspectionForm({
                   {/* RIGHT COLUMN: ACCESSORIES CHECKLIST */}
                   <div className="space-y-6">
                     <div className="border-b border-border pb-3">
-                      <h3 className="font-sans text-sm font-bold text-primary">
+                      <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">2</span>
                         Asset & Accessory Checklist
                       </h3>
                     </div>
 
-                    <div className="space-y-3.5">
+                    <div className="space-y-3">
                       {renderChecklistOption("Jack", jack, setJack)}
                       {renderChecklistOption("Jack Rod", jackRod, setJackRod)}
                       {renderChecklistOption("Spanner", spanner, setSpanner)}
@@ -680,14 +934,15 @@ export default function InspectionForm({
                       {renderChecklistOption("Seat Covers", seatCover, setSeatCover)}
                       {renderChecklistOption("Floor Carpet", floorCarpet, setFloorCarpet)}
                       {renderChecklistOption("Stepney / Spare Tire", stepney, setStepney)}
+                      {renderChecklistOption("Music System", musicSystem, setMusicSystem)}
                       <div className="flex items-center justify-between border border-border bg-slate-50/50 p-2.5 rounded-xl shadow-xs">
-                        <span className="font-sans text-sm font-semibold text-text-muted">Key Quantity</span>
+                        <span className="font-sans text-xs font-bold text-text">Key Quantity</span>
                         <input
                           type="number"
                           min="1"
                           value={keyQuantity}
                           onChange={(e) => setKeyQuantity(parseInt(e.target.value) || 0)}
-                          className="w-24 rounded-lg border border-border bg-white px-2 py-1.5 font-sans text-sm text-center outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-xs"
+                          className="w-24 rounded-lg border border-border bg-white px-2 py-1.5 font-sans text-xs text-center outline-none focus:border-primary focus:ring-1 focus:ring-primary shadow-xs font-bold"
                           placeholder="e.g. 2"
                         />
                       </div>
@@ -695,24 +950,28 @@ export default function InspectionForm({
                   </div>
                 </div>
 
-                {/* PHOTOS ATTACHMENT (15 PDI PHOTOS) */}
+                {/* PHOTOS ATTACHMENT (17 PHOTOGRAPHIC CHECKPOINTS) */}
                 <div className="border-t border-border pt-10">
                   <div className="border-b border-border pb-3 mb-6">
-                    <h3 className="font-sans text-sm font-bold text-primary">
-                      Photographic Verification (All Sides & Accessory Checkpoints)
+                    <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">3</span>
+                      Photographic Verification (All Sides, Odometer & Accessory Checkpoints)
                     </h3>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4">
                     {renderPhotoCard("Front View", "front", photoFront)}
                     {renderPhotoCard("Back View", "back", photoBack)}
                     {renderPhotoCard("LH View", "lh", photoLh)}
                     {renderPhotoCard("RH View", "rh", photoRh)}
+                    {renderPhotoCard("Odometer Photo", "odometer", odometerPhoto)}
                     {renderPhotoCard("Engine/Chassis No.", "engine_chassis", photoEngineChassis)}
                     {renderPhotoCard("Battery Sl No.", "battery", photoBattery)}
                     {renderPhotoCard("Engine Compartment", "engine_compartment", photoEngineCompartment)}
-                    {renderPhotoCard("Fast Tag", "fast_tag", photoFastTag)}
+                    {renderPhotoCard("FastTag Sticker", "fast_tag", photoFastTag)}
+                    {renderPhotoCard("FastTag Proof", "fastag_proof", fastagProof)}
                     {renderPhotoCard("Music System", "music_system", photoMusicSystem)}
+                    {renderPhotoCard("Stepney Tire", "stepney", stepneyPhoto)}
                     {renderPhotoCard("RH Front Tyre", "tyre_rh_fr", photoTyreRhFr)}
                     {renderPhotoCard("LH Front Tyre", "tyre_lh_fr", photoTyreLhFr)}
                     {renderPhotoCard("RH Rear Tyre", "tyre_rh_re", photoTyreRhRe)}
@@ -734,7 +993,7 @@ export default function InspectionForm({
                     type="submit" 
                     className="h-11 rounded-xl bg-primary px-8 font-sans text-sm font-bold text-white hover:bg-primary-hover cursor-pointer transition-all shadow-xs shadow-primary/20"
                   >
-                    {editingId ? "Update Inspection" : "Save Inspection Record"}
+                    {editingId ? "Update Inspection Record" : "Save Inspection Record"}
                   </button>
                 </div>
 
@@ -778,7 +1037,7 @@ export default function InspectionForm({
               <div className="border-b border-border bg-white px-8 py-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
                   <h3 className="font-sans text-lg font-bold text-gray-900 leading-tight">Inspection Logs Database</h3>
-                  <p className="font-sans text-xs text-text-muted mt-1">Audit trail of all vehicle checklists and odometer readings.</p>
+                  <p className="font-sans text-xs text-text-muted mt-1">Audit trail of all vehicle checklists, driver assignments, and odometer readings.</p>
                 </div>
                 <div className="flex gap-3">
                   <button 
@@ -801,17 +1060,43 @@ export default function InspectionForm({
                 </div>
               </div>
 
-              {/* SEARCH BAR */}
-              <div className="border-b border-border bg-slate-50/50 px-8 py-4">
-                <div className="relative max-w-md">
+              {/* SEARCH & FILTERS BAR */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 border-b border-border bg-slate-50/50 px-8 py-4">
+                <div className="relative">
                   <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-text-dim" />
                   <input 
                     type="text" 
-                    placeholder="Search by Vehicle Number..."
+                    placeholder="Search Vehicle, Driver, Remarks..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     className="h-10 w-full rounded-xl border border-border bg-white pl-10 pr-4 font-sans text-xs focus:border-primary focus:outline-none transition-all shadow-2xs"
                   />
+                </div>
+
+                <div>
+                  <select 
+                    value={filterCity}
+                    onChange={(e) => setFilterCity(e.target.value)}
+                    className="h-10 w-full rounded-xl border border-border bg-white px-4 font-sans text-xs focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer"
+                  >
+                    <option value="all">All Cities</option>
+                    {CITIES.map((c) => (
+                      <option key={c.value} value={c.value}>{c.text}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <select 
+                    value={filterStage}
+                    onChange={(e) => setFilterStage(e.target.value)}
+                    className="h-10 w-full rounded-xl border border-border bg-white px-4 font-sans text-xs focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer"
+                  >
+                    <option value="all">All Inspection Stages</option>
+                    <option value="Pre-Allocation (PDI)">Pre-Allocation (PDI)</option>
+                    <option value="Post-DropOff (Return)">Post-DropOff (Return)</option>
+                    <option value="Routine Audit / Maintenance">Routine Audit / Maintenance</option>
+                  </select>
                 </div>
               </div>
 
@@ -820,33 +1105,47 @@ export default function InspectionForm({
                 <table className="w-full min-w-4xl border-collapse text-left">
                   <thead>
                     <tr className="border-b border-border bg-slate-50 text-[10px] font-bold text-text-muted">
-                      <th className="px-8 py-3.5 w-16">ID</th>
-                      <th className="px-5 py-3.5">Date</th>
+                      <th className="px-6 py-3.5 w-16">ID</th>
+                      <th className="px-5 py-3.5">Stage & Date</th>
                       <th className="px-5 py-3.5">Vehicle Number</th>
+                      <th className="px-5 py-3.5">Driver & Location</th>
                       <th className="px-5 py-3.5">Odometer (Kms)</th>
-                      <th className="px-5 py-3.5">Checked Assets Status</th>
+                      <th className="px-5 py-3.5">Checked Assets</th>
                       <th className="px-5 py-3.5">Remarks</th>
-                      <th className="px-8 py-3.5 text-right w-24">Actions</th>
+                      <th className="px-6 py-3.5 text-right w-24">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border font-sans text-xs">
                     {filteredRecords.length > 0 ? (
                       filteredRecords.map((r) => {
-                        const items = [r.jack, r.jack_rod, r.spanner, r.parking_triangle, r.fire_extinguishers, r.seat_cover, r.floor_carpet];
+                        const items = [r.jack, r.jack_rod, r.spanner, r.parking_triangle, r.fire_extinguishers, r.seat_cover, r.floor_carpet, r.music_system, r.stepney];
                         const availableCount = items.filter(i => i === "Available").length;
                         return (
                           <tr key={r.id} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="px-8 py-4 font-mono font-bold text-text">#{r.id}</td>
-                            <td className="px-5 py-4 font-bold text-text">{r.inspection_date}</td>
-                            <td className="px-5 py-4 font-bold text-primary">{r.vehicle_number}</td>
-                            <td className="px-5 py-4 font-semibold text-text">{parseInt(r.odometer_reading || "0").toLocaleString()}</td>
+                            <td className="px-6 py-4 font-mono font-bold text-text">#{r.id}</td>
                             <td className="px-5 py-4">
-                              <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold ${ availableCount === 7 ? "bg-green-light text-green" : availableCount >= 5 ? "bg-yellow-light text-amber-700" : "bg-red-50 text-red-600" }`}>
-                                {availableCount} / 7 Available
+                              <span className="inline-block rounded-md px-1.5 py-0.5 font-sans text-[9px] font-bold bg-primary/10 text-primary mb-1">
+                                {r.inspection_stage || "PDI"}
+                              </span>
+                              <div className="font-bold text-slate-800">{r.inspection_date}</div>
+                            </td>
+                            <td className="px-5 py-4 font-bold text-primary font-mono text-sm">{r.vehicle_number}</td>
+                            <td className="px-5 py-4">
+                              {r.driver_name ? (
+                                <div className="font-bold text-text">{r.driver_name}</div>
+                              ) : (
+                                <div className="text-text-muted text-[11px]">Unassigned</div>
+                              )}
+                              <div className="text-[10px] text-text-muted mt-0.5">{r.city_name || "Hyderabad"} · {r.hub_name || "Hub"}</div>
+                            </td>
+                            <td className="px-5 py-4 font-bold text-slate-900 font-mono">{parseInt(r.odometer_reading || "0").toLocaleString()} km</td>
+                            <td className="px-5 py-4">
+                              <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[10px] font-bold ${ availableCount === 9 ? "bg-green-light text-green" : availableCount >= 6 ? "bg-yellow-light text-amber-700" : "bg-red-50 text-red-600" }`}>
+                                {availableCount} / 9 Available
                               </span>
                             </td>
                             <td className="px-5 py-4 text-text-muted max-w-xs truncate">{r.remarks || "—"}</td>
-                            <td className="px-8 py-4 text-right">
+                            <td className="px-6 py-4 text-right">
                               <div className="flex items-center justify-end gap-2">
                                 <button 
                                   onClick={() => loadRecordForEdit(r.id)}
@@ -869,8 +1168,8 @@ export default function InspectionForm({
                       })
                     ) : (
                       <tr>
-                        <td colSpan={7} className="px-8 py-10 text-center text-text-muted font-medium">
-                          No inspections recorded.
+                        <td colSpan={8} className="px-8 py-10 text-center text-text-muted font-medium">
+                          No vehicle inspections recorded.
                         </td>
                       </tr>
                     )}

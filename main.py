@@ -1356,6 +1356,21 @@ def startup_event():
             );
         """)
 
+        for col in [
+            "driver_id VARCHAR(100)",
+            "driver_name VARCHAR(255)",
+            "driver_phone VARCHAR(50)",
+            "city_name VARCHAR(100)",
+            "hub_name VARCHAR(100)",
+            "inspection_stage VARCHAR(100)",
+            "music_system VARCHAR(50)",
+            "fastag_balance VARCHAR(100)",
+            "fastag_proof TEXT",
+            "odometer_photo TEXT",
+            "stepney_photo TEXT"
+        ]:
+            cur.execute(f"ALTER TABLE july_inspections ADD COLUMN IF NOT EXISTS {col};")
+
         # ── july_maintenance_registry ───────────────────────────
         cur.execute("""
             CREATE TABLE IF NOT EXISTS july_maintenance_registry (
@@ -2131,6 +2146,17 @@ class InspectionData(BaseModel):
     fire_extinguishers: str
     seat_cover: str
     floor_carpet: str
+    driver_id: Optional[str] = None
+    driver_name: Optional[str] = None
+    driver_phone: Optional[str] = None
+    city_name: Optional[str] = None
+    hub_name: Optional[str] = None
+    inspection_stage: Optional[str] = None
+    music_system: Optional[str] = None
+    fastag_balance: Optional[str] = None
+    fastag_proof: Optional[Any] = None
+    odometer_photo: Optional[Any] = None
+    stepney_photo: Optional[Any] = None
     photo_front: Optional[Any] = None
     photo_back: Optional[Any] = None
     photo_lh: Optional[Any] = None
@@ -2147,7 +2173,6 @@ class InspectionData(BaseModel):
     photo_tyre_lh_re: Optional[Any] = None
     photo_tyre_spare: Optional[Any] = None
     remarks: Optional[str] = None
-    music_system: Optional[str] = None
 
 GCS_BUCKET_NAME = os.environ.get("GCS_BUCKET_NAME", "letzryd-portal-media")
 _gcs_client = None
@@ -8135,20 +8160,24 @@ def create_inspection(data: InspectionData, authorization: Optional[str] = Heade
             INSERT INTO july_inspections (
                 vehicle_number, inspection_date, odometer_reading, jack, jack_rod, spanner, 
                 parking_triangle, fire_extinguishers, seat_cover, floor_carpet, key_quantity,
+                driver_id, driver_name, driver_phone, city_name, hub_name, inspection_stage,
+                music_system, fastag_balance, fastag_proof, odometer_photo, stepney_photo,
                 photo_front, photo_back, photo_lh, photo_rh, photo_engine_chassis, photo_battery, 
                 photo_engine_compartment, photo_fast_tag, photo_music_system, 
                 photo_tyre_rh_fr, photo_tyre_lh_fr, photo_tyre_rh_re, photo_tyre_lh_re, photo_tyre_spare, 
-                remarks, music_system
-            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id;
+                remarks
+            ) VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s) RETURNING id;
         """, (
             data.vehicle_number, data.inspection_date, data.odometer_reading, data.jack, data.jack_rod, data.spanner,
             data.parking_triangle, data.fire_extinguishers, data.seat_cover, data.floor_carpet, data.key_quantity,
+            data.driver_id, data.driver_name, data.driver_phone, data.city_name, data.hub_name, data.inspection_stage,
+            data.music_system, data.fastag_balance, extract_image(data.fastag_proof), extract_image(data.odometer_photo), extract_image(data.stepney_photo),
             extract_image(data.photo_front), extract_image(data.photo_back), extract_image(data.photo_lh), extract_image(data.photo_rh),
             extract_image(data.photo_engine_chassis), extract_image(data.photo_battery), extract_image(data.photo_engine_compartment),
             extract_image(data.photo_fast_tag), extract_image(data.photo_music_system), 
             extract_image(data.photo_tyre_rh_fr), extract_image(data.photo_tyre_lh_fr), extract_image(data.photo_tyre_rh_re),
             extract_image(data.photo_tyre_lh_re), extract_image(data.photo_tyre_spare),
-            data.remarks, data.music_system
+            data.remarks
         ))
         new_id = cur.fetchone()[0]
         conn.commit()
@@ -8169,20 +8198,24 @@ def update_inspection(id: int, data: InspectionData, authorization: Optional[str
             UPDATE july_inspections SET 
                 vehicle_number=%s, inspection_date=%s, odometer_reading=%s, jack=%s, jack_rod=%s, spanner=%s, 
                 parking_triangle=%s, fire_extinguishers=%s, seat_cover=%s, floor_carpet=%s, key_quantity=%s,
+                driver_id=%s, driver_name=%s, driver_phone=%s, city_name=%s, hub_name=%s, inspection_stage=%s,
+                music_system=%s, fastag_balance=%s, fastag_proof=%s, odometer_photo=%s, stepney_photo=%s,
                 photo_front=%s, photo_back=%s, photo_lh=%s, photo_rh=%s, photo_engine_chassis=%s, photo_battery=%s, 
                 photo_engine_compartment=%s, photo_fast_tag=%s, photo_music_system=%s, 
                 photo_tyre_rh_fr=%s, photo_tyre_lh_fr=%s, photo_tyre_rh_re=%s, photo_tyre_lh_re=%s, photo_tyre_spare=%s, 
-                remarks=%s, music_system=%s
+                remarks=%s
             WHERE id=%s RETURNING id;
         """, (
             data.vehicle_number, data.inspection_date, data.odometer_reading, data.jack, data.jack_rod, data.spanner,
             data.parking_triangle, data.fire_extinguishers, data.seat_cover, data.floor_carpet, data.key_quantity,
+            data.driver_id, data.driver_name, data.driver_phone, data.city_name, data.hub_name, data.inspection_stage,
+            data.music_system, data.fastag_balance, extract_image(data.fastag_proof), extract_image(data.odometer_photo), extract_image(data.stepney_photo),
             extract_image(data.photo_front), extract_image(data.photo_back), extract_image(data.photo_lh), extract_image(data.photo_rh),
             extract_image(data.photo_engine_chassis), extract_image(data.photo_battery), extract_image(data.photo_engine_compartment),
             extract_image(data.photo_fast_tag), extract_image(data.photo_music_system), 
             extract_image(data.photo_tyre_rh_fr), extract_image(data.photo_tyre_lh_fr), extract_image(data.photo_tyre_rh_re),
             extract_image(data.photo_tyre_lh_re), extract_image(data.photo_tyre_spare),
-            data.remarks, data.music_system, id
+            data.remarks, id
         ))
         row = cur.fetchone()
         if not row:
@@ -8193,6 +8226,7 @@ def update_inspection(id: int, data: InspectionData, authorization: Optional[str
         conn.rollback()
         raise HTTPException(status_code=500, detail=str(e))
     finally:
+        postgreSQL_pool.putconn(conn)
         postgreSQL_pool.putconn(conn)
 
 @app.delete("/api/inspection/{id}")
