@@ -128,7 +128,10 @@ function SearchableApproverSelect({
         setSearch(`${selectedApprover.name} (${selectedApprover.role})`);
       }
     } else if (validApprovers.length > 0) {
-      const preferred = validApprovers.find(a => {
+      const preferred = (activeCity && norm(activeCity) === "mumbai"
+        ? validApprovers.find(a => norm(a.city) === "mumbai" && (a.name?.toLowerCase().includes("tapan") || a.username?.toLowerCase().includes("tapan")))
+        : null
+      ) || validApprovers.find(a => {
         const matchCity = activeCity ? norm(a.city) === norm(activeCity) : true;
         const matchRole = a.role?.toLowerCase().includes("city manager") || 
                           a.role?.toLowerCase().includes("general manager") ||
@@ -176,6 +179,12 @@ function SearchableApproverSelect({
         const aCityMatch = norm(a.city) === norm(activeCity) ? 0 : 1;
         const bCityMatch = norm(b.city) === norm(activeCity) ? 0 : 1;
         if (aCityMatch !== bCityMatch) return aCityMatch - bCityMatch;
+
+        if (norm(activeCity) === "mumbai") {
+          const aTapan = (a.name?.toLowerCase().includes("tapan") || a.username?.toLowerCase().includes("tapan")) ? 0 : 1;
+          const bTapan = (b.name?.toLowerCase().includes("tapan") || b.username?.toLowerCase().includes("tapan")) ? 0 : 1;
+          if (aTapan !== bTapan) return aTapan - bTapan;
+        }
       }
       if (isEditingSearch && search.trim()) {
         const s = search.toLowerCase();
@@ -675,7 +684,10 @@ export default function OnboardingForm({
             return v;
           };
           const targetCity = normCity(city || user?.city);
-          const preferred = validApprovers.find((a: any) => {
+          const preferred = (targetCity === "mumbai"
+            ? validApprovers.find((a: any) => normCity(a.city) === "mumbai" && (a.name?.toLowerCase().includes("tapan") || a.username?.toLowerCase().includes("tapan")))
+            : null
+          ) || validApprovers.find((a: any) => {
             const cityMatch = targetCity ? normCity(a.city) === targetCity : true;
             const roleMatch = a.role?.toLowerCase().includes("city manager") ||
                               a.role?.toLowerCase().includes("general manager") ||
