@@ -743,7 +743,14 @@ def startup_event():
             "photo_1 TEXT",
             "photo_2 TEXT",
             "photo_3 TEXT",
-            "photo_4 TEXT"
+            "photo_4 TEXT",
+            "reason_for_penalty TEXT",
+            "maintenance_id VARCHAR(100)",
+            "approver_1_id VARCHAR(100)",
+            "approver_1_name VARCHAR(255)",
+            "approver_2_id VARCHAR(100)",
+            "approver_2_name VARCHAR(255)",
+            "additional_photos TEXT"
         ]:
             cur.execute(f"ALTER TABLE july_partner_adjustment ADD COLUMN IF NOT EXISTS {col};")
 
@@ -1318,7 +1325,8 @@ def startup_event():
             "driver_phone VARCHAR(50)",
             "dl_front_photo TEXT",
             "dl_back_photo TEXT",
-            "police_ack_copy TEXT"
+            "police_ack_copy TEXT",
+            "additional_photos TEXT"
         ]:
             cur.execute(f"ALTER TABLE july_accidents_registry ADD COLUMN IF NOT EXISTS {col};")
 
@@ -1853,6 +1861,13 @@ class AdjustmentData(BaseModel):
     photo_2: Optional[Any] = None
     photo_3: Optional[Any] = None
     photo_4: Optional[Any] = None
+    reason_for_penalty: Optional[str] = None
+    maintenance_id: Optional[str] = None
+    approver_1_id: Optional[str] = None
+    approver_1_name: Optional[str] = None
+    approver_2_id: Optional[str] = None
+    approver_2_name: Optional[str] = None
+    additional_photos: Optional[Any] = None
 
 class AllocationData(BaseModel):
     allocation_date: str
@@ -2134,6 +2149,7 @@ class AccidentData(BaseModel):
     dl_back_photo: Optional[Any] = None
     police_ack_copy: Optional[Any] = None
     fir_document_copy: Optional[Any] = None
+    additional_photos: Optional[Any] = None
 
 class InspectionData(BaseModel):
     vehicle_number: str
@@ -5322,6 +5338,7 @@ def create_adjustment(data: AdjustmentData, authorization: Optional[str] = Heade
                 submitter_comments, sent_for_approval,
                 hisaab_date, adjustment_sub_type, adjustment_sub_type_other, adjustment_date_mandatory, adjustment_date_optional,
                 photo_1, photo_2, photo_3, photo_4,
+                reason_for_penalty, maintenance_id, approver_1_id, approver_1_name, approver_2_id, approver_2_name, additional_photos,
                 approval_status, created_by, created_at, updated_at, updated_by
             ) VALUES (
                 %s,%s,%s,%s,%s,%s,
@@ -5330,6 +5347,9 @@ def create_adjustment(data: AdjustmentData, authorization: Optional[str] = Heade
                 %s,%s,%s,%s,%s,
                 %s,%s,%s,%s,%s,
                 %s,%s,
+                %s,%s,%s,%s,%s,
+                %s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,
                 'Draft',%s, NOW(), NOW(), %s
             )
             RETURNING id;
@@ -5341,6 +5361,10 @@ def create_adjustment(data: AdjustmentData, authorization: Optional[str] = Heade
             extract_image(data.photo),
             data.hisaab_number, data.contested_line_items, data.severity_level, data.cost_level, str(data.escalate_to) if data.escalate_to else None,
             data.submitter_comments, data.sent_for_approval,
+            data.hisaab_date, data.adjustment_sub_type, data.adjustment_sub_type_other, data.adjustment_date_mandatory, data.adjustment_date_optional,
+            extract_image(data.photo_1), extract_image(data.photo_2), extract_image(data.photo_3), extract_image(data.photo_4),
+            data.reason_for_penalty, data.maintenance_id, data.approver_1_id, data.approver_1_name, data.approver_2_id, data.approver_2_name,
+            json.dumps(data.additional_photos) if isinstance(data.additional_photos, list) else (str(data.additional_photos) if data.additional_photos else None),
             uid, uid
         ))
         new_id = cur.fetchone()[0]
@@ -5443,7 +5467,11 @@ def update_adjustment(id: int, data: AdjustmentData, authorization: Optional[str
                 remittance_towards=%s, adjustment_related_to=%s, remarks=%s, first_level_approval_by=%s, 
                 finance_team_status=%s, finance_team_remarks=%s, final_level_approval_by=%s, status=%s, photo=%s,
                 hisaab_number=%s, contested_line_items=%s, severity_level=%s, cost_level=%s, escalate_to=%s,
-                submitter_comments=%s, sent_for_approval=%s, updated_at=NOW(), updated_by=%s
+                submitter_comments=%s, sent_for_approval=%s,
+                hisaab_date=%s, adjustment_sub_type=%s, adjustment_sub_type_other=%s, adjustment_date_mandatory=%s, adjustment_date_optional=%s,
+                photo_1=%s, photo_2=%s, photo_3=%s, photo_4=%s,
+                reason_for_penalty=%s, maintenance_id=%s, approver_1_id=%s, approver_1_name=%s, approver_2_id=%s, approver_2_name=%s, additional_photos=%s,
+                updated_at=NOW(), updated_by=%s
             WHERE id=%s RETURNING id;
         """, (
             data.partner_name, data.partner_code, data.driver_id, data.partner_number, data.vehicle_number, data.city_name,
@@ -5452,8 +5480,12 @@ def update_adjustment(id: int, data: AdjustmentData, authorization: Optional[str
             data.finance_team_status, data.finance_team_remarks, data.final_level_approval_by, data.status,
             extract_image(data.photo),
             data.hisaab_number, data.contested_line_items, data.severity_level, data.cost_level, str(data.escalate_to) if data.escalate_to else None,
-            data.submitter_comments, data.sent_for_approval, uid,
-            id
+            data.submitter_comments, data.sent_for_approval,
+            data.hisaab_date, data.adjustment_sub_type, data.adjustment_sub_type_other, data.adjustment_date_mandatory, data.adjustment_date_optional,
+            extract_image(data.photo_1), extract_image(data.photo_2), extract_image(data.photo_3), extract_image(data.photo_4),
+            data.reason_for_penalty, data.maintenance_id, data.approver_1_id, data.approver_1_name, data.approver_2_id, data.approver_2_name,
+            json.dumps(data.additional_photos) if isinstance(data.additional_photos, list) else (str(data.additional_photos) if data.additional_photos else None),
+            uid, id
         ))
         row = cur.fetchone()
         if not row:
@@ -8003,13 +8035,13 @@ def create_accident(data: AccidentData, authorization: Optional[str] = Header(No
                 vehicle_number, vendor_id, vendor_name, city_name, date_of_accident, time_of_accident, place_of_accident, vehicle_status,
                 driver_id, driver_name, driver_phone, no_of_persons, third_party_involvement, fir_filed,
                 accident_reason, accident_inspection, insurance_status, repair_cost, toeing_cost, challan_amount, fine_amount, comments,
-                front_vehicle_photo, back_vehicle_photo, right_vehicle_photo, left_vehicle_photo, dl_front_photo, dl_back_photo, police_ack_copy, fir_document_copy,
+                front_vehicle_photo, back_vehicle_photo, right_vehicle_photo, left_vehicle_photo, dl_front_photo, dl_back_photo, police_ack_copy, fir_document_copy, additional_photos,
                 created_by, created_at, updated_at, updated_by
             ) VALUES (
                 %s,%s,%s,%s,%s,%s,%s,%s,
                 %s,%s,%s,%s,%s,%s,
                 %s,%s,%s,%s,%s,%s,%s,%s,
-                %s,%s,%s,%s,%s,%s,%s,%s,
+                %s,%s,%s,%s,%s,%s,%s,%s,%s,
                 %s, NOW(), NOW(), %s
             ) RETURNING id;
         """, (
@@ -8018,6 +8050,7 @@ def create_accident(data: AccidentData, authorization: Optional[str] = Header(No
             data.accident_reason, data.accident_inspection, data.insurance_status, data.repair_cost, data.toeing_cost, data.challan_amount, data.fine_amount, data.comments,
             extract_image(data.front_vehicle_photo), extract_image(data.back_vehicle_photo), extract_image(data.right_vehicle_photo), extract_image(data.left_vehicle_photo),
             extract_image(data.dl_front_photo), extract_image(data.dl_back_photo), extract_image(data.police_ack_copy), extract_image(data.fir_document_copy),
+            json.dumps(data.additional_photos) if isinstance(data.additional_photos, list) else (str(data.additional_photos) if data.additional_photos else None),
             uid, uid
         ))
         new_id = cur.fetchone()[0]
@@ -8041,7 +8074,7 @@ def update_accident(id: int, data: AccidentData, authorization: Optional[str] = 
                 vehicle_number=%s, vendor_id=%s, vendor_name=%s, city_name=%s, date_of_accident=%s, time_of_accident=%s, place_of_accident=%s, vehicle_status=%s,
                 driver_id=%s, driver_name=%s, driver_phone=%s, no_of_persons=%s, third_party_involvement=%s, fir_filed=%s,
                 accident_reason=%s, accident_inspection=%s, insurance_status=%s, repair_cost=%s, toeing_cost=%s, challan_amount=%s, fine_amount=%s, comments=%s,
-                front_vehicle_photo=%s, back_vehicle_photo=%s, right_vehicle_photo=%s, left_vehicle_photo=%s, dl_front_photo=%s, dl_back_photo=%s, police_ack_copy=%s, fir_document_copy=%s,
+                front_vehicle_photo=%s, back_vehicle_photo=%s, right_vehicle_photo=%s, left_vehicle_photo=%s, dl_front_photo=%s, dl_back_photo=%s, police_ack_copy=%s, fir_document_copy=%s, additional_photos=%s,
                 updated_at=NOW(), updated_by=%s
             WHERE id = %s RETURNING id;
         """, (
@@ -8050,6 +8083,7 @@ def update_accident(id: int, data: AccidentData, authorization: Optional[str] = 
             data.accident_reason, data.accident_inspection, data.insurance_status, data.repair_cost, data.toeing_cost, data.challan_amount, data.fine_amount, data.comments,
             extract_image(data.front_vehicle_photo), extract_image(data.back_vehicle_photo), extract_image(data.right_vehicle_photo), extract_image(data.left_vehicle_photo),
             extract_image(data.dl_front_photo), extract_image(data.dl_back_photo), extract_image(data.police_ack_copy), extract_image(data.fir_document_copy),
+            json.dumps(data.additional_photos) if isinstance(data.additional_photos, list) else (str(data.additional_photos) if data.additional_photos else None),
             uid,
             id
         ))

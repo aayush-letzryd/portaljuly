@@ -51,15 +51,18 @@ export default function AdjustmentForm({
   
   const getTodayIST = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
-  const [hisaabNumber, setHisaabNumber] = useState("");
+  const [hisaabNumber, setHisaabNumber] = useState("HSB-2026-W39");
   const [hisaabDate, setHisaabDate] = useState(getTodayIST());
   const [adjustmentLevel, setAdjustmentLevel] = useState<"Operator" | "Drive to Own" | "Individual Driver" | "LetzOwn">("Operator");
   const [adjustmentType, setAdjustmentType] = useState<"Rental Waiver" | "Penalty" | "Maintenance">("Rental Waiver");
   const [adjustmentSubType, setAdjustmentSubType] = useState("");
   const [adjustmentSubTypeOther, setAdjustmentSubTypeOther] = useState("");
+  const [reasonForPenalty, setReasonForPenalty] = useState("");
+  const [maintenanceId, setMaintenanceId] = useState("");
   const [adjustmentNature, setAdjustmentNature] = useState("Monetary");
   const [adjustmentDateMandatory, setAdjustmentDateMandatory] = useState(getTodayIST());
   const [adjustmentDateOptional, setAdjustmentDateOptional] = useState("");
+  const [approvalDate, setApprovalDate] = useState("");
   const [enterAmount, setEnterAmount] = useState("");
   const [remittanceTowards, setRemittanceTowards] = useState("");
   const [adjustmentRelatedTo, setAdjustmentRelatedTo] = useState("");
@@ -68,6 +71,10 @@ export default function AdjustmentForm({
   const [severityLevel, setSeverityLevel] = useState("Low");
   const [costLevel, setCostLevel] = useState("Minor (<₹1k)");
   const [escalateTo, setEscalateTo] = useState("");
+  const [approver1Id, setApprover1Id] = useState("");
+  const [approver1Name, setApprover1Name] = useState("");
+  const [approver2Id, setApprover2Id] = useState("");
+  const [approver2Name, setApprover2Name] = useState("");
   const [submitterComments, setSubmitterComments] = useState("");
   const [sentForApproval, setSentForApproval] = useState<"Yes" | "No">("Yes");
   const [approvalStatus, setApprovalStatus] = useState<string>("Draft");
@@ -120,9 +127,16 @@ export default function AdjustmentForm({
         .then(chain => {
           if (Array.isArray(chain) && chain.length > 0) {
             const l1 = chain.find((c: any) => c.level === 1) || chain[0];
+            const l2 = chain.find((c: any) => c.level === 2);
             if (l1 && l1.approver_name) {
+              setApprover1Id(String(l1.approver_id || ""));
+              setApprover1Name(`${l1.approver_name} (${l1.approver_role_name || l1.approver_role_code})`);
               setEscalateTo(String(l1.approver_id || ""));
               setApproverSearchQuery(`${l1.approver_name} (${l1.approver_role_name || l1.approver_role_code})`);
+            }
+            if (l2 && l2.approver_name) {
+              setApprover2Id(String(l2.approver_id || ""));
+              setApprover2Name(`${l2.approver_name} (${l2.approver_role_name || l2.approver_role_code})`);
             }
           }
         })
@@ -141,14 +155,15 @@ export default function AdjustmentForm({
     completed_count: 0
   });
 
-  // Proof Image State (Up to 4 photos as per feedback)
+  // Proof Image State (Unlimited photos support)
   const [photo1, setPhoto1] = useState<string | null>(null);
   const [photo2, setPhoto2] = useState<string | null>(null);
   const [photo3, setPhoto3] = useState<string | null>(null);
   const [photo4, setPhoto4] = useState<string | null>(null);
+  const [additionalPhotos, setAdditionalPhotos] = useState<string[]>([]);
   const [photo, setPhoto] = useState<string | null>(null);
   const [cameraActive, setCameraActive] = useState(false);
-  const [activePhotoSlot, setActivePhotoSlot] = useState<1 | 2 | 3 | 4>(1);
+  const [activePhotoSlot, setActivePhotoSlot] = useState<number>(1);
 
   // Registry Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
@@ -232,15 +247,18 @@ export default function AdjustmentForm({
       setPartnerNumber(data.partner_number || "");
       setVehicleNumber(data.vehicle_number || "");
       
-      setHisaabNumber(data.hisaab_number || "");
+      setHisaabNumber(data.hisaab_number || "HSB-2026-W39");
       setHisaabDate(data.hisaab_date || getTodayIST());
       setAdjustmentLevel(data.adjustment_level || "Operator");
       setAdjustmentType(data.adjustment_type || "Rental Waiver");
       setAdjustmentSubType(data.adjustment_sub_type || "");
       setAdjustmentSubTypeOther(data.adjustment_sub_type_other || "");
+      setReasonForPenalty(data.reason_for_penalty || "");
+      setMaintenanceId(data.maintenance_id || "");
       setAdjustmentNature(data.adjustment_nature || "Monetary");
       setAdjustmentDateMandatory(data.adjustment_date_mandatory || data.adjustment_date || getTodayIST());
       setAdjustmentDateOptional(data.adjustment_date_optional || "");
+      setApprovalDate(data.approval_date || "");
       setEnterAmount(data.enter_amount || "");
       setRemittanceTowards(data.remittance_towards || "");
       setAdjustmentRelatedTo(data.adjustment_related_to || "");
@@ -248,6 +266,10 @@ export default function AdjustmentForm({
       setSeverityLevel(data.severity_level || "Low");
       setCostLevel(data.cost_level || "Minor (<₹1k)");
       setEscalateTo(data.escalate_to || "");
+      setApprover1Id(data.approver_1_id || "");
+      setApprover1Name(data.approver_1_name || "");
+      setApprover2Id(data.approver_2_id || "");
+      setApprover2Name(data.approver_2_name || "");
       setSubmitterComments(data.submitter_comments || data.remarks || "");
       setSentForApproval(data.sent_for_approval || "No");
       setApprovalStatus(data.approval_status || "Draft");
@@ -259,6 +281,12 @@ export default function AdjustmentForm({
       setPhoto3(data.photo_3 || null);
       setPhoto4(data.photo_4 || null);
       setPhoto(data.photo_1 || data.photo || null);
+      try {
+        if (data.additional_photos) {
+          const parsed = typeof data.additional_photos === 'string' ? JSON.parse(data.additional_photos) : data.additional_photos;
+          if (Array.isArray(parsed)) setAdditionalPhotos(parsed);
+        }
+      } catch (e) {}
       
       setFormMode("edit");
       setActiveTab("form");
@@ -278,15 +306,18 @@ export default function AdjustmentForm({
     setPartnerNumber("");
     setVehicleNumber("");
     
-    setHisaabNumber("");
+    setHisaabNumber("HSB-2026-W39");
     setHisaabDate(getTodayIST());
     setAdjustmentLevel("Operator");
     setAdjustmentType("Rental Waiver");
     setAdjustmentSubType("");
     setAdjustmentSubTypeOther("");
+    setReasonForPenalty("");
+    setMaintenanceId("");
     setAdjustmentNature("Monetary");
     setAdjustmentDateMandatory(getTodayIST());
     setAdjustmentDateOptional("");
+    setApprovalDate("");
     setEnterAmount("");
     setRemittanceTowards("");
     setAdjustmentRelatedTo("");
@@ -294,6 +325,10 @@ export default function AdjustmentForm({
     setSeverityLevel("Low");
     setCostLevel("Minor (<₹1k)");
     setEscalateTo("");
+    setApprover1Id("");
+    setApprover1Name("");
+    setApprover2Id("");
+    setApprover2Name("");
     setSubmitterComments("");
     setSentForApproval("No");
     setApprovalStatus("Draft");
@@ -304,19 +339,25 @@ export default function AdjustmentForm({
     setPhoto2(null);
     setPhoto3(null);
     setPhoto4(null);
+    setAdditionalPhotos([]);
     setPhoto(null);
   };
 
   const handleSaveAndSubmit = async (sendForApproval: boolean) => {
-    // Conditional Amount Validation: ONLY required when "Maintenance" is selected
-    if (adjustmentType === "Maintenance") {
-      if (!enterAmount || parseFloat(enterAmount) <= 0) {
-        return alert("Please enter a valid Amount for Maintenance adjustment");
-      }
-    }
-
     if (!partnerName.trim()) {
       return alert("Please enter Partner / Driver Name");
+    }
+
+    if (adjustmentType === "Penalty" && !reasonForPenalty.trim()) {
+      return alert("Please enter mandatory Reason for Penalty");
+    }
+
+    if (adjustmentType === "Maintenance" && !maintenanceId.trim()) {
+      return alert("Please enter/link Maintenance Record / ID");
+    }
+
+    if (!enterAmount || parseFloat(enterAmount) <= 0) {
+      return alert("Please enter a valid Amount for adjustment");
     }
 
     if (!adjustmentDateMandatory) {
@@ -345,14 +386,21 @@ export default function AdjustmentForm({
       adjustment_type: adjustmentType,
       adjustment_sub_type: adjustmentSubType,
       adjustment_sub_type_other: adjustmentSubTypeOther.trim() || null,
+      reason_for_penalty: reasonForPenalty.trim() || null,
+      maintenance_id: maintenanceId.trim() || null,
       adjustment_date: adjustmentDateMandatory,
       adjustment_date_mandatory: adjustmentDateMandatory,
       adjustment_date_optional: adjustmentDateOptional || null,
-      enter_amount: adjustmentType === "Maintenance" ? enterAmount : (enterAmount || "0"),
+      approval_date: approvalDate || null,
+      enter_amount: enterAmount,
       
       severity_level: severityLevel,
       cost_level: costLevel,
       escalate_to: String(escalateTo || ""),
+      approver_1_id: approver1Id,
+      approver_1_name: approver1Name,
+      approver_2_id: approver2Id,
+      approver_2_name: approver2Name,
       submitter_comments: submitterComments.trim(),
       sent_for_approval: sendForApproval ? "Yes" : "No",
       remarks: submitterComments.trim(),
@@ -363,7 +411,8 @@ export default function AdjustmentForm({
       photo_1: photo1 || photo || null,
       photo_2: photo2 || null,
       photo_3: photo3 || null,
-      photo_4: photo4 || null
+      photo_4: photo4 || null,
+      additional_photos: additionalPhotos
     };
 
     try {
@@ -736,17 +785,18 @@ export default function AdjustmentForm({
                           />
                         </div>
 
-                        {/* FEEDBACK POINT 2: Hisaab Number * - Need the date to be automated, with a dropdown option for selecting the required date */}
+                        {/* FEEDBACK POINT 2: Hisaab Number * - Automated date/week selector (Restricted to 2 recent available Hisaabs as requested) */}
                         <div>
-                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Hisaab Number <span className="text-red-500">*</span></label>
-                          <input 
-                            type="text" 
-                            placeholder="Ref Hisaab Bill No..."
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Hisaab Number (Recent 2 Weeks) <span className="text-red-500">*</span></label>
+                          <select 
                             value={hisaabNumber}
                             onChange={(e) => setHisaabNumber(e.target.value)}
                             required
-                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs font-mono"
-                          />
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer font-mono font-medium"
+                          >
+                            <option value="HSB-2026-W39">HSB-2026-W39 (Sep 22 - Sep 28, 2026)</option>
+                            <option value="HSB-2026-W38">HSB-2026-W38 (Sep 15 - Sep 21, 2026)</option>
+                          </select>
                         </div>
                       </div>
 
@@ -830,26 +880,68 @@ export default function AdjustmentForm({
                         </div>
                       )}
 
-                      {/* FEEDBACK POINT 5: Conditional Amount Field (Displayed ONLY when "Maintenance" is selected. Hidden for Rental Waiver & Penalty) */}
+                      {/* FEEDBACK POINT: Reason for Penalty (Mandatory open-ended field when Penalty is selected) */}
+                      {adjustmentType === "Penalty" && (
+                        <div className="bg-red-50/70 p-4 rounded-xl border border-red-200">
+                          <label className="block font-sans text-xs font-bold text-red-900 mb-2">Reason for Penalty <span className="text-red-500">*</span></label>
+                          <textarea 
+                            placeholder="Specify exact mandatory open-ended reason for issuing this penalty..."
+                            value={reasonForPenalty}
+                            onChange={(e) => setReasonForPenalty(e.target.value)}
+                            required
+                            rows={2}
+                            className="w-full rounded-xl border border-red-300 bg-white px-4 py-2 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs resize-none"
+                          />
+                        </div>
+                      )}
+
+                      {/* FEEDBACK POINT: Maintenance Link (Mandatory when Maintenance is selected) */}
                       {adjustmentType === "Maintenance" && (
-                        <div className="bg-amber-50/70 p-4 rounded-xl border border-amber-200">
-                          <label className="block font-sans text-xs font-bold text-amber-900 mb-2">Enter Amount (₹) <span className="text-red-500">*</span></label>
-                          <div className="relative">
-                            <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-amber-600" />
+                        <div className="bg-amber-50/70 p-4 rounded-xl border border-amber-200 space-y-3">
+                          <div>
+                            <label className="block font-sans text-xs font-bold text-amber-900 mb-2">Link Maintenance Record / ID <span className="text-red-500">*</span></label>
                             <input 
-                              type="number" 
-                              placeholder="0.00"
-                              value={enterAmount}
-                              onChange={(e) => setEnterAmount(e.target.value)}
+                              type="text"
+                              placeholder="e.g. MAINT-9012 or Select Maintenance Date..."
+                              value={maintenanceId}
+                              onChange={(e) => setMaintenanceId(e.target.value)}
                               required
-                              className="w-full pl-9 rounded-xl border border-amber-300 bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs font-bold text-slate-900"
+                              className="w-full rounded-xl border border-amber-300 bg-white px-4 py-2 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs font-mono"
                             />
+                            <p className="text-[10px] text-amber-700 mt-1">Links directly to Maintenance module record to prevent duplicate entries.</p>
                           </div>
                         </div>
                       )}
 
-                      {/* FEEDBACK POINT 6: Date of Application -> Two date fields: Adjustment Date - Mandatory & Adjustment Date - Optional */}
+                      {/* Amount Field (₹) */}
+                      <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
+                        <label className="block font-sans text-xs font-bold text-slate-900 mb-2">Enter Amount (₹) <span className="text-red-500">*</span></label>
+                        <div className="relative">
+                          <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600" />
+                          <input 
+                            type="number" 
+                            placeholder="0.00"
+                            value={enterAmount}
+                            onChange={(e) => setEnterAmount(e.target.value)}
+                            required
+                            className="w-full pl-9 rounded-xl border border-slate-300 bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs font-bold text-slate-900"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Distinct Date Fields: Date of Application, Adjustment Date - Mandatory, Adjustment Date - Optional, Approval Date */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Date of Application <span className="text-red-500">*</span></label>
+                          <input 
+                            type="date" 
+                            value={hisaabDate}
+                            onChange={(e) => setHisaabDate(e.target.value)}
+                            required
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2 font-sans text-sm outline-none focus:border-primary transition-all shadow-2xs cursor-pointer"
+                          />
+                        </div>
+
                         <div>
                           <label className="block font-sans text-xs font-bold text-text-muted mb-2">Adjustment Date – Mandatory <span className="text-red-500">*</span></label>
                           <input 
@@ -857,7 +949,7 @@ export default function AdjustmentForm({
                             value={adjustmentDateMandatory}
                             onChange={(e) => setAdjustmentDateMandatory(e.target.value)}
                             required
-                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm outline-none focus:border-primary transition-all shadow-2xs cursor-pointer"
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2 font-sans text-sm outline-none focus:border-primary transition-all shadow-2xs cursor-pointer"
                           />
                         </div>
 
@@ -867,7 +959,17 @@ export default function AdjustmentForm({
                             type="date" 
                             value={adjustmentDateOptional}
                             onChange={(e) => setAdjustmentDateOptional(e.target.value)}
-                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm outline-none focus:border-primary transition-all shadow-2xs cursor-pointer"
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2 font-sans text-sm outline-none focus:border-primary transition-all shadow-2xs cursor-pointer"
+                          />
+                        </div>
+
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Approval Date</label>
+                          <input 
+                            type="date" 
+                            value={approvalDate}
+                            onChange={(e) => setApprovalDate(e.target.value)}
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2 font-sans text-sm outline-none focus:border-primary transition-all shadow-2xs cursor-pointer"
                           />
                         </div>
                       </div>
@@ -948,17 +1050,81 @@ export default function AdjustmentForm({
                         />
                       </div>
 
+                      {/* TWO-LEVEL APPROVAL FLOW SELECTORS */}
+                      <div className="md:col-span-3 bg-slate-50/80 p-4 rounded-xl border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-slate-800 mb-2">
+                            Approver Level 1 (Manager / Team Lead) <span className="text-red-500">*</span>
+                          </label>
+                          <select 
+                            value={approver1Id}
+                            onChange={(e) => {
+                              const sel = approversList.find(a => String(a.id) === e.target.value);
+                              setApprover1Id(e.target.value);
+                              if (sel) setApprover1Name(`${sel.name} (${sel.role})`);
+                              setEscalateTo(e.target.value);
+                              setApproverSearchQuery(sel ? `${sel.name} (${sel.role})` : '');
+                            }}
+                            required
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-sans text-xs outline-none focus:border-primary cursor-pointer font-medium"
+                          >
+                            <option value="">-- Select L1 Approver --</option>
+                            {approversList.map(a => (
+                              <option key={a.id} value={a.id}>{a.name} ({a.role} - {a.city || 'All Cities'})</option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block font-sans text-xs font-bold text-slate-800 mb-2">
+                            Approver Level 2 (City Head / Management) <span className="text-red-500">*</span>
+                          </label>
+                          <select 
+                            value={approver2Id}
+                            onChange={(e) => {
+                              const sel = approversList.find(a => String(a.id) === e.target.value);
+                              setApprover2Id(e.target.value);
+                              if (sel) setApprover2Name(`${sel.name} (${sel.role})`);
+                            }}
+                            required
+                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-sans text-xs outline-none focus:border-primary cursor-pointer font-medium"
+                          >
+                            <option value="">-- Select L2 Approver --</option>
+                            {approversList.map(a => (
+                              <option key={a.id} value={a.id}>{a.name} ({a.role} - {a.city || 'All Cities'})</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+
                     </div>
                   </div>
                 </div>
 
-                {/* FEEDBACK POINT 8: Attachments & Proof (Optional) - Upload maximum of 4 photos */}
+                {/* FEEDBACK POINT 8: Attachments & Proof (Unlimited Photos Supported) */}
                 <div className="border-t border-border pt-10">
-                  <div className="border-b border-border pb-3 mb-6">
-                    <h3 className="font-sans text-sm font-bold text-primary">
-                      4. Attachments & Proof (Optional - Up to 4 Photos)
-                    </h3>
-                    <p className="font-sans text-xs text-text-muted mt-1">Upload or capture up to 4 receipts, bills, or proof photos related to this adjustment.</p>
+                  <div className="flex justify-between items-center border-b border-border pb-3 mb-6">
+                    <div>
+                      <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
+                        <span>4. Attachments & Proof (Unlimited Photos)</span>
+                      </h3>
+                      <p className="font-sans text-xs text-text-muted mt-1">Upload or capture receipts, bills, or proof photos related to this adjustment. No upload limit.</p>
+                    </div>
+                    <label className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary-hover shadow-xs cursor-pointer">
+                      <Plus className="h-4 w-4" />
+                      Add Extra Photo
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) {
+                            compressImage(file).then((img) => setAdditionalPhotos(prev => [...prev, img]));
+                          }
+                        }} 
+                        className="hidden" 
+                      />
+                    </label>
                   </div>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -1019,6 +1185,27 @@ export default function AdjustmentForm({
                             </div>
                           </div>
                         )}
+                      </div>
+                    ))}
+
+                    {/* Additional Unlimited Photos Grid */}
+                    {additionalPhotos.map((img, idx) => (
+                      <div key={`extra-${idx}`} className="w-full rounded-2xl border border-dashed border-primary/40 bg-primary/5 p-4 text-center transition-all shadow-2xs flex flex-col items-center justify-between min-h-[160px]">
+                        <span className="text-[10px] font-bold text-primary uppercase mb-2">Extra Photo #{idx + 5}</span>
+                        <div className="relative inline-block w-full">
+                          <img 
+                            src={img} 
+                            alt={`Extra Proof ${idx + 5}`} 
+                            className="h-28 w-full object-cover rounded-xl border border-primary/20 shadow-xs"
+                          />
+                          <button 
+                            type="button"
+                            onClick={() => setAdditionalPhotos(prev => prev.filter((_, i) => i !== idx))}
+                            className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white border border-white hover:bg-red-700 shadow-xs cursor-pointer"
+                          >
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
                       </div>
                     ))}
                   </div>

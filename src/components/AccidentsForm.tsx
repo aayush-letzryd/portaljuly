@@ -79,6 +79,7 @@ export default function AccidentsForm({
   const [dlBackPhoto, setDlBackPhoto] = useState<string | null>(null);
   const [policeAckCopy, setPoliceAckCopy] = useState<string | null>(null);
   const [firDoc, setFirDoc] = useState<string | null>(null);
+  const [additionalPhotos, setAdditionalPhotos] = useState<string[]>([]);
 
   // Camera capture modal state
   const [cameraActiveField, setCameraActiveField] = useState<"front" | "back" | "right" | "left" | "dl_front" | "dl_back" | "police_ack" | "fir" | null>(null);
@@ -200,6 +201,12 @@ export default function AccidentsForm({
       setDlBackPhoto(data.dl_back_photo || null);
       setPoliceAckCopy(data.police_ack_copy || null);
       setFirDoc(data.fir_document_copy || null);
+      try {
+        if (data.additional_photos) {
+          const parsed = typeof data.additional_photos === 'string' ? JSON.parse(data.additional_photos) : data.additional_photos;
+          if (Array.isArray(parsed)) setAdditionalPhotos(parsed);
+        }
+      } catch (e) {}
       
       setActiveTab("form");
       setRetrieveIdInput("");
@@ -243,6 +250,7 @@ export default function AccidentsForm({
     setDlBackPhoto(null);
     setPoliceAckCopy(null);
     setFirDoc(null);
+    setAdditionalPhotos([]);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -292,7 +300,8 @@ export default function AccidentsForm({
       dl_front_photo: dlFrontPhoto || null,
       dl_back_photo: dlBackPhoto || null,
       police_ack_copy: policeAckCopy || null,
-      fir_document_copy: firFiled === "Yes" ? (firDoc || null) : null
+      fir_document_copy: firFiled === "Yes" ? (firDoc || null) : null,
+      additional_photos: additionalPhotos
     };
 
     try {
@@ -1027,6 +1036,61 @@ export default function AccidentsForm({
                           </div>
                         )}
                       </div>
+                    </div>
+                  </div>
+
+                  {/* Section 6: Additional Proof & Evidence Photographs (Unlimited) */}
+                  <div className="border-t border-border pt-6 mt-6">
+                    <div className="flex justify-between items-center border-b border-border pb-3 mb-4">
+                      <div>
+                        <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">6</span>
+                          Additional Proof Photographs (Unlimited)
+                        </h3>
+                        <p className="font-sans text-xs text-text-muted mt-1">Upload any additional evidence photos, scene pictures, or damage closeups. No upload limit.</p>
+                      </div>
+                      <label className="flex items-center gap-1.5 rounded-xl bg-primary px-3 py-2 text-xs font-bold text-white hover:bg-primary-hover shadow-xs cursor-pointer">
+                        <Plus className="h-4 w-4" />
+                        Add Extra Photo
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) {
+                              compressImage(file).then((img) => setAdditionalPhotos(prev => [...prev, img]));
+                            }
+                          }} 
+                          className="hidden" 
+                        />
+                      </label>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                      {additionalPhotos.map((img, idx) => (
+                        <div key={`extra-${idx}`} className="w-full rounded-2xl border border-dashed border-primary/40 bg-primary/5 p-4 text-center transition-all shadow-2xs flex flex-col items-center justify-between min-h-[140px]">
+                          <span className="text-[10px] font-bold text-primary uppercase mb-2">Extra Photo #{idx + 1}</span>
+                          <div className="relative inline-block w-full">
+                            <img 
+                              src={img} 
+                              alt={`Extra Evidence ${idx + 1}`} 
+                              className="h-24 w-full object-cover rounded-xl border border-primary/20 shadow-xs"
+                            />
+                            <button 
+                              type="button"
+                              onClick={() => setAdditionalPhotos(prev => prev.filter((_, i) => i !== idx))}
+                              className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-red-600 text-white border border-white hover:bg-red-700 shadow-xs cursor-pointer"
+                            >
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      {additionalPhotos.length === 0 && (
+                        <div className="col-span-2 md:col-span-4 p-4 text-center border border-dashed border-border rounded-xl bg-slate-50 text-xs text-text-muted">
+                          No additional evidence photos added yet. Click "Add Extra Photo" to attach unlimited proof photos.
+                        </div>
+                      )}
                     </div>
                   </div>
 

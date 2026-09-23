@@ -149,6 +149,13 @@ export interface AdjustmentRecord {
   sent_for_approval?: string;
   approval_status?: string;
   current_approver_id?: number;
+  reason_for_penalty?: string;
+  maintenance_id?: string;
+  approver_1_id?: string;
+  approver_1_name?: string;
+  approver_2_id?: string;
+  approver_2_name?: string;
+  additional_photos?: string[] | string;
 }
 
 export interface InspectionRecord {
@@ -523,6 +530,7 @@ export interface AccidentRecord {
   dl_back_photo?: string;
   police_ack_copy?: string;
   fir_document_copy?: string;
+  additional_photos?: string[] | string;
   created_at?: string;
 }
 
