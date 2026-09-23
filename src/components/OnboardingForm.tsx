@@ -94,62 +94,96 @@ function SearchableApproverSelect({
   approvers, 
   selectedId, 
   onSelect, 
-  label 
+  label,
+  activeCity
 }: { 
   approvers: any[]; 
   selectedId: number | null; 
   onSelect: (id: number) => void; 
   label: string; 
+  activeCity?: string;
 }) {
   const [search, setSearch] = useState("");
   const [isOpen, setIsOpen] = useState(false);
+  const [isEditingSearch, setIsEditingSearch] = useState(false);
   const containerRef = React.useRef<HTMLDivElement>(null);
 
-  const validApprovers = approvers;
+  const norm = (s?: string) => {
+    if (!s) return "";
+    const v = s.trim().toLowerCase();
+    if (["bangalore", "bengaluru", "blr"].includes(v)) return "bangalore";
+    if (["hyderabad", "hyd"].includes(v)) return "hyderabad";
+    if (["mumbai", "bom"].includes(v)) return "mumbai";
+    if (["delhi", "del"].includes(v)) return "delhi";
+    if (["chennai", "maa"].includes(v)) return "chennai";
+    return v;
+  };
 
+  const validApprovers = approvers;
   const selectedApprover = validApprovers.find(a => a.id === selectedId);
 
   useEffect(() => {
     if (selectedApprover) {
-      setSearch(`${selectedApprover.name} (${selectedApprover.role})`);
+      if (!isEditingSearch) {
+        setSearch(`${selectedApprover.name} (${selectedApprover.role})`);
+      }
     } else if (validApprovers.length > 0) {
-      const preferred = validApprovers.find(a => 
+      const preferred = validApprovers.find(a => {
+        const matchCity = activeCity ? norm(a.city) === norm(activeCity) : true;
+        const matchRole = a.role?.toLowerCase().includes("city manager") || 
+                          a.role?.toLowerCase().includes("general manager") ||
+                          a.role?.toLowerCase().includes("manager") ||
+                          ["CM", "GM", "BH", "DM"].includes(a.role_code);
+        return matchCity && matchRole;
+      }) || validApprovers.find(a => 
         a.role?.toLowerCase().includes("city manager") || 
         a.role?.toLowerCase().includes("general manager") ||
         a.role?.toLowerCase().includes("manager") ||
         ["CM", "GM", "BH", "DM"].includes(a.role_code)
       ) || validApprovers[0];
+
       onSelect(preferred.id);
       setSearch(`${preferred.name} (${preferred.role})`);
     }
-  }, [selectedId, validApprovers]);
+  }, [selectedId, validApprovers, activeCity]);
 
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
         setIsOpen(false);
+        setIsEditingSearch(false);
+        if (selectedApprover) {
+          setSearch(`${selectedApprover.name} (${selectedApprover.role})`);
+        }
       }
     };
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
-
-  const isExactSelectedDisplay = selectedApprover && search === `${selectedApprover.name} (${selectedApprover.role})`;
+  }, [selectedApprover]);
 
   const filtered = validApprovers
-    .filter(a =>
-      isExactSelectedDisplay ||
-      !search.trim() ||
-      a.name?.toLowerCase().includes(search.toLowerCase()) ||
-      a.role?.toLowerCase().includes(search.toLowerCase()) ||
-      a.city?.toLowerCase().includes(search.toLowerCase())
-    )
-    .sort((a, b) => {
-      if (!search.trim() || isExactSelectedDisplay) return 0;
+    .filter(a => {
+      if (!isEditingSearch || !search.trim()) return true;
       const s = search.toLowerCase();
-      const aNameStarts = a.name?.toLowerCase().startsWith(s) ? 0 : 1;
-      const bNameStarts = b.name?.toLowerCase().startsWith(s) ? 0 : 1;
-      return aNameStarts - bNameStarts;
+      return (
+        a.name?.toLowerCase().includes(s) ||
+        a.role?.toLowerCase().includes(s) ||
+        a.city?.toLowerCase().includes(s)
+      );
+    })
+    .sort((a, b) => {
+      if (activeCity) {
+        const aCityMatch = norm(a.city) === norm(activeCity) ? 0 : 1;
+        const bCityMatch = norm(b.city) === norm(activeCity) ? 0 : 1;
+        if (aCityMatch !== bCityMatch) return aCityMatch - bCityMatch;
+      }
+      if (isEditingSearch && search.trim()) {
+        const s = search.toLowerCase();
+        const aNameStarts = a.name?.toLowerCase().startsWith(s) ? 0 : 1;
+        const bNameStarts = b.name?.toLowerCase().startsWith(s) ? 0 : 1;
+        if (aNameStarts !== bNameStarts) return aNameStarts - bNameStarts;
+      }
+      return (a.name || "").localeCompare(b.name || "");
     });
 
   return (
@@ -159,13 +193,20 @@ function SearchableApproverSelect({
         <input
           type="text"
           value={search}
-          onFocus={() => setIsOpen(true)}
+          onFocus={() => {
+            setIsOpen(true);
+            setIsEditingSearch(false);
+          }}
+          onClick={() => {
+            setIsOpen(true);
+          }}
           onChange={(e) => {
             setSearch(e.target.value);
+            setIsEditingSearch(true);
             setIsOpen(true);
           }}
           placeholder="Search approver name, role or city..."
-          className="w-full h-11 px-4 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-emerald-600 shadow-xs"
+          className="w-full h-11 px-4 bg-white border border-slate-200 rounded-xl text-sm font-semibold outline-none focus:border-emerald-600 shadow-xs cursor-pointer"
         />
         {isOpen && (
           <div className="absolute z-50 left-0 right-0 top-full mt-1 max-h-52 overflow-y-auto bg-white border border-slate-200 rounded-xl shadow-xl divide-y divide-slate-100">
@@ -175,11 +216,19 @@ function SearchableApproverSelect({
                 onClick={() => {
                   onSelect(a.id);
                   setSearch(`${a.name} (${a.role})`);
+                  setIsEditingSearch(false);
                   setIsOpen(false);
                 }}
                 className={`p-3 hover:bg-emerald-50 transition-colors cursor-pointer text-xs ${a.id === selectedId ? "bg-emerald-50 font-bold text-emerald-700" : "text-slate-800"}`}
               >
-                <span className="font-bold block text-slate-900">{a.name}</span>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-slate-900">{a.name}</span>
+                  {a.city && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-medium">
+                      {a.city}
+                    </span>
+                  )}
+                </div>
                 <span className="text-[11px] text-slate-500">{a.role}</span>
               </div>
             ))}
@@ -613,9 +662,27 @@ export default function OnboardingForm({
         const validApprovers = appData.filter((a: any) => a.id !== currentUserId);
         setApproversList(validApprovers);
 
-        // Auto-set default to first City Manager or General Manager
+        // Auto-set default to City Manager or General Manager matching active city first
         if (validApprovers.length > 0) {
-          const preferred = validApprovers.find((a: any) =>
+          const normCity = (s?: string) => {
+            if (!s) return "";
+            const v = s.trim().toLowerCase();
+            if (["bangalore", "bengaluru", "blr"].includes(v)) return "bangalore";
+            if (["hyderabad", "hyd"].includes(v)) return "hyderabad";
+            if (["mumbai", "bom"].includes(v)) return "mumbai";
+            if (["delhi", "del"].includes(v)) return "delhi";
+            if (["chennai", "maa"].includes(v)) return "chennai";
+            return v;
+          };
+          const targetCity = normCity(city || user?.city);
+          const preferred = validApprovers.find((a: any) => {
+            const cityMatch = targetCity ? normCity(a.city) === targetCity : true;
+            const roleMatch = a.role?.toLowerCase().includes("city manager") ||
+                              a.role?.toLowerCase().includes("general manager") ||
+                              a.role?.toLowerCase().includes("manager") ||
+                              ["CM", "GM", "BH", "DM"].includes(a.role_code);
+            return cityMatch && roleMatch;
+          }) || validApprovers.find((a: any) =>
             a.role?.toLowerCase().includes("city manager") ||
             a.role?.toLowerCase().includes("general manager") ||
             a.role?.toLowerCase().includes("manager") ||
@@ -2736,6 +2803,7 @@ export default function OnboardingForm({
                             selectedId={approvalRequestedTo}
                             onSelect={(id) => setApprovalRequestedTo(id)}
                             label="Send Approval Request To *"
+                            activeCity={city}
                           />
 
                           <div className="space-y-1.5">
@@ -2778,6 +2846,7 @@ export default function OnboardingForm({
                               selectedId={forwardToId}
                               onSelect={(id) => setForwardToId(id)}
                               label="Forward To Approver"
+                              activeCity={city}
                             />
                           </div>
                         </div>
