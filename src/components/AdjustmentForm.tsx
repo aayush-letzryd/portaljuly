@@ -787,7 +787,7 @@ export default function AdjustmentForm({
 
                         {/* FEEDBACK POINT 2: Hisaab Number * - Automated date/week selector (Restricted to 2 recent available Hisaabs as requested) */}
                         <div>
-                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Hisaab Number (Recent 2 Weeks) <span className="text-red-500">*</span></label>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Hisaab Number / Week <span className="text-red-500">*</span></label>
                           <select 
                             value={hisaabNumber}
                             onChange={(e) => setHisaabNumber(e.target.value)}
@@ -796,19 +796,12 @@ export default function AdjustmentForm({
                           >
                             <option value="HSB-2026-W39">HSB-2026-W39 (Sep 22 - Sep 28, 2026)</option>
                             <option value="HSB-2026-W38">HSB-2026-W38 (Sep 15 - Sep 21, 2026)</option>
+                            <option value="HSB-2026-W37">HSB-2026-W37 (Sep 08 - Sep 14, 2026)</option>
+                            <option value="HSB-2026-W36">HSB-2026-W36 (Sep 01 - Sep 07, 2026)</option>
+                            <option value="HSB-2026-W35">HSB-2026-W35 (Aug 25 - Aug 31, 2026)</option>
+                            <option value="HSB-2026-W34">HSB-2026-W34 (Aug 18 - Aug 24, 2026)</option>
                           </select>
                         </div>
-                      </div>
-
-                      <div>
-                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Hisaab Date (Automated / Select Date) <span className="text-red-500">*</span></label>
-                        <input 
-                          type="date" 
-                          value={hisaabDate}
-                          onChange={(e) => setHisaabDate(e.target.value)}
-                          required
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm outline-none focus:border-primary transition-all shadow-2xs cursor-pointer font-medium"
-                        />
                       </div>
 
                     </div>
@@ -929,172 +922,67 @@ export default function AdjustmentForm({
                         </div>
                       </div>
 
-                      {/* Distinct Date Fields: Date of Application, Adjustment Date - Mandatory, Adjustment Date - Optional, Approval Date */}
+                      {/* 2 Clean Date Fields: Adjustment Date & Application Date */}
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Date of Application <span className="text-red-500">*</span></label>
-                          <input 
-                            type="date" 
-                            value={hisaabDate}
-                            onChange={(e) => setHisaabDate(e.target.value)}
-                            required
-                            className="w-full rounded-xl border border-border bg-white px-4 py-2 font-sans text-sm outline-none focus:border-primary transition-all shadow-2xs cursor-pointer"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Adjustment Date – Mandatory <span className="text-red-500">*</span></label>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Adjustment Date <span className="text-red-500">*</span></label>
                           <input 
                             type="date" 
                             value={adjustmentDateMandatory}
                             onChange={(e) => setAdjustmentDateMandatory(e.target.value)}
                             required
-                            className="w-full rounded-xl border border-border bg-white px-4 py-2 font-sans text-sm outline-none focus:border-primary transition-all shadow-2xs cursor-pointer"
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm outline-none focus:border-primary transition-all shadow-2xs cursor-pointer font-medium"
                           />
                         </div>
 
                         <div>
-                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Adjustment Date – Optional</label>
+                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Application Date <span className="text-red-500">*</span></label>
                           <input 
                             type="date" 
-                            value={adjustmentDateOptional}
-                            onChange={(e) => setAdjustmentDateOptional(e.target.value)}
-                            className="w-full rounded-xl border border-border bg-white px-4 py-2 font-sans text-sm outline-none focus:border-primary transition-all shadow-2xs cursor-pointer"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block font-sans text-xs font-bold text-text-muted mb-2">Approval Date</label>
-                          <input 
-                            type="date" 
-                            value={approvalDate}
-                            onChange={(e) => setApprovalDate(e.target.value)}
-                            className="w-full rounded-xl border border-border bg-white px-4 py-2 font-sans text-sm outline-none focus:border-primary transition-all shadow-2xs cursor-pointer"
+                            value={hisaabDate}
+                            onChange={(e) => setHisaabDate(e.target.value)}
+                            required
+                            className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm outline-none focus:border-primary transition-all shadow-2xs cursor-pointer font-medium"
                           />
                         </div>
                       </div>
 
-                      {/* FEEDBACK POINT 7: Contested Hisaab Line Items field has been REMOVED completely */}
-
-                    </div>
-                  </div>
-
-                  {/* COLUMN 3: APPROVALS & ESCALATIONS */}
-                  <div className="space-y-6 lg:col-span-2 border-t border-border pt-6">
-                    <div className="border-b border-border pb-3">
-                      <h3 className="font-sans text-sm font-bold text-primary flex items-center gap-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10 text-primary text-xs font-bold">3</span>
-                        Reasoning, Remittance & Approval Workflow
-                      </h3>
-                    </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                      {/* Submitter Comments & Justification */}
                       <div>
-                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Adjustment Reason / Related To</label>
-                        <input 
-                          type="text" 
-                          placeholder="e.g. App Discrepancy, Maintenance Repair..."
-                          value={adjustmentRelatedTo}
-                          onChange={(e) => setAdjustmentRelatedTo(e.target.value)}
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Remittance / Account Reference</label>
-                        <input 
-                          type="text" 
-                          placeholder="e.g. Ledger Acc #9081..."
-                          value={remittanceTowards}
-                          onChange={(e) => setRemittanceTowards(e.target.value)}
-                          className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs"
-                        />
-                      </div>
-
-                      <div>
-                        <label className="block font-sans text-xs font-bold text-text-muted mb-2">Severity & Cost Level</label>
-                        <div className="grid grid-cols-2 gap-2">
-                          <select 
-                            value={severityLevel}
-                            onChange={(e) => setSeverityLevel(e.target.value)}
-                            className="w-full rounded-xl border border-border bg-white px-3 py-2.5 font-sans text-xs focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer"
-                          >
-                            <option value="Low">Low</option>
-                            <option value="Medium">Medium</option>
-                            <option value="High">High</option>
-                            <option value="Critical">Critical</option>
-                          </select>
-                          <select 
-                            value={costLevel}
-                            onChange={(e) => setCostLevel(e.target.value)}
-                            className="w-full rounded-xl border border-border bg-white px-3 py-2.5 font-sans text-xs focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer"
-                          >
-                            <option value="Minor (<₹1k)">&lt;₹1,000</option>
-                            <option value="Moderate (₹1k-₹5k)">₹1k - ₹5k</option>
-                            <option value="Major (>₹5k)">&gt;₹5,000</option>
-                          </select>
-                        </div>
-                      </div>
-
-                      <div className="md:col-span-3">
                         <label className="block font-sans text-xs font-bold text-text-muted mb-2">
-                          Submitter Comments & Justification <span className="text-red-500">*</span>
+                          Submitter Comments &amp; Justification <span className="text-red-500">*</span>
                         </label>
                         <textarea 
                           placeholder="Provide detailed reason or justification for this adjustment request..."
                           value={submitterComments}
                           onChange={(e) => setSubmitterComments(e.target.value)}
                           required
-                          rows={2}
+                          rows={3}
                           className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:ring-1 focus:ring-primary focus:outline-none transition-all shadow-2xs resize-none"
                         />
                       </div>
 
-                      {/* TWO-LEVEL APPROVAL FLOW SELECTORS */}
-                      <div className="md:col-span-3 bg-slate-50/80 p-4 rounded-xl border border-slate-200 grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block font-sans text-xs font-bold text-slate-800 mb-2">
-                            Approver Level 1 (Manager / Team Lead) <span className="text-red-500">*</span>
-                          </label>
-                          <select 
-                            value={approver1Id}
-                            onChange={(e) => {
-                              const sel = approversList.find(a => String(a.id) === e.target.value);
-                              setApprover1Id(e.target.value);
-                              if (sel) setApprover1Name(`${sel.name} (${sel.role})`);
-                              setEscalateTo(e.target.value);
-                              setApproverSearchQuery(sel ? `${sel.name} (${sel.role})` : '');
-                            }}
-                            required
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-sans text-xs outline-none focus:border-primary cursor-pointer font-medium"
-                          >
-                            <option value="">-- Select L1 Approver --</option>
-                            {approversList.map(a => (
-                              <option key={a.id} value={a.id}>{a.name} ({a.role} - {a.city || 'All Cities'})</option>
-                            ))}
-                          </select>
-                        </div>
-
-                        <div>
-                          <label className="block font-sans text-xs font-bold text-slate-800 mb-2">
-                            Approver Level 2 (City Head / Management) <span className="text-red-500">*</span>
-                          </label>
-                          <select 
-                            value={approver2Id}
-                            onChange={(e) => {
-                              const sel = approversList.find(a => String(a.id) === e.target.value);
-                              setApprover2Id(e.target.value);
-                              if (sel) setApprover2Name(`${sel.name} (${sel.role})`);
-                            }}
-                            required
-                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 font-sans text-xs outline-none focus:border-primary cursor-pointer font-medium"
-                          >
-                            <option value="">-- Select L2 Approver --</option>
-                            {approversList.map(a => (
-                              <option key={a.id} value={a.id}>{a.name} ({a.role} - {a.city || 'All Cities'})</option>
-                            ))}
-                          </select>
-                        </div>
+                      {/* Single Approver Selection (Level 1) */}
+                      <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200">
+                        <label className="block font-sans text-xs font-bold text-slate-800 mb-2">
+                          Select Approver (Manager / TL) <span className="text-red-500">*</span>
+                        </label>
+                        <select 
+                          value={approver1Id}
+                          onChange={(e) => {
+                            const sel = approversList.find(a => String(a.id) === e.target.value);
+                            setApprover1Id(e.target.value);
+                            if (sel) setApprover1Name(`${sel.name} (${sel.role})`);
+                            setEscalateTo(e.target.value);
+                          }}
+                          required
+                          className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 font-sans text-xs outline-none focus:border-primary cursor-pointer font-medium"
+                        >
+                          <option value="">-- Select Approver --</option>
+                          {approversList.map(a => (
+                            <option key={a.id} value={a.id}>{a.name} ({a.role} - {a.city || 'All Cities'})</option>
+                          ))}
+                        </select>
                       </div>
 
                     </div>
@@ -1217,56 +1105,19 @@ export default function AdjustmentForm({
                     <p className="text-[10px] font-bold text-red-500">* means mandatory</p>
                   </div>
                   <div className="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto justify-end">
-                    {/* Searchable Approver Selector */}
-                    <div className="relative w-full sm:w-72">
-                      <div className="relative">
-                        <Search className="w-3.5 h-3.5 absolute left-3 top-3 text-slate-400" />
-                        <input
-                          type="text"
-                          placeholder="Search & select approver..."
-                          value={approverSearchQuery}
-                          onFocus={() => setIsApproverDropdownOpen(true)}
-                          onChange={(e) => { setApproverSearchQuery(e.target.value); setIsApproverDropdownOpen(true); }}
-                          required
-                          className="w-full pl-8 pr-3 py-2 bg-white border border-border rounded-xl text-xs outline-none focus:border-primary shadow-2xs font-semibold"
-                        />
-                      </div>
-                      
-                      {isApproverDropdownOpen && (
-                        <div className="absolute bottom-full mb-1 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-xl max-h-56 overflow-y-auto z-50 p-1">
-                          {approversList
-                            .filter(a => !approverSearchQuery || a.name?.toLowerCase().includes(approverSearchQuery.toLowerCase()) || a.role?.toLowerCase().includes(approverSearchQuery.toLowerCase()) || a.city?.toLowerCase().includes(approverSearchQuery.toLowerCase()))
-                            .map(a => (
-                              <div
-                                key={a.id}
-                                onClick={() => {
-                                  setEscalateTo(a.id);
-                                  setApproverSearchQuery(`${a.name} (${a.role})`);
-                                  setIsApproverDropdownOpen(false);
-                                }}
-                                className="p-2 hover:bg-slate-100 rounded-lg cursor-pointer text-xs"
-                              >
-                                <p className="font-bold text-slate-900">{a.name} <span className="text-emerald-600 font-normal">({a.role})</span></p>
-                                <p className="text-[10px] text-slate-500">{a.city}</p>
-                              </div>
-                            ))}
-                        </div>
-                      )}
-                    </div>
-
                     <button 
                       type="button"
                       onClick={() => handleSaveAndSubmit(false)}
                       className="rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-5 py-2.5 font-sans text-xs font-bold text-slate-700 shadow-2xs transition-all cursor-pointer"
                     >
-                      💾 Save as Draft
+                      Save as Draft
                     </button>
                     <button 
                       type="button"
                       onClick={() => handleSaveAndSubmit(true)}
                       className="rounded-xl bg-primary hover:bg-primary-hover px-6 py-2.5 font-sans text-xs font-bold text-white shadow-sm transition-all cursor-pointer"
                     >
-                      🚀 {editingId ? "Update & Send for Approval" : "Submit & Send for Approval"}
+                      {editingId ? "Update & Send for Approval" : "Submit & Send for Approval"}
                     </button>
                   </div>
                 </div>

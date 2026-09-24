@@ -5382,54 +5382,63 @@ def send_adjustment_for_approval(id: int, authorization: Optional[str] = Header(
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
-        cur.execute("SELECT id, approval_status, created_by, city_name FROM july_partner_adjustment WHERE id = %s;", (id,))
+        try:
+            cur.execute("ALTER TABLE july_partner_adjustment ADD COLUMN IF NOT EXISTS current_approver_id INT;")
+            cur.execute("ALTER TABLE july_partner_adjustment ADD COLUMN IF NOT EXISTS approval_submitted_at TIMESTAMP;")
+            conn.commit()
+        except Exception as col_err:
+            conn.rollback()
+
+        cur.execute("SELECT id, approval_status, created_by, city_name, approver_1_id FROM july_partner_adjustment WHERE id = %s;", (id,))
         rec = cur.fetchone()
         if not rec:
             raise HTTPException(status_code=404, detail="Adjustment record not found")
-        _, current_status, created_by_id, city_name = rec
+        _, current_status, created_by_id, city_name, direct_app1 = rec
         if current_status and current_status not in ("Draft", None, ""):
             raise HTTPException(status_code=400, detail=f"Record is already in status: {current_status}")
 
-        submitter_id = created_by_id or uid
-        # Look up L1 approver from july_user_approval_chain
-        cur.execute("""
-            SELECT ac.approver_role_code, ac.approver_city
-            FROM july_user_approval_chain ac
-            WHERE ac.portal_user_id = %s AND ac.level = 1;
-        """, (submitter_id,))
-        l1_row = cur.fetchone()
-        l1_approver_id = None
-        if l1_row:
-            l1_role_code, l1_city = l1_row
-            cur.execute("""
-                SELECT pu.portal_user_id FROM july_portal_users pu
-                LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
-                LEFT JOIN july_roles r ON r.role_id = pu.role_id
-                WHERE r.role_code = %s AND COALESCE(pu.city, e.city, '') = %s
-                  AND COALESCE(pu.account_status,'Active') = 'Active' LIMIT 1;
-            """, (l1_role_code, l1_city or ""))
-            row = cur.fetchone()
-            if row:
-                l1_approver_id = row[0]
-
-        # Fallback: any BH/CM in same city
+        l1_approver_id = direct_app1
         if not l1_approver_id:
-            city = city_name or ""
+            submitter_id = created_by_id or uid
+            # Look up L1 approver from july_user_approval_chain
             cur.execute("""
-                SELECT pu.portal_user_id FROM july_portal_users pu
-                LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
-                LEFT JOIN july_roles r ON r.role_id = pu.role_id
-                WHERE r.role_code IN ('BH','CM','SOM','OM','CH')
-                  AND COALESCE(pu.city, e.city,'') ILIKE %s
-                  AND COALESCE(pu.account_status,'Active') = 'Active' LIMIT 1;
-            """, (f"%{city}%",))
-            row = cur.fetchone()
-            if row:
-                l1_approver_id = row[0]
+                SELECT ac.approver_role_code, ac.approver_city
+                FROM july_user_approval_chain ac
+                WHERE ac.portal_user_id = %s AND ac.level = 1;
+            """, (submitter_id,))
+            l1_row = cur.fetchone()
+            if l1_row:
+                l1_role_code, l1_city = l1_row
+                cur.execute("""
+                    SELECT pu.portal_user_id FROM july_portal_users pu
+                    LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
+                    LEFT JOIN july_roles r ON r.role_id = pu.role_id
+                    WHERE r.role_code = %s AND COALESCE(pu.city, e.city, '') = %s
+                      AND COALESCE(pu.account_status,'Active') = 'Active' LIMIT 1;
+                """, (l1_role_code, l1_city or ""))
+                row = cur.fetchone()
+                if row:
+                    l1_approver_id = row[0]
+
+            # Fallback: any BH/CM in same city
+            if not l1_approver_id:
+                city = city_name or ""
+                cur.execute("""
+                    SELECT pu.portal_user_id FROM july_portal_users pu
+                    LEFT JOIN july_employees e ON e.employee_id = pu.employee_id
+                    LEFT JOIN july_roles r ON r.role_id = pu.role_id
+                    WHERE r.role_code IN ('BH','CM','SOM','OM','CH')
+                      AND COALESCE(pu.city, e.city,'') ILIKE %s
+                      AND COALESCE(pu.account_status,'Active') = 'Active' LIMIT 1;
+                """, (f"%{city}%",))
+                row = cur.fetchone()
+                if row:
+                    l1_approver_id = row[0]
 
         cur.execute("""
             UPDATE july_partner_adjustment SET
                 approval_status = 'Pending Approval',
+                status = 'Pending Approval',
                 current_approver_id = %s,
                 approval_submitted_at = NOW(),
                 updated_at = NOW(),
@@ -10293,4 +10302,5 @@ else:
     print("[INFO] dist/ not found — skipping static file mount (run 'npm run build' for production)")
 
 if __name__ == "__main__":
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    port = int(os.environ.get("PORT", 8005))
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
