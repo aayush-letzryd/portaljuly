@@ -1848,6 +1848,7 @@ class AdjustmentData(BaseModel):
     cost_level: Optional[str] = None
     escalate_to: Optional[Union[str, int]] = None
     submitter_comments: Optional[str] = None
+    sent_for_approval: Optional[str] = "No"
     approval_status: Optional[str] = "Draft"
     current_approver_id: Optional[int] = None
     approval_remarks: Optional[str] = None
@@ -5328,6 +5329,27 @@ def create_adjustment(data: AdjustmentData, authorization: Optional[str] = Heade
             except Exception:
                 pass
         cur = conn.cursor()
+
+        for col in [
+            "sent_for_approval VARCHAR(10)",
+            "submitter_comments TEXT",
+            "approver_1_id VARCHAR(100)",
+            "approver_1_name VARCHAR(255)",
+            "approver_2_id VARCHAR(100)",
+            "approver_2_name VARCHAR(255)",
+            "current_approver_id INTEGER",
+            "approval_submitted_at TIMESTAMP",
+            "created_by INTEGER",
+            "updated_by INTEGER"
+        ]:
+            try:
+                cur.execute(f"ALTER TABLE july_partner_adjustment ADD COLUMN IF NOT EXISTS {col};")
+                conn.commit()
+            except Exception:
+                conn.rollback()
+
+        sent_flag = getattr(data, "sent_for_approval", "No") or "No"
+
         cur.execute("""
             INSERT INTO july_partner_adjustment (
                 partner_name, partner_code, driver_id, partner_number, vehicle_number, city_name, 
@@ -5360,7 +5382,7 @@ def create_adjustment(data: AdjustmentData, authorization: Optional[str] = Heade
             data.finance_team_status, data.finance_team_remarks, data.final_level_approval_by, data.status,
             extract_image(data.photo),
             data.hisaab_number, data.contested_line_items, data.severity_level, data.cost_level, str(data.escalate_to) if data.escalate_to else None,
-            data.submitter_comments, data.sent_for_approval,
+            data.submitter_comments, sent_flag,
             data.hisaab_date, data.adjustment_sub_type, data.adjustment_sub_type_other, data.adjustment_date_mandatory, data.adjustment_date_optional,
             extract_image(data.photo_1), extract_image(data.photo_2), extract_image(data.photo_3), extract_image(data.photo_4),
             data.reason_for_penalty, data.maintenance_id, data.approver_1_id, data.approver_1_name, data.approver_2_id, data.approver_2_name,
@@ -5370,6 +5392,9 @@ def create_adjustment(data: AdjustmentData, authorization: Optional[str] = Heade
         new_id = cur.fetchone()[0]
         conn.commit()
         return {"success": True, "id": new_id}
+    except Exception as err:
+        conn.rollback()
+        raise HTTPException(status_code=500, detail=f"Database save failed: {str(err)}")
     finally:
         postgreSQL_pool.putconn(conn)
 
@@ -5397,7 +5422,10 @@ def send_adjustment_for_approval(id: int, authorization: Optional[str] = Header(
         if current_status and current_status not in ("Draft", None, ""):
             raise HTTPException(status_code=400, detail=f"Record is already in status: {current_status}")
 
-        l1_approver_id = direct_app1
+        l1_approver_id = None
+        if direct_app1 and str(direct_app1).isdigit():
+            l1_approver_id = int(direct_app1)
+
         if not l1_approver_id:
             submitter_id = created_by_id or uid
             # Look up L1 approver from july_user_approval_chain
@@ -5434,6 +5462,9 @@ def send_adjustment_for_approval(id: int, authorization: Optional[str] = Header(
                 row = cur.fetchone()
                 if row:
                     l1_approver_id = row[0]
+
+        if not l1_approver_id:
+            raise HTTPException(status_code=400, detail="Please select an Approver (Manager / TL) before submitting for approval.")
 
         cur.execute("""
             UPDATE july_partner_adjustment SET

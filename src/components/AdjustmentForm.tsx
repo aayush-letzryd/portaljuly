@@ -364,6 +364,15 @@ export default function AdjustmentForm({
       return alert("Please select Mandatory Adjustment Date");
     }
 
+    if (sendForApproval) {
+      if (!submitterComments.trim()) {
+        return alert("Please enter Submitter Comments & Justification before submitting for approval.");
+      }
+      if (!approver1Id) {
+        return alert("Please select an Approver (Manager / TL) before submitting for approval.");
+      }
+    }
+
     const payload = {
       partner_name: partnerName.trim(),
       partner_code: partnerCode.trim(),
