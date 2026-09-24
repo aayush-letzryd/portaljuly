@@ -232,6 +232,8 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
   const [invoiceNo, setInvoiceNo] = useState("");
   const [invoiceDate, setInvoiceDate] = useState(getTodayDateString());
   const [invoiceAmount, setInvoiceAmount] = useState("");
+  const [insuranceLiabilityAmount, setInsuranceLiabilityAmount] = useState("");
+  const [letzrydPayableAmount, setLetzrydPayableAmount] = useState("");
   const [documents, setDocuments] = useState<string[]>([]);
   const [paymentStatus, setPaymentStatus] = useState("Pending");
   const [outwardPhotos, setOutwardPhotos] = useState<string[]>([]);
@@ -566,6 +568,8 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
       setInvoiceNo(r.invoice_no || "");
       setInvoiceDate(r.invoice_date || getTodayDateString());
       setInvoiceAmount(r.invoice_amount || "");
+      setInsuranceLiabilityAmount(r.insurance_liability_discounts || "");
+      setLetzrydPayableAmount(r.letzryd_payable || "");
       setDocuments(safeParseOutwardDocuments(r.invoice_file, r.approval_file));
       setPaymentStatus(r.payment_status || "Pending");
       setFinalStatus(r.final_status || "Completed & RFD");
@@ -608,6 +612,8 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
       setInvoiceNo("");
       setInvoiceDate(getTodayDateString());
       setInvoiceAmount("");
+      setInsuranceLiabilityAmount("");
+      setLetzrydPayableAmount("");
       setDocuments([]);
       setPaymentStatus("Pending");
       setOutwardPhotos([]);
@@ -706,8 +712,8 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
         invoice_no: invoiceNo.trim() || null,
         invoice_date: invoiceDate.trim() || null,
         invoice_amount: invoiceAmount.trim() || null,
-        insurance_liability_discounts: "0",
-        letzryd_payable: null,
+        insurance_liability_discounts: insuranceLiabilityAmount.trim() || null,
+        letzryd_payable: letzrydPayableAmount.trim() || null,
         invoice_file: documents[0] || null,
         type_of_payment: null,
         payment_status: paymentStatus.trim() || "Pending",
@@ -781,7 +787,8 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
       const headers = [
         "Outward ID", "Inward ID", "Vehicle Number", "Workshop", "In Date/Time",
         "Out Date/Time", "Out KMs", "RFD Date", "Invoice No", "Invoice Date",
-        "Invoice Amount (₹)", "Payment Status", "Final Status", "Remarks",
+        "Invoice Amount (₹)", "Insurance Liability Amount (₹)", "LetzRyd Payable Amount (₹)",
+        "Payment Status", "Final Status", "Remarks",
         "Handover To", "Driver Name", "Driver Phone"
       ];
       const rows = registryRecords.map(r => {
@@ -798,6 +805,8 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
             r?.invoice_no || "",
             r?.invoice_date || "",
             r?.invoice_amount || "",
+            r?.insurance_liability_discounts || "",
+            r?.letzryd_payable || "",
             r?.payment_status || "Pending",
             r?.final_status || "",
             (r?.remarks || "").replace(/[\r\n]+/g, " "),
@@ -1173,7 +1182,7 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
                 <h4 className="text-xs font-bold text-slate-800 flex items-center gap-2">
                   <Receipt className="w-4 h-4 text-primary" /> Invoice &amp; Documents
                 </h4>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 text-xs">
                   <div>
                     <span className="text-[11px] text-slate-400 block">Invoice Number</span>
                     <span className="font-mono font-semibold text-slate-800">{viewingRecord.invoice_no || "—"}</span>
@@ -1181,6 +1190,18 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
                   <div>
                     <span className="text-[11px] text-slate-400 block">Invoice Date</span>
                     <span className="font-mono text-slate-800">{formatIndianDate(viewingRecord.invoice_date)}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-slate-400 block">Invoice Amount (₹)</span>
+                    <span className="font-mono font-semibold text-slate-800">{viewingRecord.invoice_amount ? `₹${viewingRecord.invoice_amount}` : "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-slate-400 block">Insurance Liability (₹)</span>
+                    <span className="font-mono text-slate-800">{viewingRecord.insurance_liability_discounts ? `₹${viewingRecord.insurance_liability_discounts}` : "—"}</span>
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-slate-400 block">LetzRyd Payable (₹)</span>
+                    <span className="font-mono font-bold text-emerald-700">{viewingRecord.letzryd_payable ? `₹${viewingRecord.letzryd_payable}` : "—"}</span>
                   </div>
                   <div>
                     <span className="text-[11px] text-slate-400 block">Payment Status</span>
@@ -1753,9 +1774,7 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
                     Invoice &amp; Approval Details
                   </h3>
                   <span className="text-[11px] font-semibold text-text-muted">Workshop billing &amp; approvals</span>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                   <div>
                     <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
                       Workshop Invoice No
@@ -1802,13 +1821,65 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
                       value={invoiceAmount}
                       onChange={e => {
                         try {
-                          setInvoiceAmount(e.target.value);
+                          const val = e.target.value;
+                          setInvoiceAmount(val);
+                          if (insuranceLiabilityAmount) {
+                            const invNum = parseFloat(val.replace(/,/g, "")) || 0;
+                            const insNum = parseFloat(insuranceLiabilityAmount.replace(/,/g, "")) || 0;
+                            if (invNum > 0) {
+                              setLetzrydPayableAmount(Math.max(0, invNum - insNum).toString());
+                            }
+                          }
                         } catch (err) {
                           console.error("Error setting invoiceAmount:", err);
                         }
                       }}
                       placeholder="e.g. 15000"
                       className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-mono font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
+                      Insurance Liability Amount (₹)
+                    </label>
+                    <input
+                      type="text"
+                      value={insuranceLiabilityAmount}
+                      onChange={e => {
+                        try {
+                          const val = e.target.value;
+                          setInsuranceLiabilityAmount(val);
+                          const invNum = parseFloat(invoiceAmount.replace(/,/g, "")) || 0;
+                          const insNum = parseFloat(val.replace(/,/g, "")) || 0;
+                          if (invNum > 0) {
+                            setLetzrydPayableAmount(Math.max(0, invNum - insNum).toString());
+                          }
+                        } catch (err) {
+                          console.error("Error setting insuranceLiabilityAmount:", err);
+                        }
+                      }}
+                      placeholder="e.g. 5000"
+                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-mono font-medium text-slate-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-sans text-xs font-medium text-slate-700 mb-1.5">
+                      LetzRyd Payable Amount (₹)
+                    </label>
+                    <input
+                      type="text"
+                      value={letzrydPayableAmount}
+                      onChange={e => {
+                        try {
+                          setLetzrydPayableAmount(e.target.value);
+                        } catch (err) {
+                          console.error("Error setting letzrydPayableAmount:", err);
+                        }
+                      }}
+                      placeholder="e.g. 10000"
+                      className="w-full h-10 rounded-xl border border-slate-200 bg-white px-3 text-xs font-mono font-semibold text-emerald-800 focus:border-primary focus:ring-1 focus:ring-primary/20 outline-none transition-all shadow-2xs"
                     />
                   </div>
 
@@ -1833,8 +1904,7 @@ export default function MaintenanceOutForm({ user, onBackToSelector, onLogout }:
                       <option value="Part-Paid">Part-Paid</option>
                     </select>
                   </div>
-
-                </div>
+                </div>               </div>
 
                 {/* Dedicated Document Section (Up to 2 documents) */}
                 <div className="pt-6 mt-6 border-t border-slate-100">

@@ -9158,6 +9158,15 @@ def update_maintenance_out(id: int, data: MaintenanceOutCreate, authorization: O
     conn = postgreSQL_pool.getconn()
     try:
         cur = conn.cursor()
+        payable = data.letzryd_payable
+        if not payable and data.invoice_amount:
+            try:
+                inv = float(re.sub(r"[^\d.]", "", data.invoice_amount))
+                disc = float(re.sub(r"[^\d.]", "", data.insurance_liability_discounts or "0"))
+                payable = str(round(max(0.0, inv - disc), 2))
+            except Exception:
+                payable = data.invoice_amount
+
         cur.execute("""
             UPDATE july_maintenance_out
             SET vehicle_number = %s,
@@ -9167,6 +9176,8 @@ def update_maintenance_out(id: int, data: MaintenanceOutCreate, authorization: O
                 invoice_no = %s,
                 invoice_date = %s,
                 invoice_amount = %s,
+                insurance_liability_discounts = %s,
+                letzryd_payable = %s,
                 invoice_file = %s,
                 payment_status = %s,
                 approved_by = %s,
@@ -9187,6 +9198,7 @@ def update_maintenance_out(id: int, data: MaintenanceOutCreate, authorization: O
             data.vehicle_number.strip().upper(), data.rfd_date,
             data.vehicle_out_date_time, data.vehicle_out_k_m_s,
             data.invoice_no, data.invoice_date, data.invoice_amount,
+            data.insurance_liability_discounts, payable,
             data.invoice_file, data.payment_status or "Pending",
             data.approved_by, data.approval_date, data.approval_file,
             photos_val, data.final_status, data.remarks,
