@@ -42,7 +42,8 @@ const normalizeCity = (cityVal: string): string => {
   if (c === "blr" || c === "bangalore" || c === "bengaluru") return "Bangalore";
   if (c === "hyd" || c === "hyderabad") return "Hyderabad";
   if (c === "mum" || c === "mumbai") return "Mumbai";
-  return "Hyderabad"; // Fallback
+  if (c === "del" || c === "delhi" || c === "delhi ncr") return "Delhi";
+  return cityVal;
 };
 
 const ensureISOIST = (dateStr?: string): string | undefined => {

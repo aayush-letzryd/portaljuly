@@ -559,7 +559,7 @@ export default function RentForm({
                       City *
                     </label>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                      {["Bangalore", "Hyderabad", "Mumbai", "ALL"].map((c) => (
+                      {["Bangalore", "Hyderabad", "Mumbai", "Delhi", "ALL"].map((c) => (
                         <button
                           key={c}
                           type="button"
@@ -958,6 +958,7 @@ export default function RentForm({
                   <option value="Bangalore">Bangalore</option>
                   <option value="Hyderabad">Hyderabad</option>
                   <option value="Mumbai">Mumbai</option>
+                  <option value="Delhi">Delhi</option>
                   <option value="ALL">Universal (All Cities)</option>
                 </select>
 

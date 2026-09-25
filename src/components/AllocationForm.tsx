@@ -2156,6 +2156,7 @@ export default function AllocationForm({
                   <option value="Hyderabad">Hyderabad</option>
                   <option value="Bengaluru">Bengaluru</option>
                   <option value="Mumbai">Mumbai</option>
+                  <option value="Delhi">Delhi</option>
                 </select>
               </div>
             </div>

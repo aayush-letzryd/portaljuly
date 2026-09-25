@@ -154,11 +154,12 @@ def startup_event():
             INSERT INTO july_cities (id, city_name, city_code, state, status) VALUES
             (1, 'Bengaluru', 'BLR', 'Karnataka', 'Active'),
             (2, 'Mumbai', 'BOM', 'Maharashtra', 'Active'),
-            (3, 'Hyderabad', 'HYD', 'Telangana', 'Active');
+            (3, 'Hyderabad', 'HYD', 'Telangana', 'Active'),
+            (4, 'Delhi', 'DEL', 'Delhi', 'Active');
         """)
         cur.execute("SELECT setval('july_cities_id_seq', (SELECT MAX(id) FROM july_cities));")
         conn.commit()
-        print("[OK] july_cities table initialized with Bengaluru, Mumbai, and Hyderabad")
+        print("[OK] july_cities table initialized with Bengaluru, Mumbai, Hyderabad, and Delhi")
 
         # ── july_cities ──────────────────────────────────────
         try:
@@ -171,7 +172,7 @@ def startup_event():
             cur.execute("TRUNCATE TABLE july_cities RESTART IDENTITY CASCADE;")
             cur.execute("""
                 INSERT INTO july_cities (id, name) VALUES
-                (1, 'Bengaluru'), (2, 'Mumbai'), (3, 'Hyderabad');
+                (1, 'Bengaluru'), (2, 'Mumbai'), (3, 'Hyderabad'), (4, 'Delhi');
             """)
             cur.execute("SELECT setval('july_cities_id_seq', (SELECT MAX(id) FROM july_cities));")
             conn.commit()
@@ -3195,7 +3196,8 @@ def get_all_cities():
             return [
                 {"id": 1, "value": "Bengaluru", "text": "Bengaluru", "name": "Bengaluru", "code": "BLR", "state": "Karnataka", "country": "India", "status": "Active"},
                 {"id": 2, "value": "Mumbai", "text": "Mumbai", "name": "Mumbai", "code": "BOM", "state": "Maharashtra", "country": "India", "status": "Active"},
-                {"id": 3, "value": "Hyderabad", "text": "Hyderabad", "name": "Hyderabad", "code": "HYD", "state": "Telangana", "country": "India", "status": "Active"}
+                {"id": 3, "value": "Hyderabad", "text": "Hyderabad", "name": "Hyderabad", "code": "HYD", "state": "Telangana", "country": "India", "status": "Active"},
+                {"id": 4, "value": "Delhi", "text": "Delhi", "name": "Delhi", "code": "DEL", "state": "Delhi", "country": "India", "status": "Active"}
             ]
         return [{
             "id": r[0],
