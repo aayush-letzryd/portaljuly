@@ -51,7 +51,38 @@ export default function AdjustmentForm({
   
   const getTodayIST = () => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Kolkata' }).format(new Date());
 
-  const [hisaabNumber, setHisaabNumber] = useState("HSB-2026-W39");
+  const generateHisaabWeeks = () => {
+    const weeks = [];
+    const now = new Date();
+    for (let i = 0; i < 16; i++) {
+      const targetDate = new Date(now.getTime() - i * 7 * 24 * 60 * 60 * 1000);
+      const d = new Date(Date.UTC(targetDate.getFullYear(), targetDate.getMonth(), targetDate.getDate()));
+      const dayNum = d.getUTCDay() || 7;
+      d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+      const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+      const weekNo = Math.ceil((((d.getTime() - yearStart.getTime()) / 86400000) + 1) / 7);
+      const year = d.getUTCFullYear();
+      
+      const monday = new Date(targetDate);
+      const currentDay = monday.getDay();
+      const diffToMonday = monday.getDate() - currentDay + (currentDay === 0 ? -6 : 1);
+      monday.setDate(diffToMonday);
+      
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+
+      const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+      const monStr = `${monthNames[monday.getMonth()]} ${String(monday.getDate()).padStart(2, '0')}`;
+      const sunStr = `${monthNames[sunday.getMonth()]} ${String(sunday.getDate()).padStart(2, '0')}`;
+      
+      const weekCode = `HSB-${year}-W${String(weekNo).padStart(2, '0')}`;
+      const label = `${weekCode} (${monStr} - ${sunStr}, ${year})`;
+      weeks.push({ code: weekCode, label });
+    }
+    return weeks;
+  };
+
+  const [hisaabNumber, setHisaabNumber] = useState(generateHisaabWeeks()[0]?.code || "HSB-2026-W39");
   const [hisaabDate, setHisaabDate] = useState(getTodayIST());
   const [adjustmentLevel, setAdjustmentLevel] = useState<"Operator" | "Drive to Own" | "Individual Driver" | "LetzOwn">("Operator");
   const [adjustmentType, setAdjustmentType] = useState<"Rental Waiver" | "Penalty" | "Maintenance">("Rental Waiver");
@@ -368,8 +399,8 @@ export default function AdjustmentForm({
       if (!submitterComments.trim()) {
         return alert("Please enter Submitter Comments & Justification before submitting for approval.");
       }
-      if (!approver1Id) {
-        return alert("Please select an Approver (Manager / TL) before submitting for approval.");
+      if (!approver1Id && !approver1Name) {
+        return alert("Please select First Approver before submitting for approval.");
       }
     }
 
@@ -803,12 +834,9 @@ export default function AdjustmentForm({
                             required
                             className="w-full rounded-xl border border-border bg-white px-4 py-2.5 font-sans text-sm focus:border-primary focus:outline-none transition-all shadow-2xs cursor-pointer font-mono font-medium"
                           >
-                            <option value="HSB-2026-W39">HSB-2026-W39 (Sep 22 - Sep 28, 2026)</option>
-                            <option value="HSB-2026-W38">HSB-2026-W38 (Sep 15 - Sep 21, 2026)</option>
-                            <option value="HSB-2026-W37">HSB-2026-W37 (Sep 08 - Sep 14, 2026)</option>
-                            <option value="HSB-2026-W36">HSB-2026-W36 (Sep 01 - Sep 07, 2026)</option>
-                            <option value="HSB-2026-W35">HSB-2026-W35 (Aug 25 - Aug 31, 2026)</option>
-                            <option value="HSB-2026-W34">HSB-2026-W34 (Aug 18 - Aug 24, 2026)</option>
+                            {generateHisaabWeeks().map((w) => (
+                              <option key={w.code} value={w.code}>{w.label}</option>
+                            ))}
                           </select>
                         </div>
                       </div>
@@ -917,7 +945,7 @@ export default function AdjustmentForm({
 
                       {/* Amount Field (₹) */}
                       <div className="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                        <label className="block font-sans text-xs font-bold text-slate-900 mb-2">Enter Amount (₹) <span className="text-red-500">*</span></label>
+                        <label className="block font-sans text-xs font-bold text-slate-900 mb-2">Requested Amount (₹) <span className="text-red-500">*</span></label>
                         <div className="relative">
                           <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-600" />
                           <input 
@@ -974,23 +1002,51 @@ export default function AdjustmentForm({
                       {/* Single Approver Selection (Level 1) */}
                       <div className="bg-slate-50/80 p-4 rounded-xl border border-slate-200">
                         <label className="block font-sans text-xs font-bold text-slate-800 mb-2">
-                          Select Approver (Manager / TL) <span className="text-red-500">*</span>
+                          Select First Approver <span className="text-red-500">*</span>
                         </label>
                         <select 
-                          value={approver1Id}
+                          value={approver1Id || approver1Name}
                           onChange={(e) => {
-                            const sel = approversList.find(a => String(a.id) === e.target.value);
-                            setApprover1Id(e.target.value);
-                            if (sel) setApprover1Name(`${sel.name} (${sel.role})`);
-                            setEscalateTo(e.target.value);
+                            const val = e.target.value;
+                            const sel = approversList.find(a => String(a.id) === val || a.name?.toLowerCase() === val.toLowerCase());
+                            if (sel) {
+                              setApprover1Id(String(sel.id));
+                              setApprover1Name(sel.name);
+                              setEscalateTo(String(sel.id));
+                            } else {
+                              setApprover1Id(val);
+                              setApprover1Name(val);
+                              setEscalateTo(val);
+                            }
                           }}
                           required
                           className="w-full rounded-xl border border-slate-300 bg-white px-4 py-2.5 font-sans text-xs outline-none focus:border-primary cursor-pointer font-medium"
                         >
-                          <option value="">-- Select Approver --</option>
-                          {approversList.map(a => (
-                            <option key={a.id} value={a.id}>{a.name} ({a.role} - {a.city || 'All Cities'})</option>
-                          ))}
+                          <option value="">-- Select First Approver --</option>
+                          <optgroup label="Primary Approvers">
+                            {["Mohan Kumar", "Sarvagna", "Ravi"].map(name => {
+                              const matchedUser = approversList.find(a => a.name?.toLowerCase().includes(name.toLowerCase()));
+                              const idVal = matchedUser ? String(matchedUser.id) : name;
+                              const displayName = matchedUser ? matchedUser.name : name;
+                              const displayRole = matchedUser?.role || matchedUser?.email || 'Management';
+                              return (
+                                <option key={name} value={idVal}>
+                                  {displayName} ({displayRole})
+                                </option>
+                              );
+                            })}
+                          </optgroup>
+                          {approversList.filter(a => !["mohan", "sarvagna", "ravi"].some(k => a.name?.toLowerCase().includes(k))).length > 0 && (
+                            <optgroup label="Other Approvers">
+                              {approversList
+                                .filter(a => !["mohan", "sarvagna", "ravi"].some(k => a.name?.toLowerCase().includes(k)))
+                                .map(a => (
+                                  <option key={a.id} value={String(a.id)}>
+                                    {a.name} ({a.role || a.email || 'Approver'})
+                                  </option>
+                                ))}
+                            </optgroup>
+                          )}
                         </select>
                       </div>
 

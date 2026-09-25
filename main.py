@@ -1578,9 +1578,66 @@ def startup_event():
             );
         """)
 
+        # ── Auto-seed requested users (Sarvagna G, Ravikumar C, Ramanagouda V Patil) ──
+        seed_users = [
+            {
+                "fname": "Sarvagna", "lname": "G",
+                "email": "sarvagna@letzryd.com",
+                "role": "CityHead / General Manager", "role_id": 218,
+                "city": "All Cities",
+                "forms": ["adjustment", "onboarding", "walkin", "allocation", "dropoff", "rents", "expenses", "vehicle_onboarding"]
+            },
+            {
+                "fname": "Ravikumar", "lname": "Chinnasamy",
+                "email": "ravikumar@letzryd.com",
+                "role": "CityHead / General Manager", "role_id": 218,
+                "city": "All Cities",
+                "forms": ["adjustment", "onboarding", "walkin", "allocation", "dropoff", "rents", "expenses", "vehicle_onboarding"]
+            },
+            {
+                "fname": "Ramanagouda", "lname": "V Patil",
+                "email": "docs2@letzryd.com",
+                "role": "Onboarding Executive", "role_id": 201,
+                "city": "All Cities",
+                "forms": ["onboarding", "walkin", "driver_onboarding"]
+            }
+        ]
+        default_pw_hash_sys = pwd_context.hash("123456")
+        for u in seed_users:
+            cur.execute("SELECT employee_id FROM july_employees WHERE LOWER(company_email) = %s;", (u["email"].lower(),))
+            emp_row = cur.fetchone()
+            emp_id = emp_row[0] if emp_row else None
+            if not emp_id:
+                cur.execute("""
+                    INSERT INTO july_employees (first_name, last_name, company_email, department, city, is_active, role_id, phone)
+                    VALUES (%s, %s, %s, 'Operations', %s, TRUE, %s, '9999999999')
+                    RETURNING employee_id;
+                """, (u["fname"], u["lname"], u["email"], u["city"], u["role_id"]))
+                emp_id = cur.fetchone()[0]
+
+            cur.execute("SELECT portal_user_id FROM july_portal_users WHERE LOWER(username) = %s OR LOWER(email) = %s;", (u["email"].lower(), u["email"].lower()))
+            pu_row = cur.fetchone()
+            pu_id = pu_row[0] if pu_row else None
+            if not pu_id:
+                cur.execute("""
+                    INSERT INTO july_portal_users (employee_id, username, password_hash, role, role_id, account_status, email, company_email, city)
+                    VALUES (%s, %s, %s, %s, %s, 'Active', %s, %s, %s)
+                    RETURNING portal_user_id;
+                """, (emp_id, u["email"], default_pw_hash_sys, u["role"], u["role_id"], u["email"], u["email"], u["city"]))
+                pu_id = cur.fetchone()[0]
+
+            for form_key in u["forms"]:
+                cur.execute("""
+                    INSERT INTO july_user_form_access (portal_user_id, form_key, can_access)
+                    SELECT %s, %s, TRUE
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM july_user_form_access WHERE portal_user_id = %s AND form_key = %s
+                    );
+                """, (pu_id, form_key, pu_id, form_key))
+
         conn.commit()
         cur.close()
-        print("[OK] Database setup complete")
+        print("[OK] Database setup complete and requested users seeded")
 
     except Exception as e:
         print(f"[ERROR] Startup error: {e}")
